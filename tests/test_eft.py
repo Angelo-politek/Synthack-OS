@@ -36,6 +36,16 @@ def test_parse_info_mismatch():
     assert not eft.parse_info(SAMPLE.replace("checksums : ok", "checksums : MISMATCH")).checksums_ok
 
 
+@pytest.mark.parametrize("name, expected", [
+    ("section_3_MAIN_OS.bin", "section_3_MAIN_OS.bin"),
+    ("section_7_blob.raw", "section_7_blob.raw"),
+    ("section_8_?.bin", "section_8_unknown.bin"),
+    ("section_8_.bin", "section_8_unknown.bin"),
+])
+def test_safe_section_name(name, expected):
+    assert eft.safe_section_name(name) == expected
+
+
 @pytest.mark.skipif(eft.os.name != "nt", reason="percorsi Windows")
 def test_to_wsl_path():
     assert eft.to_wsl_path(r"C:\Users\x\f.syx") == "/mnt/c/Users/x/f.syx"

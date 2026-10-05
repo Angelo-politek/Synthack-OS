@@ -151,8 +151,28 @@ def unpack(syx: Path, outdir: Path, ids: list[int] | None = None) -> dict[int, P
         matches = sorted(outdir.glob(f"section_{sid}_*"))
         if len(matches) != 1:
             raise EftError(f"attesi 1 file per la sezione {sid} in {outdir}, trovati {len(matches)}")
-        found[sid] = matches[0]
+        found[sid] = _safe_name(matches[0])
     return found
+
+
+def safe_section_name(name: str) -> str:
+    """section_8_?.bin -> section_8_unknown.bin
+
+    Il tool usa "?" per le sezioni senza etichetta; su NTFS via WSL diventa un
+    carattere Unicode privato (U+F03F) scomodo da usare su Windows.
+    """
+    stem, dot, ext = name.rpartition(".")
+    head, _, label = stem.partition("_")[2].partition("_")
+    if re.fullmatch(r"[A-Za-z0-9_-]+", label):
+        return name
+    return f"section_{head}_unknown{dot}{ext}"
+
+
+def _safe_name(p: Path) -> Path:
+    new = p.with_name(safe_section_name(p.name))
+    if new != p:
+        os.replace(p, new)
+    return new
 
 
 def repack(syx: Path, out: Path, replace: dict[int, Path] | None = None, level: int = 3) -> None:
@@ -207,22 +227,24 @@ def roundtrip(syx: Path, workdir: Path, level: int = 3, log=print) -> bool:
     h_in, h_out = sha256(syx), sha256(exact)
     same = h_in == h_out
     ok &= same
-    log(f"{'OK  ' if same else 'FAIL'}  byte-esatto (-r): {h_in[:16]}… {'==' if same else '!='} {h_out[:16]}…")
+    log(f"{'OK  ' if same else 'FAIL'}  byte-esatto (-r): {h_in[:16]}... {'==' if same else '!='} {h_out[:16]}...")
 
     # 2. semantico
     a = unpack(syx, workdir / "orig")
-    targets = {sid: a[sid] for sid in PATCHABLE_SECTIONS
-               if (s := orig.section(sid)) is not None and not s.raw}
+    # Le sezioni raw restano raw anche se sostituite: il test copre entrambi i percorsi
+    # (ricompressione aPLib per quelle compresse, copia per quelle raw).
+    targets = {sid: a[sid] for sid in PATCHABLE_SECTIONS if orig.section(sid) is not None}
     if not targets:
-        log("FAIL  nessuna sezione patchabile compressa trovata (attese id 3 e/o 7)")
+        log("FAIL  nessuna sezione patchabile trovata (attese id 3 e/o 7)")
         return False
 
-    rebuilt = workdir / "repack_recompressed.syx"
+    rebuilt = workdir / "repack_replaced.syx"
     repack(syx, rebuilt, replace=targets, level=level)
     if not info(rebuilt).checksums_ok:
-        log("FAIL  il .syx ricompresso non passa i checksum")
+        log("FAIL  il .syx ricostruito non passa i checksum")
         return False
-    log(f"OK    ricompressione sezioni {sorted(targets)} (livello {level}): checksum validi")
+    kinds = ", ".join(f"{sid} {'raw' if orig.section(sid).raw else 'ricompressa'}" for sid in sorted(targets))
+    log(f"OK    sostituzione sezioni [{kinds}] (livello {level}): checksum validi")
 
     b = unpack(rebuilt, workdir / "rebuilt")
     for sid in sorted(a):
@@ -263,6 +285,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--keep", type=Path, help="conserva i file intermedi in questa cartella")
 
     args = ap.parse_args(argv)
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):  # console Windows (cp1252) -> UTF-8
+            stream.reconfigure(encoding="utf-8", errors="replace")
     if not args.syx.is_file():
         print(f"errore: file non trovato: {args.syx}  (vedi firmware/README.md)", file=sys.stderr)
         return 2
