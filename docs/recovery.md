@@ -18,10 +18,11 @@ Quindi:
   brick.
 
 Si recupera via **MIDI DIN** (il connettore tondo a 5 pin) e non via USB perché il
-recupero
-deve funzionare anche quando l'OS è rotto. L'USB della Syntakt è gestito in larga parte
-dall'OS, mentre la ricezione via MIDI DIN nel menu di avvio è più semplice e indipendente.
-*(Ipotesi ragionevole, da confermare: per ora la trattiamo come "la via sicura".)*
+recupero deve funzionare anche quando l'OS è rotto. Il manuale ufficiale lo dice
+esplicitamente: *"USB MIDI transfer is not possible when upgrading the OS from the STARTUP
+menu"* (Syntakt User Manual OS 1.30, §15.4). Il nostro sospetto è che l'USB sia gestito
+dall'OS principale, mentre la ricezione via MIDI DIN vive nel bootstrap. È un'ipotesi
+coerente con quanto sopra, ma non verificata.
 
 ## Cosa serve
 
@@ -30,23 +31,35 @@ dall'OS, mentre la ricezione via MIDI DIN nel menu di avvio è più semplice e i
 | Interfaccia con **MIDI OUT a 5 pin** | da recuperare | scheda Behringer dell'utente: verificare che abbia MIDI OUT e driver Windows funzionanti |
 | Cavo MIDI DIN 5 pin | da verificare | MIDI OUT interfaccia → **MIDI IN** Syntakt |
 | OS stock `Syntakt_OS1.41.syx` | da scaricare | da elektron.se, tenerlo in `firmware/` (git-ignored) |
-| Programma per inviare SysEx | da scegliere | Elektron Transfer (se offre ancora l'invio "legacy" su DIN) oppure MIDI-OX / SysEx Librarian — **da verificare** |
+| Programma per inviare SysEx | ✅ confermato | **Elektron Transfer**, pagina SYSEX TRANSFER → "OS Upgrade via device startup menu" (manuale §15.4). Ripiego: MIDI-OX |
 | Backup di progetti e sound | da fare | con Elektron Transfer, prima di qualunque flash |
 
-## Procedura (bozza — da confermare sul manuale ufficiale Syntakt)
+## Procedura ufficiale (Syntakt User Manual OS 1.30, §15 "Startup menu", pag. 81)
 
-> I passaggi qui sotto vengono dalla community, non da Elektron. Prima della prova a secco
-> confrontali con il manuale utente ufficiale (sezione "Startup menu" / "OS upgrade") e
-> correggi questa pagina.
+> ✅ Verificata sul manuale ufficiale. Il manuale è dell'OS 1.30: alla prova a secco
+> controlla che le voci di Transfer abbiano ancora gli stessi nomi.
 
-1. Collega **MIDI OUT** dell'interfaccia → **MIDI IN** della Syntakt.
-2. Syntakt spenta. Tieni premuto **[FUNC]** e accendi: compare il menu **STARTUP**.
-3. Premi **[TRIG 4]** → "OS UPGRADE". La macchina si mette in attesa di dati SysEx.
-4. Dal PC invia il `.syx` **stock** sulla porta MIDI dell'interfaccia
-   (Transfer: modalità "Legacy OS Upgrade" su MIDI DIN — da verificare il nome esatto).
-5. Attendi la fine (può volerci parecchio: il MIDI DIN va a 31.25 kbit/s). La Syntakt
-   mostra l'avanzamento e poi chiede di riavviare.
-6. Riavvia e controlla la versione dell'OS.
+1. Scarica l'OS stock da elektron.se (`firmware/Syntakt_OS1.41.syx`).
+2. Collega la porta **MIDI IN** della Syntakt alla porta **MIDI OUT** dell'interfaccia MIDI del PC.
+3. Syntakt spenta: tieni premuto **[FUNC]** e accendila. Compare il menu **STARTUP**.
+4. Premi **[TRIG 4]** per entrare in modalità **OS UPGRADE**.
+5. Apri **Elektron Transfer**. Nella pagina CONNECTION clicca "go to the SYSEX TRANSFER page".
+6. Nella pagina SYSEX TRANSFER clicca **"OS Upgrade via device startup menu"** e segui le
+   istruzioni a schermo, scegliendo come uscita la porta MIDI dell'interfaccia.
+7. Attendi la fine. Può volerci parecchio: il MIDI DIN va a 31,25 kbit/s, quindi ~2,5 MB
+   richiedono diversi minuti. A fine aggiornamento la Syntakt si riavvia da sola.
+8. Controlla la versione dell'OS.
+
+Altre voci del menu STARTUP (manuale §15): TRIG 1 = test mode, TRIG 2 = empty reset
+(**cancella pattern e suoni**), TRIG 3 = factory reset (**sovrascrive progetto attivo e banchi
+A–E**), TRIG 5 = esci. Attenzione a non premere 2 o 3 per sbaglio.
+
+### Aggiornamento normale (OS funzionante, via USB)
+
+Per confronto, a macchina funzionante l'OS si aggiorna via USB con Transfer: pagina DROP,
+trascini il `.syx` e confermi con [YES] (manuale §14.8.5). La Syntakt è sempre pronta a
+ricevere un OS via USB. Questa **non** è la strada di recupero, perché richiede che l'OS
+principale funzioni.
 
 ### Se l'invio fallisce
 
@@ -68,7 +81,7 @@ Si fa **con l'OS stock**, cioè un normale reinstallo ufficiale: rischio minimo,
 insegna la procedura quando ancora non serve.
 
 - [ ] Backup progetti/sound con Transfer
-- [ ] Procedura verificata sul manuale ufficiale e corretta qui sopra
+- [x] Procedura verificata sul manuale ufficiale (OS 1.30, §15.4) e corretta qui sopra
 - [ ] Reinstallo dell'OS stock via **MIDI DIN** riuscito
 - [ ] Registrato qui sotto: data, interfaccia, programma usato, durata, problemi
 
