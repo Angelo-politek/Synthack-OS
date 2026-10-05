@@ -1,0 +1,10 @@
+#!/bin/sh
+# Rifiuta i commit che contengono firmware Elektron (vedi docs/legal.md).
+# Attivazione, una volta per clone:  git config core.hooksPath tools/hooks
+for py in python3 python py; do
+    if command -v "$py" >/dev/null 2>&1 && "$py" -c "import sys" >/dev/null 2>&1; then
+        exec "$py" "$(git rev-parse --show-toplevel)/tools/hooks/check_no_firmware.py"
+    fi
+done
+echo "pre-commit: Python non trovato, impossibile verificare l'assenza di firmware" >&2
+exit 1

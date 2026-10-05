@@ -1,0 +1,4 @@
+* text=auto
+# Script eseguiti da bash/WSL: fine riga Unix obbligatorio
+*.sh text eol=lf
+tools/hooks/pre-commit text eol=lf

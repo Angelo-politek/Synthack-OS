@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------
+# MAI byte del firmware Elektron nel repo (vedi docs/legal.md).
+# Questa e' la prima linea di difesa; la seconda e' l'hook
+# tools/hooks/pre-commit (attivalo con: git config core.hooksPath tools/hooks).
+# ---------------------------------------------------------------
+*.syx
+*.SYX
+*.bin
+*.raw
+*.elf
+*.img
+
+# Firmware stock scaricato da elektron.se: resta solo in locale
+firmware/*
+!firmware/README.md
+
+# Output di unpack/build
+unpacked/
+build/out/
+out/
+
+# Dipendenze esterne clonate/compilate in locale (tools/unpack/setup_eft.sh)
+third_party/
+
+# Ghidra: il progetto contiene il firmware disassemblato -> mai nel repo
+*.gpr
+*.rep/
+ghidra/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+
+# Node
+node_modules/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
