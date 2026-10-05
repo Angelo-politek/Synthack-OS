@@ -28,7 +28,7 @@ coerente con quanto sopra, ma non verificata.
 
 | Cosa | Stato | Note |
 |---|---|---|
-| Interfaccia con **MIDI OUT a 5 pin** | da recuperare | scheda Behringer dell'utente: verificare che abbia MIDI OUT e driver Windows funzionanti |
+| Interfaccia con **MIDI OUT a 5 pin** | ✅ Behringer UMC404HD | ha MIDI IN/OUT DIN; verificare driver Windows aggiornati |
 | Cavo MIDI DIN 5 pin | da verificare | MIDI OUT interfaccia → **MIDI IN** Syntakt |
 | OS stock `Syntakt_OS1.41.syx` | da scaricare | da elektron.se, tenerlo in `firmware/` (git-ignored) |
 | Programma per inviare SysEx | ✅ confermato | **Elektron Transfer**, pagina SYSEX TRANSFER → "OS Upgrade via device startup menu" (manuale §15.4). Ripiego: MIDI-OX |
