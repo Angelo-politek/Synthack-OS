@@ -19,19 +19,22 @@ Un `.syx` è una "matrioska" di tre strati:
 3. **Sezioni** — blocchi compressi con un algoritmo LZ77 in stile **aPLib**. aPLib è un
    compressore molto semplice, pensato per decomprimere velocemente su CPU piccole. 🟡
 
-## Sezioni (etichette di elektron-firmware-tool)
+## Sezioni di Syntakt OS 1.41 (etichette di elektron-firmware-tool)
 
-| id | etichetta | contenuto ipotizzato | noi |
-|---|---|---|---|
-| 1 | FPGA | bitstream delle FPGA Spartan | non toccare |
-| 2 | bootstrap | menu di avvio / OS upgrade (ColdFire) | **MAI toccare** |
-| 3 | MAIN OS | OS principale, ColdFire #1, caricato a `0x40000000` 🟡 | patch UI/sequencer |
-| 4 | updater | ? | non toccare |
-| 5 | meta | ? | non toccare |
-| 6 | boot | stub ColdFire ~1.5 kB | **MAI toccare** |
-| 7 | blob | motore audio, ColdFire #2, caricato a `0x40000400` 🟡 | patch DSP |
+Ordine fisico nel container: 5, 2, 1, 3, 4, 6, 7, 8. Dimensioni = byte decompressi.
 
-Da verificare sul nostro 1.41: numero effettivo di sezioni (il brief dice 8), id, dimensioni.
+| id | etichetta | dimensione | compressa | contenuto ipotizzato | noi |
+|---|---|---:|---|---|---|
+| 1 | FPGA | 149 516 | sì | bitstream FPGA (formato non Xilinx standard 🟡) | non toccare |
+| 2 | bootstrap | 30 782 | sì | menu di avvio / OS upgrade (ColdFire) ✅ | **MAI toccare** |
+| 3 | MAIN OS | 3 438 480 | sì | OS principale, ColdFire #1, a `0x40000000` 🟡 | patch UI/sequencer |
+| 4 | updater | 32 776 | no | ? | non toccare |
+| 5 | meta | 15 | no | timestamp di build (ASCII) ✅ | non toccare |
+| 6 | boot | 1 744 | no | stub ColdFire | **MAI toccare** |
+| 7 | blob | 383 760 | **no** | codice ColdFire senza stringhe → motore audio, a `0x40000400` 🟡 | patch DSP |
+| 8 | (nessuna) | 159 948 | sì | inizia con `FF…`: seconda FPGA? 🟡 | non toccare |
+
+Il wrapper salva la sezione 8 come `section_8_unknown.bin`.
 
 ## Round-trip
 

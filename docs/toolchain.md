@@ -63,7 +63,7 @@ Il progetto Ghidra contiene il firmware disassemblato, quindi **non va mai nel r
 Tienilo in `C:\Users\<te>\ghidra-projects\`.
 
 1. `File → New Project → Non-Shared Project` → cartella `ghidra-projects`, nome `syntakt-1.41`.
-2. `File → Import File` → la sezione estratta (es. `unpacked/1.41/section_7_blob.bin`).
+2. `File → Import File` → la sezione estratta (es. `unpacked/1.41/section_7_blob.raw`).
 3. Nel dialogo di import:
    - **Format:** `Raw Binary` (le sezioni non hanno un header ELF che dica a Ghidra cosa sono)
    - **Language:** `68000:BE:32:Coldfire` (big-endian, 32 bit, variante ColdFire)

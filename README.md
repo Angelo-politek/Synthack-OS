@@ -13,7 +13,7 @@ Phase 0 — foundations. Nothing here is flashable yet.
 
 - [x] repo scaffold, safety and legal docs
 - [x] unpack/repack wrapper around [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool)
-- [ ] byte-identical round-trip verified on Syntakt OS 1.41
+- [x] byte-identical round-trip verified on Syntakt OS 1.41
 - [ ] emulation harness for the audio engine section
 - [ ] first map of sections 3 and 7 in Ghidra
 
