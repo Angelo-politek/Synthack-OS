@@ -7,6 +7,8 @@ sono ipotesi di lavoro da validare (🟡) finché non le verifichiamo noi (✅).
 |---|---|---|
 | CPU | due **NXP ColdFire**: #1 per OS/UI/sequencer **+ mixer/FX/uscita**, #2 come motore delle voci | 🟡 |
 | Modello CPU | probabilmente **MCF5441x** (ColdFire V4m, **con EMAC, senza FPU**), per analogia con Digitone mk1/Model:Cycles | 🟡 |
+| Caratteristiche MCF5441x (data sheet NXP MCF54418 Rev. 8) | core ColdFire V4 **con EMAC e MMU, nessuna FPU**; fino a **250 MHz**; **64 KB di SRAM interna**; eDMA a **64 canali**; controller DDR2; 2 SSI (interfacce audio seriali). Tutto coerente con il codice visto (DMA ch.47, dati in SRAM a `0x80000000` per 59 440 B < 64 KB). Ancora nessuna prova diretta che il chip sia proprio questo | 🟡 |
+| Budget CPU #2 (se 250 MHz) | un blocco = 32 campioni a 48 kHz = 0,667 ms → **~166 000 cicli per blocco** per 8 voci e tutta l'elaborazione | 🟡 |
 | Memoria CPU #2 | codice a `0x40000400`; dati copiati all'avvio in SRAM a `0x80000000` (vedi [emulation.md](emulation.md)) | 🟡/✅ |
 | DSP | **nessuno SHARC** (a differenza di Digitakt II / Digitone II) → codice DT2/DN2 non portabile | 🟡 |
 | Parentela | famiglia "ColdFire" come Digitakt/Digitone mk1 e Model:Cycles/Samples → codice di quelle macchine in principio studiabile | 🟡 |
