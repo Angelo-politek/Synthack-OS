@@ -5,7 +5,9 @@ sono ipotesi di lavoro da validare (🟡) finché non le verifichiamo noi (✅).
 
 | Componente | Ipotesi | Stato |
 |---|---|---|
-| CPU | due **NXP ColdFire**: #1 per OS/UI/sequencer, #2 come motore audio | 🟡 |
+| CPU | due **NXP ColdFire**: #1 per OS/UI/sequencer **+ mixer/FX/uscita**, #2 come motore delle voci | 🟡 |
+| Modello CPU | probabilmente **MCF5441x** (ColdFire V4m, **con EMAC, senza FPU**), per analogia con Digitone mk1/Model:Cycles | 🟡 |
+| Memoria CPU #2 | codice a `0x40000400`; dati copiati all'avvio in SRAM a `0x80000000` (vedi [emulation.md](emulation.md)) | 🟡/✅ |
 | DSP | **nessuno SHARC** (a differenza di Digitakt II / Digitone II) → codice DT2/DN2 non portabile | 🟡 |
 | Parentela | famiglia "ColdFire" come Digitakt/Digitone mk1 e Model:Cycles/Samples → codice di quelle macchine in principio studiabile | 🟡 |
 | FPGA | due Xilinx Spartan | 🟡 |

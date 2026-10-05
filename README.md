@@ -14,6 +14,7 @@ Phase 0 — foundations. Nothing here is flashable yet.
 - [x] repo scaffold, safety and legal docs
 - [x] unpack/repack wrapper around [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool)
 - [x] byte-identical round-trip verified on Syntakt OS 1.41
+- [x] emulation approach chosen (see docs/emulation.md)
 - [ ] emulation harness for the audio engine section
 - [ ] first map of sections 3 and 7 in Ghidra
 
@@ -44,6 +45,7 @@ python tools/unpack/eft.py roundtrip firmware/Syntakt_OS1.41.syx
 - [docs/firmware-format.md](docs/firmware-format.md) — `.syx` / ELE3 container notes
 - [docs/hardware-notes.md](docs/hardware-notes.md) — hardware hypotheses
 - [docs/toolchain.md](docs/toolchain.md) — WSL, Ghidra, cross-compiler setup
+- [docs/emulation.md](docs/emulation.md) — how we plan to emulate the audio engine
 - [docs/re-journal.md](docs/re-journal.md) — reverse-engineering log
 
 ## License

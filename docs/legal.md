@@ -60,8 +60,11 @@ Regole pratiche che ne derivano:
 |---|---|---|---|
 | `mischa85/elektron-firmware-tool` | MIT | clonato e compilato in locale (`third_party/`), invocato come programma esterno | compatibile con MIT |
 | `irpina/elekloader` | **GPL-2.0-or-later** | per ora solo studio | se copiamo codice o contribuiamo un "core Syntakt" a monte, **quel** codice è GPL. Va deciso consapevolmente, caso per caso |
-| `m-dwyer/digikit`, `irpina/digiemu` | da verificare | da valutare per l'emulazione | se GPL, valgono le stesse regole di elekloader |
-| `18nelli18/Modded-Cycles`, `Bezronczek/syntakt-firmware-workbench`, `DigiAlchemydsp/Tone-FX` | da verificare | studio | idem |
+| `irpina/digiemu`, `m-dwyer/digikit` | **GPL-2.0-or-later** | studio; eventuale Unicorn patchato installato a parte dall'utente | mai copiati nel repo; solo come processo/pacchetto esterno |
+| `18nelli18/Modded-Cycles` | **nessuna licenza** (= tutti i diritti riservati) | studio; output usato come riferimento di confronto nei test | riusiamo solo **fatti** (indirizzi, layout), mai codice. Chiedere una licenza via issue |
+| `Bezronczek/syntakt-firmware-workbench` | MIT | costanti (offset, hash) | riusabili citando la fonte |
+| `DigiAlchemydsp/Tone-FX` | da verificare | studio | — |
+| Unicorn engine | GPL-2.0 | dipendenza installata via pip, non inclusa | il nostro sorgente MIT che la importa resta pubblicabile; un eventuale binario unico distribuito ricadrebbe sotto GPL |
 | `TinyGregAudio/Model-TG` | MIT | studio/riferimento | compatibile |
 
 Chiamare un programma GPL come processo separato (riga di comando) non rende GPL il nostro

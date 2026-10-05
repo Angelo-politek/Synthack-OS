@@ -67,10 +67,16 @@ Tienilo in `C:\Users\<te>\ghidra-projects\`.
 3. Nel dialogo di import:
    - **Format:** `Raw Binary` (le sezioni non hanno un header ELF che dica a Ghidra cosa sono)
    - **Language:** `68000:BE:32:Coldfire` (big-endian, 32 bit, variante ColdFire)
-   - **Options… → Base Address:** l'indirizzo di caricamento ipotizzato, cioè `40000400` per la
-     sezione 7 e `40000000` per la 3. È un'**ipotesi**: se i salti assoluti puntano nel vuoto,
+   - **Options… → Base Address:** `40000400`, sia per la sezione 7 sia per la 3 (verificato con
+     un test statistico sui salti assoluti, vedi re-journal). Se i salti puntassero nel vuoto,
      l'indirizzo è sbagliato.
 4. Alla domanda "Analyze now?" → **Yes**, opzioni di default.
+
+> **Nota EMAC.** Il motore audio usa le istruzioni dell'unità EMAC (multiply-accumulate). Il
+> linguaggio ColdFire di serie di Ghidra potrebbe non decodificarle: in quel caso vedrai byte
+> marcati come "bad instruction" o lasciati non disassemblati. È atteso. digiemu offre
+> un'estensione Ghidra (`tools/ghidra/ColdfireEMAC`, GPL) che si può installare **localmente**,
+> senza copiarla nel repo, se ci servirà.
 
 Le scoperte vanno annotate in [re-journal.md](re-journal.md), con parole nostre e senza incollare
 disassemblato.

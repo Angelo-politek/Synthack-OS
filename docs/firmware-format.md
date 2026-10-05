@@ -27,11 +27,11 @@ Ordine fisico nel container: 5, 2, 1, 3, 4, 6, 7, 8. Dimensioni = byte decompres
 |---|---|---:|---|---|---|
 | 1 | FPGA | 149 516 | sì | bitstream FPGA (formato non Xilinx standard 🟡) | non toccare |
 | 2 | bootstrap | 30 782 | sì | menu di avvio / OS upgrade (ColdFire) ✅ | **MAI toccare** |
-| 3 | MAIN OS | 3 438 480 | sì | OS principale, ColdFire #1, a `0x40000000` 🟡 | patch UI/sequencer |
+| 3 | MAIN OS | 3 438 480 | sì | OS principale + mixer/FX (🟡), ColdFire #1, a `0x40000400` ✅ | patch UI/sequencer/master |
 | 4 | updater | 32 776 | no | ? | non toccare |
 | 5 | meta | 15 | no | timestamp di build (ASCII) ✅ | non toccare |
 | 6 | boot | 1 744 | no | stub ColdFire | **MAI toccare** |
-| 7 | blob | 383 760 | **no** | codice ColdFire senza stringhe → motore audio, a `0x40000400` 🟡 | patch DSP |
+| 7 | blob | 383 760 | **no** | codice ColdFire senza stringhe → motore audio (🟡), a `0x40000400` ✅ | patch DSP (voci/machine) |
 | 8 | (nessuna) | 159 948 | sì | inizia con `FF…`: seconda FPGA? 🟡 | non toccare |
 
 Il wrapper salva la sezione 8 come `section_8_unknown.bin`.
