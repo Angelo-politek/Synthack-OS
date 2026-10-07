@@ -18,7 +18,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 | Aggiornamento della Syntakt a 1.41 (USB) | ⬜ | hardware, utente |
 | **Prova di recupero via MIDI DIN** | ⬜ | **prerequisito di qualunque flash modificato** |
 | Harness di emulazione sezione 7 | ✅ | [emulation.md](emulation.md): avvio, blocchi audio, EMAC, WAV |
-| Survey dei 12 engine (ID machine ↔ nome) | 🔄 | `cli.py survey`, da ascoltare |
+| Survey dei 12 engine (ID machine ↔ nome) | 🔄 | WAV generati in `out/emu/`: 11 engine suonano, engine 11 (ID 44) muto; manca l'ascolto per associare i nomi |
 | Mappa sezione 7 in Ghidra | 🔄 | main, interrupt, tabelle engine, contratto CPU #1 ↔ CPU #2 |
 | Mappa sezione 3 in Ghidra | 🔄 | appena iniziata: prelievo blocchi audio vicino a `0x400A4798`, stringhe di routing |
 
