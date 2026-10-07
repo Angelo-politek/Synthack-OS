@@ -36,7 +36,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 
 | Mod | Stato | Sezione | Emulabile | Note / prerequisiti |
 |---|---|---|---|---|
-| **Input dual mono** (routing "external in" + UI) | ⬜ | 3 🟡 | no | analisi del routing dell'ingresso esterno in sezione 3 (indizi: stringhe `EXT_IN_L/R`, ritorni ADC); test su hardware con recupero già provato |
+| **Input dual mono**: L e R come due ingressi separati, almeno con **volume indipendente** | 🔄 analisi | 3 | solo la funzione modificata, isolata | esiste già un dual mono di serie (interruttore) con controlli unici; l'hardware ha guadagni separati `extin_left/right` → mod: in "due mono" IN LR = volume L, BAL = volume R. Test su hardware con recupero già provato |
 
 ## Fase 2 — Loudness e basi
 
