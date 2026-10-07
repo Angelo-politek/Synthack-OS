@@ -1,7 +1,31 @@
 # Emulazione del motore audio (sezione 7) — proposta
 
-Stato: **proposta**, nessun codice ancora. Basata su una ricerca dell'ottobre 2026 sui progetti
-della community (solo lettura; dettagli e date in [re-journal.md](re-journal.md)).
+Stato: **funzionante** (ottobre 2026). Il codice ORIGINALE della sezione 7 di OS 1.41 si avvia e
+produce audio in Unicorn; dettagli e scoperte in [re-journal.md](re-journal.md).
+
+## Uso rapido
+
+```sh
+pip install unicorn              # GPL-2.0, installato a parte (non nel repo)
+python tools/emu/cli.py render --machine 5 --note 60 --seconds 0.5 -o out/emu/id05.wav
+python tools/emu/cli.py survey --seconds 0.5 -o out/emu      # un WAV per ognuno dei 12 engine
+```
+
+Velocita': ~0,2-0,25 s per blocco da 32 campioni (~400x piu' lento del tempo reale);
+il survey usa piu' processi in parallelo.
+
+## Come funziona (in breve)
+
+| Pezzo | File | Cosa fa |
+|---|---|---|
+| mappa di memoria | `memmap.py` | RAM condivisa a 0, DDR a `0x40000000`, SRAM a `0x80000000`, periferiche |
+| periferiche | `periph.py` | modelli comportamentali: PIT sempre pronto, DMA che copia davvero, TCD DONE |
+| motore | `engine.py` | avvio fedele (handshake simulato della CPU #1), un interrupt = un blocco |
+| EMAC | `emac.py` | MAC/MSAC/move secondo il ref. manual cap. 5, via "breakpoint" ILLEGAL |
+| siti EMAC | `gen_emac_sites.py` → `emac_sites_os141.json` | elenco esatto delle 839 istruzioni EMAC (GNU objdump) |
+| uscita | `wav.py`, `cli.py` | WAV 48 kHz 32 bit, survey degli engine |
+
+## Proposta iniziale (storico)
 
 ## Perché ci serve
 

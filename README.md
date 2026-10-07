@@ -15,7 +15,7 @@ Phase 0 — foundations. Nothing here is flashable yet.
 - [x] unpack/repack wrapper around [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool)
 - [x] byte-identical round-trip verified on Syntakt OS 1.41
 - [x] emulation approach chosen (see docs/emulation.md)
-- [ ] emulation harness for the audio engine section
+- [x] emulation harness: the original audio engine boots and renders audio (see docs/emulation.md)
 - [ ] first map of sections 3 and 7 in Ghidra
 
 ## What this repo contains — and what it never contains
