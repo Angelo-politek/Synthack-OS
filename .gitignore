@@ -40,3 +40,7 @@ node_modules/
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Manuali e datasheet di terzi (copyright NXP/Elektron): solo in locale
+refs/
+*.pdf
