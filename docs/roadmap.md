@@ -18,7 +18,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 | Aggiornamento della Syntakt a 1.41 (USB) | ⬜ | hardware, utente |
 | **Prova di recupero via MIDI DIN** | ⬜ | **prerequisito di qualunque flash modificato** |
 | Harness di emulazione sezione 7 | ✅ | [emulation.md](emulation.md): avvio, blocchi audio, EMAC, WAV |
-| Survey dei 12 engine (ID machine ↔ nome) | 🔄 | WAV generati in `out/emu/`: 11 engine suonano, engine 11 (ID 44) muto; manca l'ascolto per associare i nomi |
+| Survey dei 12 engine (ID machine ↔ nome) | ✅ | 12 engine identificati (BD MODERN … CP VINTAGE, SY TOY, SY BITS, SY SWARM, SP TWINSHOT); SY CHORD confermato all'ascolto |
 | Mappa sezione 7 in Ghidra | 🔄 | main, interrupt, tabelle engine, contratto CPU #1 ↔ CPU #2 |
 | Mappa sezione 3 in Ghidra | 🔄 | appena iniziata: prelievo blocchi audio vicino a `0x400A4798`, stringhe di routing |
 
@@ -53,9 +53,9 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 | Suite Master FX | ⬜ | 3 🟡 | solo l'algoritmo | come il compressor |
 | Beat-repeat / performance FX | ⬜ | 3 🟡 | no | legato a sequencer e buffer audio |
 | Arpeggiatore | ⬜ | 3 | no | sequencer |
-| Resampling verso Twinshot | ⬜ | 3 🟡 + 7 🟡 | parziale | SP TWINSHOT è tra le machine; da capire dove vivono i sample |
+| Resampling verso Twinshot | ⬜ | 3 🟡 + 7 | parziale | SP TWINSHOT = engine 11 (ID 44) della sez. 7; i campioni arrivano probabilmente col comando 2 (blocchi da 2 KB) |
 | UI euclidea a cerchi | ⬜ | 3 | no | display e interfaccia |
-| SY SWARM+ | ⬜ | 7 🟡 | sì | se SY SWARM è uno dei 12 engine della sez. 7 (da confermare col survey) |
+| SY SWARM+ | ⬜ | 7 | sì | SY SWARM = engine 10 (ID 38) della sezione 7 ✅ |
 
 ## Fase 4 — Avanzate e sperimentali
 

@@ -21,7 +21,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import engine as eng  # noqa: E402
 from wav import SAMPLE_RATE, write_q31  # noqa: E402
 
-MACHINE_MAP = 0x4001_4950      # mappa ID machine -> engine (46 byte)
+MACHINE_MAP = 0x4001_4950      # mappa ID machine -> engine (46 byte), sezione 7
+MACHINE_NAMES = 0x4022_AF88    # tabella (nome lungo, sigla) per ID, sezione 3 (OS 1.41)
+N_MACHINES = 45
 TRIG_LOAD, TRIG_NOTE = 0, 2    # il primo trig carica la machine, il secondo suona la nota
 
 
@@ -54,13 +56,29 @@ def machine_to_engine() -> list[int]:
     return list(e.uc.mem_read(MACHINE_MAP, 46))
 
 
+def machine_names() -> list[str]:
+    """Nomi delle machine per ID, letti dalla tabella di puntatori della sezione 3."""
+    import memmap
+    syx = memmap.REPO / "firmware" / "Syntakt_OS1.41.syx"
+    sec3 = memmap.eft.unpack(syx, memmap.REPO / "unpacked" / syx.stem, ids=[3])[3].read_bytes()
+    base = memmap.LOAD_ADDR                                  # anche la sezione 3 parte da 0x40000400
+
+    def cstr(addr: int) -> str:
+        o = addr - base
+        return sec3[o:sec3.index(b"\x00", o)].decode("latin1").strip()
+
+    t = MACHINE_NAMES - base
+    return [cstr(int.from_bytes(sec3[t + 8 * k:t + 8 * k + 4], "big")) for k in range(N_MACHINES)]
+
+
 def _survey_one(args: tuple[int, int, float, Path]) -> str:
-    engine_id, machine, seconds, outdir = args
+    engine_id, machine, seconds, outdir, name = args
     t = time.time()
     samples = render(machine, 60, seconds)
-    path = outdir / f"engine{engine_id:02d}_id{machine:02d}.wav"
+    slug = name.lower().replace(" ", "_")
+    path = outdir / f"engine{engine_id:02d}_id{machine:02d}_{slug}.wav"
     peak = write_q31(path, samples, normalize=True)
-    return f"engine {engine_id:2d} (ID {machine:2d}): picco {peak:6.1f} dBFS -> {path.name} ({time.time() - t:.0f}s)"
+    return f"engine {engine_id:2d} (ID {machine:2d} {name}): picco {peak:6.1f} dBFS -> {path.name} ({time.time() - t:.0f}s)"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -85,13 +103,14 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     mapping = machine_to_engine()
+    names = machine_names()
     first_id = {}
     for machine, engine_id in enumerate(mapping):
         first_id.setdefault(engine_id, machine)
     for engine_id in sorted(first_id):
         ids = [m for m, e in enumerate(mapping) if e == engine_id]
-        print(f"engine {engine_id:2d} <- ID {ids}")
-    jobs = [(e, m, a.seconds, a.out) for e, m in sorted(first_id.items())]
+        print(f"engine {engine_id:2d} <- ID {ids[:3]}{'...' if len(ids) > 3 else ''} ({names[ids[0]]})")
+    jobs = [(e, m, a.seconds, a.out, names[m]) for e, m in sorted(first_id.items())]
     with ProcessPoolExecutor(max_workers=a.jobs) as pool:
         for line in pool.map(_survey_one, jobs):
             print(line, flush=True)
