@@ -40,3 +40,13 @@ def test_boot_initialises_8_voices(booted):
     # 8 strutture voce da 1800 B in SRAM: dopo voice_prep/voice_reset non sono tutte zero
     for v in range(8):
         assert any(booted.uc.mem_read(0x8000_0000 + 1800 * v, 1800)), v
+
+
+def test_render_block_runs_isr_with_emac_and_dma(booted):
+    before = booted.emac.count
+    out = booted.render_block(bytes(engine.PARAMS_SIZE))
+    assert booted.emac.count > before                       # il DSP usa l'EMAC
+    ch, src, dst, n = booted.periph.dma_transfers[-1]
+    assert (ch, src, dst, n) == (47, 0x8000_3840, engine.AUDIO_OUT, engine.AUDIO_SIZE)
+    assert len(out) == engine.VOICES and all(len(v) == engine.BLOCK for v in out)
+    assert all(x == 0 for v in out for x in v)              # nessuna nota: silenzio

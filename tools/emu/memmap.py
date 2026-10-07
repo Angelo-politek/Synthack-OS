@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from unicorn import UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, Uc
-from unicorn.m68k_const import UC_CPU_M68K_CFV4E
+from unicorn.m68k_const import UC_CPU_M68K_ANY
 
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "unpack"))
@@ -87,7 +87,7 @@ def default_section7() -> Path:
 
 def new_cpu(section7: bytes) -> Uc:
     """CPU ColdFire con memoria mappata e sezione 7 caricata (nessuna istruzione eseguita)."""
-    uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_CFV4E)
+    uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
     for r in REGIONS:
         uc.mem_map(r.base, r.size)
     uc.mem_write(LOAD_ADDR, section7)

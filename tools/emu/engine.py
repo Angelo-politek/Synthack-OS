@@ -16,13 +16,17 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from unicorn import UC_ARCH_M68K, UC_HOOK_CODE, UC_HOOK_MEM_WRITE, UC_MODE_BIG_ENDIAN, Uc, UcError
-from unicorn.m68k_const import UC_CPU_M68K_CFV4E, UC_M68K_REG_A7, UC_M68K_REG_D0, UC_M68K_REG_PC, UC_M68K_REG_SR
+from unicorn.m68k_const import UC_CPU_M68K_ANY, UC_M68K_REG_A7, UC_M68K_REG_D0, UC_M68K_REG_PC, UC_M68K_REG_SR
+
+import json
 
 import memmap
+from emac import UnicornEmac
 from periph import Peripherals
 
 # --- indirizzi del codice (sezione 7, OS 1.41) — vedi docs/re-journal.md
 AUDIO_ISR = 0x4000_0934          # gestore dell'interrupt DTIM0 (vettore 96)
+AUDIO_ISR_RTE = 0x4000_0B1E      # il suo 'rte' finale: ci fermiamo qui (Unicorn non gestisce l'RTE)
 IDLE_LOOP = 0x4000_106E          # "bra.s *" finale di audio_main: avvio concluso
 MEMCLR = 0x4000_9F08             # memclr(ptr, len), byte per byte
 EXT_CHIP_INIT = 0x4000_0706      # invio dati via GPIO a un chip esterno (FPGA?)
@@ -40,6 +44,8 @@ AUDIO_OUT = 0x1B0                # dove il DMA deposita l'audio (8 voci x 32 x 4
 AUDIO_SIZE = 0x400
 VOICES, BLOCK = 8, 32
 
+EMAC_SITES = Path(__file__).with_name("emac_sites_os141.json")
+
 BOOT_STEPS = list(range(3, 13))  # 1, poi 3..12 se l'handshake va a buon fine
 
 
@@ -53,19 +59,24 @@ class Engine:
     trace_periph: bool = False
     uc: Uc = field(init=False)
     periph: Peripherals = field(init=False)
+    emac: UnicornEmac = field(init=False)
     status: list[int] = field(default_factory=list, init=False)
     ticks: int = field(default=0, init=False)
 
     def __post_init__(self) -> None:
         sec = memmap.load_section7(self.section7_path or memmap.default_section7())
         self.periph = Peripherals(trace=[] if self.trace_periph else None)
-        uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_CFV4E)
+        uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         for r in memmap.REGIONS:
             if r.name.startswith("periph"):
                 uc.mmio_map(r.base, r.size, self.periph.read, r.base, self.periph.write, r.base)
             else:
                 uc.mem_map(r.base, r.size)
         uc.mem_write(memmap.LOAD_ADDR, sec)
+        sites = json.loads(EMAC_SITES.read_text())
+        if sites["section7_sha256"] != memmap.SECTION7_SHA256:
+            raise EngineError("emac_sites_os141.json non corrisponde alla sezione 7 caricata")
+        self.emac = UnicornEmac(uc, sites["sites"])
 
         uc.hook_add(UC_HOOK_MEM_WRITE, self._cpu1_mailbox, begin=MBOX_STATUS, end=MBOX_STATUS + 1)
         uc.hook_add(UC_HOOK_CODE, self._fast_memclr, begin=MEMCLR, end=MEMCLR)
@@ -93,6 +104,8 @@ class Engine:
             except UcError as e:
                 raise EngineError(f"{e} a PC={self.uc.reg_read(UC_M68K_REG_PC):08X}") from e
             pc = self.uc.reg_read(UC_M68K_REG_PC)
+            if self.emac.error:
+                raise EngineError(f"EMAC: {self.emac.error}") from self.emac.error
             if pc == until:
                 return
         raise EngineError(f"budget di istruzioni esaurito, PC={pc:08X}")
@@ -145,14 +158,11 @@ class Engine:
             raise ValueError(f"servono {PARAMS_SIZE} byte di parametri, non {len(params)}")
         uc = self.uc
         uc.mem_write(0, params)
-        # Simuliamo l'ingresso nell'interrupt: frame d'eccezione ColdFire da 2 long
-        # [formato 4 | vettore | SR] + [PC di ritorno]. L'RTE finale ci riporta a IDLE_LOOP.
-        sp = 0x47F0_0000 - 8
-        frame = (0x4 << 28) | (VECTOR_DTIM0 << 18) | 0x2000
-        uc.mem_write(sp, struct.pack(">II", frame, IDLE_LOOP))
-        uc.reg_write(UC_M68K_REG_A7, sp)
+        # Entriamo nel gestore come farebbe la CPU all'interrupt e ci fermiamo sul suo 'rte':
+        # il gestore salva e ripristina da solo i registri, quindi lo stack torna com'era.
+        uc.reg_write(UC_M68K_REG_A7, 0x47F0_0000)
         uc.reg_write(UC_M68K_REG_SR, 0x2700)
-        self._run(AUDIO_ISR, IDLE_LOOP, budget=50_000_000)
+        self._run(AUDIO_ISR, AUDIO_ISR_RTE, budget=50_000_000)
         raw = bytes(uc.mem_read(AUDIO_OUT, AUDIO_SIZE))
         samples = struct.unpack(">256i", raw)
         return [list(samples[v * BLOCK:(v + 1) * BLOCK]) for v in range(VOICES)]
