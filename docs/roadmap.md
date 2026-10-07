@@ -36,7 +36,8 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 
 | Mod | Stato | Sezione | Emulabile | Note / prerequisiti |
 |---|---|---|---|---|
-| **Input dual mono**: L e R come due ingressi separati, almeno con **volume indipendente** | 🔄 analisi | 3 | solo la funzione modificata, isolata | esiste già un dual mono di serie (interruttore) con controlli unici; l'hardware ha guadagni separati `extin_left/right` → mod: in "due mono" IN LR = volume L, BAL = volume R. Test su hardware con recupero già provato |
+| Input dual mono **v2**: mandate separate L/R a delay e riverbero | ⬜ | 3 🟡 | solo funzioni isolate | fattibile solo se le mandate dell'ingresso sono calcolate in software (non FPGA/analogico); servono 2-3 parametri nuovi (la pagina 3 del mixer ha 3 manopole libere) e il loro salvataggio nei dati del pattern/kit |
+| **Input dual mono v1**: L e R come due ingressi separati, almeno con **volume indipendente** | 🔄 analisi | 3 | solo la funzione modificata, isolata | esiste già un dual mono di serie (interruttore) con controlli unici; l'hardware ha guadagni separati `extin_left/right` → mod: in "due mono" IN LR = volume L, BAL = volume R. Test su hardware con recupero già provato |
 
 ## Fase 2 — Loudness e basi
 
