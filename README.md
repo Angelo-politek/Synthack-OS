@@ -40,6 +40,7 @@ python tools/unpack/eft.py roundtrip firmware/Syntakt_OS1.41.syx
 
 ## Docs
 
+- [docs/roadmap.md](docs/roadmap.md) — roadmap and status of every planned mod
 - [docs/recovery.md](docs/recovery.md) — how to recover a device (do this dry run first)
 - [docs/legal.md](docs/legal.md) — licensing, interoperability, what we do not publish
 - [docs/firmware-format.md](docs/firmware-format.md) — `.syx` / ELE3 container notes
