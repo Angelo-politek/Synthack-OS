@@ -36,8 +36,8 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 
 | Mod | Stato | Sezione | Emulabile | Note / prerequisiti |
 |---|---|---|---|---|
-| Input dual mono **v2**: mandate separate L/R a delay e riverbero | ⬜ | 3 🟡 | solo funzioni isolate | fattibile solo se le mandate dell'ingresso sono calcolate in software (non FPGA/analogico); servono 2-3 parametri nuovi (la pagina 3 del mixer ha 3 manopole libere) e il loro salvataggio nei dati del pattern/kit |
-| **Input dual mono v1**: L e R come due ingressi separati, almeno con **volume indipendente** | 🔄 analisi | 3 | solo la funzione modificata, isolata | esiste già un dual mono di serie (interruttore) con controlli unici; l'hardware ha guadagni separati `extin_left/right` → mod: in "due mono" IN LR = volume L, BAL = volume R. Test su hardware con recupero già provato |
+| **Input dual mono v1**: L e R come due ingressi separati, ognuno con **volume e pan** | 🔄 analisi | 3 | solo le funzioni modificate, isolate | esiste già un dual mono di serie (interruttore) con controlli unici. Volume: l'hardware ha guadagni separati `extin_left/right`. **Pan per ingresso**: serve una matrice 2×2 (4 guadagni) → possibile se l'ingresso è mixato in software, non se ci sono solo 2 VCA analogici (da verificare: prova hardware "BAL in due mono"). UI: IN LR→VOL L, BAL→PAN L, + VOL R e PAN R su manopole libere. Test su hardware con recupero già provato |
+| Input dual mono **v2**: mandate separate L/R a delay e riverbero | ⬜ | 3 🟡 | solo funzioni isolate | fattibile solo se le mandate dell'ingresso sono calcolate in software (non FPGA/analogico); con v1 restano 1 manopola libera per DEL R/REV R → spostare PRE/POST nelle impostazioni o seconda pagina; salvataggio dei nuovi parametri nei dati del pattern/kit |
 
 ## Fase 2 — Loudness e basi
 
