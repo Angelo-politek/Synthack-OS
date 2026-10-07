@@ -21,7 +21,8 @@ def booted():
 def test_boot_handshake_sequence(booted):
     # 1 = inizio; 3..12 = handshake riuscito, voci inizializzate, interrupt installato
     assert booted.status == [1] + engine.BOOT_STEPS
-    assert booted.uc.mem_read(engine.MBOX_HANDSHAKE, 4) in (b"B0\xa5\xa5",)
+    # mailbox: "B0" (risposta CPU #1), comando 3 (avvio), 0xA5A5 (conferma del motore)
+    assert bytes(booted.uc.mem_read(engine.MBOX_HANDSHAKE, 6)) == b"B0\x00\x03\xa5\xa5"
 
 
 def test_boot_installs_audio_isr(booted):
