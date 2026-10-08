@@ -15,7 +15,8 @@ from unicorn import UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, Uc  # noqa: E402
 from unicorn.m68k_const import UC_CPU_M68K_ANY, UC_M68K_REG_A7, UC_M68K_REG_SR  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "tools" / "splash"))
+sys.path[:0] = [str(ROOT / "tools" / "splash"), str(ROOT / "mods" / "splash")]
+import make_patch  # noqa: E402
 import render  # noqa: E402
 
 SPEC = json.loads((ROOT / "mods" / "splash" / "patch.json").read_text(encoding="utf-8"))
@@ -48,8 +49,9 @@ def test_splash_draw_copies_the_logo_into_the_framebuffer():
 
 
 def test_logo_matches_the_rendered_design():
-    expected = render.compose(render.figlet("SyntHack", "smslant"), 3, 6, "v0.1")
-    assert render.Bitmap.from_bytes_syntakt(LOGO).px == expected.px
+    design = render.compose(render.figlet("SyntHack", make_patch.FIGLET_FONT), 3, 6, make_patch.VERSION)
+    # in memoria il logo e' scritto invertito secondo FLIP (orientamento dello schermo durante l'intro)
+    assert render.Bitmap.from_bytes_syntakt(LOGO).px == design.flipped(make_patch.FLIP).px
 
 
 def test_new_animation_entries_keep_original_and_add_splash():
@@ -58,9 +60,25 @@ def test_new_animation_entries_keep_original_and_add_splash():
     for e in entries:
         o = e - BASE
         func, frames, sfunc, sframes, end0, end1 = struct.unpack_from(">IIIIII", DATA, o)
-        assert 0x4000_0400 <= func < 0x4033_9000 and frames > 0      # animazione originale
-        assert (sfunc, sframes) == (BASE, 120)                      # poi il nostro splash
+        assert 0x4000_0400 <= func < 0x4033_9000 and frames > 0      # animazione originale (accorciata)
+        assert (sfunc, sframes) == (BASE, make_patch.SPLASH_FRAMES) # poi il nostro splash
         assert (end0, end1) == (0, 0)                               # fine elenco
+
+
+def test_total_intro_duration_is_unchanged():
+    # durate originali delle 5 animazioni (OS 1.41): 0x83, 0xD2, 0xB4, 0xB4, 0xB4 fotogrammi
+    original = {0x4008715A: 0x83, 0x4008777E: 0xD2, 0x400867B4: 0xB4, 0x40086C8C: 0xB4, 0x40086BCE: 0xB4}
+    for p in SPEC["patches"][1:]:
+        o = int(p["hex"], 16) - BASE
+        func, frames, _, sframes = struct.unpack_from(">IIII", DATA, o)
+        assert frames + sframes == original[func]
+
+
+def test_flipped_helper():
+    bm = render.Bitmap.blank()
+    bm.set(0, 0)
+    assert bm.flipped("v").px[63][0] == 1 and bm.flipped("h").px[0][127] == 1
+    assert bm.flipped("vh").px[63][127] == 1
 
 
 def test_fits_in_the_free_region():

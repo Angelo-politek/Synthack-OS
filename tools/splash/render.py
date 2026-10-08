@@ -87,6 +87,15 @@ class Bitmap:
                 out.append(b)
         return bytes(out)
 
+    def flipped(self, how: str) -> "Bitmap":
+        """Copia invertita: 'v' = righe (alto/basso), 'h' = colonne (sinistra/destra), 'vh' = entrambe."""
+        rows = [list(r) for r in self.px]
+        if "v" in how:
+            rows.reverse()
+        if "h" in how:
+            rows = [r[::-1] for r in rows]
+        return Bitmap(rows)
+
     def to_bytes_syntakt(self) -> bytes:
         """Formato del framebuffer Syntakt (verificato su set_pixel 0x400F7140, OS 1.41):
         per colonne, 8 byte per colonna; byte = fb[x*8 + y//8], bit = 7 - (y % 8), 1 = acceso."""

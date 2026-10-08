@@ -31,7 +31,12 @@ FREE_START, FREE_END = 0x4033_8740, 0x4033_9000     # riempimento del linker, ve
 # (indirizzo dell'istruzione `pea`, voce originale a cui punta)
 PEA_SITES = [(0x4008_7E90, 0x4029_A7C4), (0x4008_7EA4, 0x4029_A7B4), (0x4008_7EBA, 0x4029_A7A4),
              (0x4008_7ECC, 0x4029_A794), (0x4008_7ED4, 0x4029_A784)]
-SPLASH_FRAMES = 120                                 # ~2 s, se l'intro gira a ~60 fotogrammi/s
+# L'intro gira a ~28 fotogrammi/s (PIT 3: prescaler 512, PMR 8593, bus ~125 MHz; vedi re-journal).
+# v0.1 AGGIUNGEVA 120 fotogrammi (~4,2 s) e la macchina si e' bloccata su "PREPARING SAMPLES":
+# ora la durata totale resta quella originale, l'animazione ufficiale cede gli ultimi N fotogrammi.
+SPLASH_FRAMES = 57                                  # ~2 s
+# Orientamento dello schermo durante l'intro (v0.1 appariva capovolto): "none" | "v" | "h" | "vh"
+FLIP = "v"
 FIGLET_FONT, VERSION = "smslant", "v0.1"
 WSL_BINUTILS = "~/tools/m68k/root"
 
@@ -62,8 +67,8 @@ def main() -> None:
 
     # 1. logo nel formato del framebuffer
     bm = render.compose(render.figlet("SyntHack", FIGLET_FONT), 3, 6, VERSION)
-    logo = bm.to_bytes_syntakt()
-    bm.to_png(REPO / "out" / "splash" / "splash_final.png")
+    bm.to_png(REPO / "out" / "splash" / "splash_final.png")          # come deve APPARIRE
+    logo = bm.flipped(FLIP).to_bytes_syntakt()                         # come va SCRITTO in memoria
 
     # 2. codice + logo
     blob = bytearray(assemble(HERE / "splash.S", logo))
@@ -81,8 +86,11 @@ def main() -> None:
         func, frames = u32(entry), u32(entry + 4)
         if u32(entry + 8) != 0:
             raise SystemExit(f"la voce {entry:#x} ha piu' di un segmento: formato inatteso")
+        if frames <= SPLASH_FRAMES:
+            raise SystemExit(f"la voce {entry:#x} dura solo {frames} fotogrammi")
         new_entries.append(FREE_START + len(blob))
-        blob += struct.pack(">IIIIII", func, frames, code_addr, SPLASH_FRAMES, 0, 0)
+        # stessa durata totale: l'animazione originale cede gli ultimi SPLASH_FRAMES fotogrammi
+        blob += struct.pack(">IIIIII", func, frames - SPLASH_FRAMES, code_addr, SPLASH_FRAMES, 0, 0)
 
     end = FREE_START + len(blob)
     if end > FREE_END:
@@ -101,8 +109,8 @@ def main() -> None:
                         "hex": struct.pack(">I", new).hex(),
                         "what": f"pea {entry:#x} -> pea {new:#x}"})
     spec = {"name": "splash", "os": "1.41",
-            "description": f"Splash 'SyntHack {VERSION}' (figlet {FIGLET_FONT}) per {SPLASH_FRAMES} "
-                           "fotogrammi dopo l'animazione d'avvio ufficiale.",
+            "description": f"Splash 'SyntHack {VERSION}' (figlet {FIGLET_FONT}) negli ultimi {SPLASH_FRAMES} "
+                           f"fotogrammi dell'animazione d'avvio (durata totale invariata; flip={FLIP}).",
             "generated_by": "mods/splash/make_patch.py", "patches": patches}
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
     print(f"patch.json: codice+logo+voci = {len(blob)} B a {FREE_START:#x}..{end:#x}; "
