@@ -18,38 +18,50 @@
   ],
   "symbols": {
     "comp_hook": "0x46000000",
-    "k_const": "0x46000174",
-    "k_expt": "0x460001e0",
-    "k_logt": "0x4600019c",
-    "k_state": "0x46000194",
-    "scale": "0x4600014a"
+    "convert": "0x46000156",
+    "fx_page": "0x460001e4",
+    "get_hook": "0x46000244",
+    "k_const": "0x460002d4",
+    "k_dt": "0x460003a4",
+    "k_expt": "0x46000360",
+    "k_ids": "0x460002fe",
+    "k_logt": "0x4600031c",
+    "k_params": "0x460002f4",
+    "k_state": "0x46000314",
+    "kit_hook": "0x46000228",
+    "scale": "0x460002aa",
+    "set_hook": "0x46000266"
   },
   "emac_sites": [
     "0x46000008",
     "0x4600000c",
-    "0x46000084",
-    "0x46000088",
-    "0x460000a0",
-    "0x460000a4",
-    "0x460000b0",
+    "0x4600008c",
+    "0x46000090",
+    "0x460000a8",
+    "0x460000ac",
     "0x460000b8",
-    "0x460000bc",
-    "0x460000ca",
+    "0x460000c0",
+    "0x460000c4",
     "0x460000d2",
-    "0x460000d6",
-    "0x460000ee",
-    "0x460000f2",
-    "0x4600011e",
-    "0x46000122",
-    "0x4600013e"
+    "0x460000da",
+    "0x460000de",
+    "0x460000f6",
+    "0x460000fa",
+    "0x46000126",
+    "0x4600012a",
+    "0x4600014a",
+    "0x46000174",
+    "0x46000178",
+    "0x460001c2",
+    "0x460001c6"
   ],
   "patches": [
     {
       "section": 3,
       "addr": "0X40348000",
-      "len": 548,
+      "len": 2071,
       "append": true,
-      "hex": "4fefffcc48d737ffa9802f00a93c000000a041f980003c5043f980003cd045f94600019449f94600019c4bf9460001742a122c2a00047e2020182800721fe2a4b98024192802e2a4b982b4806f0220020c80000001006c06203c00000100280004c424045382e5a02400721ae2aa720fc48126342c0422342c009681028003ffffffeb88a0030800a1c3d2834c15480092847000240194ad00046d10262d0008a4030800a1c0d0ad00049081262d000ca0030800262d0010aa030800a1c22a00b0826d022a02262d0014aa030800262d0018ac030800a1c653876600ff5c248525460004dcad001c263ceabd5a5fac030800a1c028007217e2a424007213e2aa720fc48102800007ffff720ce3a849f9460001e026342c0422342c009681a0030800a1c3d283e8a1202f0008611c37400046202f0010611237400048201fa9004cd737ff4fef00344e750c800000ffff6f06203c0000ffff4a806d164c010000740ce4a80c800000ffff6306203c0000ffff4e750302a2d4f10000002000000000094c027ff6b3fd00b99ade7f466521f6f816f2000000000000000000000000004366eb0082f34900bf0fd700f816e3012e557e01620df8019379c901c2cb0e01f02dc5021bc8bb0245be57026e2d43029530eb02bae1f102df568c0302a2d4000100000000f5250000eac10000e0cd0000d7450000ce250000c5670000bd090000b5050000ad580000a5ff00009ef500009838000091c400008b96000085ab00008000",
+      "hex": "4fefffcc48d737ffa9802f00a93c000000a0610001d06100013e41f980003c5043f980003cd045f94600031449f94600031c4bf9460002d42a122c2a00047e2020182800721fe2a4b98024192802e2a4b982b4806f0220020c80000001006c06203c00000100280004c424045382e5a02400721ae2aa720fc48126342c0422342c009681028003ffffffeb88a0030800a1c3d2834c15480092847000240194ad00046d10262d0008a4030800a1c0d0ad00049081262d000ca0030800262d0010aa030800a1c22a00b0826d022a02262d0014aa030800262d0018ac030800a1c653876600ff5c248525460004dcad001c263ceabd5a5fac030800a1c028007217e2a424007213e2aa720fc48102800007ffff720ce3a849f94600036026342c0422342c009681a0030800a1c3d283e8a1202f00086100017437400046202f00106100016837400048201fa9004cd737ff4fef00344e7541f9460002f44bf9460002d443f9460003a4223c1e000000715048404240a0010800a1c090812b40000471a8000222310c002b410018243c7fffffff94812b42001445e9020071a8000422320c002b410010243c7fffffff94812b42000c223c0c0a8c127168000648404240a0010800a1c090812b40001c45e9040071a800087207c08122320c002b4100084e7541f941b9f9502028001c0c8000000096661c4aa8001466164aa80018661043f9460002fe720471d920c053816cf84e7541f9460002fe7204b0701a00670453816cf64e75202f000861e64a816b0470014e752f02747c222f00084ef94000d878202f000861ca4a816b0c41f9460002f471701a004e752f02222f00084ef94000d950202f000861a84a816b2c202f000c4a806c02700041f9460003082f0275f01a00b0826f022002241f41f9460002f431801a0070004e752f032f02222f000c4ef94000da3a0c800000ffff6f06203c0000ffff4a806d164c010000740ce4a80c800000ffff6306203c0000ffff4e750302a2d4000000000000000000000000000000000000000000000000000000004000180020002000030000900048005b0065007f7f007f007f007f0007000000000000000000000000000000004366eb0082f34900bf0fd700f816e3012e557e01620df8019379c901c2cb0e01f02dc5021bc8bb0245be57026e2d43029530eb02bae1f102df568c0302a2d4000100000000f5250000eac10000e0cd0000d7450000ce250000c5670000bd090000b5050000ad580000a5ff00009ef500009838000091c400008b96000085ab0000800067ed87bb6932ca506c512ffa6ff9444e73488b7475f3d1d378010f45798f0f207abd3c0d7ba4d9fd7c58a54a7ce61e757d56f12b7db212527dfc8f067e3a1d2e7e6d7f437e98c9507ebd90e47edd0ec27ef836c47f0fc9027f245e487f36713b7f4665217f548af87f6125547f6c6b4f7f768ace7f7faa4b7f87ea327f8f66027f9635227f9c6b9c7fa21aab7fa751307fac1c0f7fb086837fb49a597fb8602b7fbbdf857fbf1f157fc224c07fc4f5c17fc796c37fca0bed7fcc58f67fce81337fd087a37fd26ef97fd439a37fd5e9d57fd7818d7fd9029a7fda6ea37fdbc7267fdd0d827fde42f87fdf68ad7fe07fac7fe188ee7fe285557fe375b27fe45ac67fe535427fe605cb7fe6ccf97fe78b597fe8416d7fe8efb07fe996927fea367c7feacfd07feb62e97febf01c7fec77ba7fecfa0b7fed77567fedefdd7fee63db7feed38c7fef3f237fefa6d57ff00ad07ff06b427ff0c8547ff1222e7ff178f77ff1ccd07ff21ddd7ff26c3b7ff2b80a7ff301657ff348677ff38d2a7ff3cfc67ff410507ff44ee07ff48b897ff4c65e7ff4ff747ff536da7ff56ca37ff5a0dd7ff5d3987ff604e37ff634cb7ff6635d7ff690a77ff6bcb37ff6e78e7ff711437ff739db7ff761617ff787de7ff7ad5c7ff7d1e47ff7f57d7ff8182f7ff83a037ff85b007ff87b2d7ff89a907ff8b9307ff8d7147ff8f4417ff910bd7ff92c8e7fbbcded7fbbe0ff7fbc39457fbcf2937fbe1c427fbfbbcb7fc1cd887fc445de7fc7130c7fca1f7d7fcd543e7fd09b227fd3e0637fd7139f7fda28347fdd15297fdfd4cb7fe2641b7fe4c23c7fe6efe67fe8eee67feac1c17fec6b667fedeef07fef4f857ff090357ff1b3ea7ff2bd617ff3af1f7ff48b737ff554787ff60c147ff6b3fd7ff74dbe7ff7dab97ff85c2a7ff8d32d7ff940c07ff9a5c67ffa030b7ffa59467ffaa91a7ffaf3197ffb37c87ffb779d7ffbb3037ffbea597ffc1df87ffc4e2c7ffc7b3e7ffca56d7ffcccf37ffcf2067ffd14d57ffd358c7ffd54547ffd71507ffd8ca17ffda6677ffdbebd7ffdd5bd7ffdeb7e7ffe00157ffe13977ffe26157ffe37a17ffe484a7ffe581f7ffe672c7ffe757e7ffe83217ffe901e7ffe9c807ffea8507ffeb3977ffebe5b7ffec8a57ffed27c7ffedbe57ffee4e77ffeed877ffef5cb7ffefdb77fff05517fff0c9b7fff139b7fff1a547fff20ca7fff26ff7fff2cf87fff32b77fff383e7fff3d917fff42b27fff47a37fff4c677fff50ff7fff556d7fff59b47fff5dd57fff61d27fff65ac7fff69657fff6cfe7fff70797fff73d67fff77187fff7a3f7fff7d4c7fff80417fff831e7fff85e47fff88947fff8b307fff8db77fff902b7fff928c7fff94db7fff97197fff99467fff9b647fff9d727fff9f717fffa1617fffa3447fffa51a7fffa6e27fffa89e55555555400000002aaaaaab200000001555555510000000080000000666666654485200436f6d70205468726573686f6c640041544b00436f6d702041747461636b0052454c00436f6d702052656c65617365004d555000436f6d70204d616b6575700052415400436f6d7020526174696f00",
       "ram": "0x46000000",
       "what": "(area mod) routine del compressore + costanti del preset + stato + tabelline"
     },
@@ -60,6 +72,198 @@
       "expect_sha256": "286e6d5c084c7e03c3907206d5aaf8d97b5b2391247b057fcc436e3653e506b8",
       "hex": "4eb9460000006000001c",
       "what": "trampolino: jsr comp_hook ; bra.w 0x40090562 (sostituisce limite e scrittura dei CV del master)"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000D870",
+      "len": 8,
+      "expect_sha256": "9543cb23f5dfdfba7a01beb7c6d94be848abc0d9daabf2597886638ffc3b5b29",
+      "hex": "4ef9460002284e71",
+      "what": "aggancio: jmp kit_hook ; nop"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000D94A",
+      "len": 6,
+      "expect_sha256": "d6c9f1f60272197a17511f496fc19dd21ddd7df5f1f1ec0cab7a16cad60b0609",
+      "hex": "4ef946000244",
+      "what": "aggancio: jmp get_hook"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000DA32",
+      "len": 8,
+      "expect_sha256": "f537d32566bd64115d10ae86f44d24d947ff5cf58a554cf0b67ab60a34ad6e4d",
+      "hex": "4ef9460002664e71",
+      "what": "aggancio: jmp set_hook ; nop"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022F2E4",
+      "len": 12,
+      "expect_sha256": "8b5f6420dac8fd1694a66321a754e7048494143149444e0d0f57c8bd1bd50086",
+      "hex": "0000000000007f0000004000",
+      "what": "id 144 -> THR: min, max, default"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022F304",
+      "len": 4,
+      "expect_sha256": "e26a461a2482ffbd709db224f88d71cddfe83761e3def5a7904b911e83df7bb5",
+      "hex": "460007c8",
+      "what": "id 144: nome lungo 'Comp Threshold'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022F30C",
+      "len": 4,
+      "expect_sha256": "0965d3f5d6fdaea1fae66d573778b608dfc32a71a639894a31cff1b2093f151e",
+      "hex": "460007c4",
+      "what": "id 144: nome breve 'THR'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022E444",
+      "len": 12,
+      "expect_sha256": "8b5f6420dac8fd1694a66321a754e7048494143149444e0d0f57c8bd1bd50086",
+      "hex": "0000000000007f0000001800",
+      "what": "id 72 -> ATK: min, max, default"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022E464",
+      "len": 4,
+      "expect_sha256": "e26a461a2482ffbd709db224f88d71cddfe83761e3def5a7904b911e83df7bb5",
+      "hex": "460007db",
+      "what": "id 72: nome lungo 'Comp Attack'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022E46C",
+      "len": 4,
+      "expect_sha256": "0965d3f5d6fdaea1fae66d573778b608dfc32a71a639894a31cff1b2093f151e",
+      "hex": "460007d7",
+      "what": "id 72: nome breve 'ATK'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022E820",
+      "len": 12,
+      "expect_sha256": "8b5f6420dac8fd1694a66321a754e7048494143149444e0d0f57c8bd1bd50086",
+      "hex": "0000000000007f0000002000",
+      "what": "id 91 -> REL: min, max, default"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022E840",
+      "len": 4,
+      "expect_sha256": "1de97ec92014575b004c8b46566c4595c1d2b453bde51a272406b08809ef81f7",
+      "hex": "460007eb",
+      "what": "id 91: nome lungo 'Comp Release'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022E848",
+      "len": 4,
+      "expect_sha256": "d32706cf55ff58607f252ad2ea888eb989373049095710d559bb514bf371c949",
+      "hex": "460007e7",
+      "what": "id 91: nome breve 'REL'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EA28",
+      "len": 12,
+      "expect_sha256": "8b5f6420dac8fd1694a66321a754e7048494143149444e0d0f57c8bd1bd50086",
+      "hex": "0000000000007f0000002000",
+      "what": "id 101 -> MUP: min, max, default"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EA48",
+      "len": 4,
+      "expect_sha256": "1de97ec92014575b004c8b46566c4595c1d2b453bde51a272406b08809ef81f7",
+      "hex": "460007fc",
+      "what": "id 101: nome lungo 'Comp Makeup'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EA50",
+      "len": 4,
+      "expect_sha256": "d32706cf55ff58607f252ad2ea888eb989373049095710d559bb514bf371c949",
+      "hex": "460007f8",
+      "what": "id 101: nome breve 'MUP'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EF70",
+      "len": 12,
+      "expect_sha256": "666b68e657d64991f3f28638f14ad95396b1c58893e9db9748109e204be4b4f8",
+      "hex": "000000000000070000000300",
+      "what": "id 127 -> RAT: min, max, default"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EF90",
+      "len": 4,
+      "expect_sha256": "326a0502ff067436590314dcd74bb82958dbdb5b97c170b5dcd4b79013b6f619",
+      "hex": "4600080c",
+      "what": "id 127: nome lungo 'Comp Ratio'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EF98",
+      "len": 4,
+      "expect_sha256": "18db2ff0818545c9ec31c6f2fbf88c390d39280ac97e5b51dfc87083b45b1767",
+      "hex": "46000808",
+      "what": "id 127: nome breve 'RAT'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018B986",
+      "len": 4,
+      "expect_sha256": "f29d2507b54cd4a7a46d5cb050a82cc289d77b18b7aed5a3d1a7a258dfaebc80",
+      "hex": "41b9d670",
+      "what": "id 91 +68: renderer clessidra -> barra (come 144)"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018BCA4",
+      "len": 4,
+      "expect_sha256": "f29d2507b54cd4a7a46d5cb050a82cc289d77b18b7aed5a3d1a7a258dfaebc80",
+      "hex": "41b9d670",
+      "what": "id 101 +68: renderer clessidra -> barra"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C4B0",
+      "len": 2,
+      "expect_sha256": "e66b395a5f86146eab65009f9115f9e1b261f84c1df3aa5fb4090ac4a88cd069",
+      "hex": "2f02",
+      "what": "id 127 +4: prototipo bipolare -> come 125/126"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C4C4",
+      "len": 4,
+      "expect_sha256": "da29d618406e3fbc94b0994c0cd0cb5b8230c197656e304b75a55dfd1ac6c8a0",
+      "hex": "41b9dfb0",
+      "what": "id 127 +20: formattatore pan -> numerico"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C4D6",
+      "len": 4,
+      "expect_sha256": "a14b0e3668d92a7ce5f67e7668dc47ea5e6fba4675133f330e010f45ce038941",
+      "hex": "41b9dc00",
+      "what": "id 127 +36: come 125/126"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C4E4",
+      "len": 4,
+      "expect_sha256": "f29d2507b54cd4a7a46d5cb050a82cc289d77b18b7aed5a3d1a7a258dfaebc80",
+      "hex": "41b9d5d0",
+      "what": "id 127 +68: renderer clessidra -> barra"
     }
   ]
 }

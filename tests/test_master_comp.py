@@ -34,6 +34,9 @@ LOAD = 0x4000_0400
 HOOK, AFTER = 0x4009_053E, 0x4009_0562
 ADC_L, ADC_R = 0x8000_3C50, 0x8000_3CD0
 HW, STACK = 0x5000_2000, 0x5001_0000
+FX_SLOTS = 0x41B9_F950
+IDS = {"THR": 144, "ATK": 72, "REL": 91, "MUP": 101, "RAT": 127}
+GET, SET, KIT = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
 REGS = [getattr(__import__("unicorn.m68k_const", fromlist=["x"]), f"UC_M68K_REG_{r}")
         for r in ("D0", "D2", "D4", "D5", "D6", "D7", "A0", "A1", "A2", "A4", "A5")]
 
@@ -59,6 +62,8 @@ class Machine:
             uc.mem_write(dst, bytes.fromhex(p["hex"]))
         uc.mem_map(0x8000_0000, 0x1_0000)
         uc.mem_map(0x5000_0000, 0x2_0000)
+        uc.mem_map(0x41B9_F000, 0x1000)                         # pagina FX Drive (BSS)
+        uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
         self.emac = UnicornEmac(uc, [int(a, 16) for a in spec["emac_sites"]])
 
     def block(self, left, right, cv_l, cv_r, macsr=0x20):
@@ -131,3 +136,80 @@ def test_loud_signal_reduces_cv(setup):
     for _ in range(200):
         got = m.block(loud, loud, 30000, 30000)[0]
     assert got < quiet / 2                    # piu' di 6 dB di riduzione su un segnale a -1 dBFS
+
+
+# ----------------------------------------------------------------------------- interfaccia (v0.3)
+def call(m, fn, args, stop):
+    """Chiama fn(args...) con un indirizzo di ritorno fittizio; si ferma a 'stop' (ritorno o ripresa)."""
+    uc = m.uc
+    uc.mem_write(0x5000_8000, b"Nu")
+    sp = STACK - 4 * (len(args) + 1)
+    uc.mem_write(sp, struct.pack(f">{len(args) + 1}I", 0x5000_8000, *[a & 0xFFFFFFFF for a in args]))
+    uc.reg_write(UC_M68K_REG_SR, 0x2700)
+    uc.reg_write(UC_M68K_REG_A7, sp)
+    uc.emu_start(fn, stop, count=10_000)
+    return uc.reg_read(UC_M68K_REG_D0) & 0xFFFFFFFF
+
+
+def test_ui_get_set_and_clamp(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    params = [int(x, 16) for x in spec["params"]]
+    for (name, i), default in zip(IDS.items(), params):
+        assert call(m, GET, [0x5000_0000, i], 0x5000_8000) == default            # preset
+        assert call(m, KIT, [0x5000_0000, i], 0x5000_8000) == 1                  # "di kit"
+    call(m, SET, [0x5000_0000, IDS["THR"], 0x1234, 1], 0x5000_8000)
+    assert call(m, GET, [0x5000_0000, IDS["THR"]], 0x5000_8000) == 0x1234
+    call(m, SET, [0x5000_0000, IDS["RAT"], 0x7F00, 1], 0x5000_8000)             # oltre il massimo
+    assert call(m, GET, [0x5000_0000, IDS["RAT"]], 0x5000_8000) == 0x0700
+    call(m, SET, [0x5000_0000, IDS["MUP"], -5, 1], 0x5000_8000)                 # sotto lo zero
+    assert call(m, GET, [0x5000_0000, IDS["MUP"]], 0x5000_8000) == 0
+
+
+@pytest.mark.parametrize("fn,resume", [(KIT, 0x4000_D878), (GET, 0x4000_D950), (SET, 0x4000_DA3A)])
+def test_other_ids_resume_original_code_identically(setup, fn, resume):
+    """Per un id non nostro lo stato alla ripresa e' lo stesso dell'OS originale."""
+    from unicorn.m68k_const import UC_M68K_REG_D1, UC_M68K_REG_D2
+    spec, sec3, _ = setup
+    states = []
+    for patched in (False, True):
+        m = Machine(spec if patched else {"patches": [], "emac_sites": []}, sec3)
+        uc = m.uc
+        uc.reg_write(UC_M68K_REG_D2, 0x2222_2222)
+        uc.reg_write(UC_M68K_REG_D3, 0x3333_3333)
+        call(m, fn, [0x5000_0100, 126, 0x4000, 1], resume)
+        sp = uc.reg_read(UC_M68K_REG_A7)
+        states.append((sp, bytes(uc.mem_read(sp, 32)), uc.reg_read(UC_M68K_REG_D1), uc.reg_read(UC_M68K_REG_D2),
+                       uc.reg_read(UC_M68K_REG_D3)))
+    assert states[0] == states[1]
+
+
+def test_constants_follow_parameters(setup):
+    from model import Preset, Tables
+    spec, sec3, _ = setup
+    dt = Tables(eft.unpack(DT, ROOT / "unpacked" / "DT1.54", ids=[3])[3])
+    m = Machine(spec, sec3)
+    rnd = random.Random(11)
+    kc = int(spec["symbols"]["k_const"], 16)
+    for _ in range(20):
+        v = {k: rnd.randrange(0, 0x80) << 8 for k in IDS}
+        v["RAT"] = rnd.randrange(0, 8) << 8
+        for k, i in IDS.items():
+            call(m, SET, [0x5000_0000, i, v[k], 1], 0x5000_8000)
+        m.block([0] * 32, [0] * 32, 1000, 1000)
+        got = struct.unpack(">8i", m.uc.mem_read(kc, 32))
+        pr = Preset(dt, [v["THR"], v["ATK"], v["REL"], v["MUP"], v["RAT"], 0, 0, 0x7F00])
+        one = (1 << 31) - 1
+        assert got[1:] == (pr.thr, pr.slope, one - pr.rel, pr.rel, one - pr.att, pr.att, pr.mk)
+
+
+def test_fx_page_gets_the_five_knobs_only_if_original(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    m.block([0] * 32, [0] * 32, 1000, 1000)
+    assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == [144, 72, 91, 101, 127, 0, 0, 150]
+    m2 = Machine(spec, sec3)
+    weird = [1, 2, 3, 4, 5, 6, 7, 8]
+    m2.uc.mem_write(FX_SLOTS, struct.pack(">8i", *weird))
+    m2.block([0] * 32, [0] * 32, 1000, 1000)
+    assert list(struct.unpack(">8i", m2.uc.mem_read(FX_SLOTS, 32))) == weird
