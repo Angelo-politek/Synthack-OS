@@ -16,7 +16,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 | Wrapper unpack/repack + round-trip su OS 1.41 | ✅ | `tools/unpack/eft.py`, byte-esatto e semantico |
 | Procedura di recupero verificata sul manuale | ✅ | manuale OS 1.30 §15.4 |
 | Aggiornamento della Syntakt a 1.41 (USB) | ✅ | 2026-10-08 |
-| **Prova di recupero via MIDI DIN** | 🔄 | **prerequisito di qualunque flash modificato** |
+| **Prova di recupero via MIDI DIN** | ✅ | 2026-10-08, UMC404HD + Transfer: riuscita (lenta) → i flash di mod sono sbloccati |
 | Harness di emulazione sezione 7 | ✅ | [emulation.md](emulation.md): avvio, blocchi audio, EMAC, WAV |
 | Survey dei 12 engine (ID machine ↔ nome) | ✅ | 12 engine identificati (BD MODERN … CP VINTAGE, SY TOY, SY BITS, SY SWARM, SP TWINSHOT); SY CHORD confermato all'ascolto |
 | Mappa sezione 7 in Ghidra | 🔄 | main, interrupt, tabelle engine, contratto CPU #1 ↔ CPU #2 |

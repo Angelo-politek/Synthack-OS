@@ -1,7 +1,7 @@
 # Recovery — come riportare la Syntakt all'OS stock
 
 > **Regola:** nessun flash di firmware modificato finché la "prova a secco" in fondo a questa
-> pagina non è stata completata e registrata.
+> pagina non è stata completata e registrata. ✅ Completata il 2026-10-08 (vedi registro).
 
 ## Perché funziona (in breve)
 
@@ -80,14 +80,14 @@ principale funzioni.
 Si fa **con l'OS stock**, cioè un normale reinstallo ufficiale: rischio minimo, ma ci
 insegna la procedura quando ancora non serve.
 
-- [ ] Backup progetti/sound con Transfer
+- [x] Backup progetti/sound con Transfer
 - [x] Procedura verificata sul manuale ufficiale (OS 1.30, §15.4) e corretta qui sopra
-- [ ] Reinstallo dell'OS stock via **MIDI DIN** riuscito
-- [ ] Registrato qui sotto: data, interfaccia, programma usato, durata, problemi
+- [x] Reinstallo dell'OS stock via **MIDI DIN** riuscito
+- [x] Registrato qui sotto: data, interfaccia, programma usato, durata, problemi
 
 ### Registro delle prove
 
 | Data | Interfaccia | Programma | OS inviato | Durata | Esito / note |
 |---|---|---|---|---|---|
 | 2026-10-08 | USB diretto (aggiornamento normale, non recovery) | Elektron Transfer, pagina DROP | 1.40A → 1.41 stock | — | ✅ riuscito |
-| 2026-10-08 | Behringer UMC404HD, MIDI DIN | Elektron Transfer, "OS Upgrade via device startup menu" | 1.41 stock | in corso (molto lento) | 🔄 trasferimento avviato e in avanzamento |
+| 2026-10-08 | Behringer UMC404HD, MIDI DIN | Elektron Transfer, "OS Upgrade via device startup menu" | 1.41 stock | lungo (non cronometrato, decine di minuti) | ✅ **riuscito**: trasferimento completo, la Syntakt si è riavviata con l'OS 1.41 |
