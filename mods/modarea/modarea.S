@@ -4,7 +4,7 @@
 | (0x40347B90) viene azzerato all'avvio (BSS fino a 0x45565490). Le mod grandi vengono quindi
 | ACCODATE alla sezione 3 a partire da IMG e copiate qui, a RAM, prima dell'azzeramento.
 | RAM = 0x46000000: nella zona tra la fine del BSS e lo stack d'avvio (0x48000000) che nessuna
-| istruzione e nessun dato dell'OS indirizza (docs/re-journal.md, 2026-10-09).
+| istruzione e nessun dato dell'OS indirizza (docs/).
 |
 | Aggancio: jmp al posto delle prime due istruzioni di 0x400004B2 (azzeramento del BSS, chiamato
 | una sola volta dall'avvio, a 0x40000542). Cache non ancora attive a questo punto.

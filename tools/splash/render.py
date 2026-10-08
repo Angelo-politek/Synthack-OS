@@ -80,7 +80,7 @@ class Bitmap:
 
     def to_bytes_rowmajor(self) -> bytes:
         """1 bit per pixel, righe da sinistra a destra, bit 7 = pixel piu' a sinistra.
-        (Il formato reale del framebuffer Syntakt va ancora verificato: vedi docs/re-journal.md.)"""
+        (Il formato reale del framebuffer Syntakt va ancora verificato: vedi docs/.)"""
         out = bytearray()
         for row in self.px:
             for x in range(0, W, 8):

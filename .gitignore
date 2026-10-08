@@ -44,3 +44,7 @@ Thumbs.db
 # Manuali e datasheet di terzi (copyright NXP/Elektron): solo in locale
 refs/
 *.pdf
+
+# Note di lavoro locali (journal, brief, strumenti di studio): mai pubblicate
+local/
+CLAUDE.md

@@ -1,12 +1,12 @@
 """Genera mods/splash/patch.json: splash "SyntHack <versione>" dopo l'animazione d'avvio ufficiale.
 
-Come funziona (dettagli in docs/re-journal.md, 2026-10-08):
+Come funziona (dettagli in docs/):
 - il task dell'intro sceglie a caso una di 5 voci {segmenti...} con 5 istruzioni `pea <voce>`;
 - creiamo 5 voci nuove = {animazione originale, splash_draw x N fotogrammi, fine} nello
   spazio libero 0x40338740..0x40339000 e facciamo puntare le 5 `pea` alle voci nuove;
 - splash_draw (splash.S) copia il logo (1024 B, formato a colonne) nel framebuffer.
 
-    python mods/splash/make_patch.py            # richiede binutils m68k in WSL (vedi docs/toolchain.md)
+    python mods/splash/make_patch.py            # richiede binutils m68k in WSL (vedi CONTRIBUTING.md)
 """
 
 from __future__ import annotations
@@ -27,11 +27,11 @@ import eft  # noqa: E402
 import render  # noqa: E402
 
 LOAD = 0x4000_0400
-FREE_START, FREE_END = 0x4033_8740, 0x4033_9000     # riempimento del linker, vedi re-journal
+FREE_START, FREE_END = 0x4033_8740, 0x4033_9000     # riempimento del linker, vedi docs/memory-map.md
 # (indirizzo dell'istruzione `pea`, voce originale a cui punta)
 PEA_SITES = [(0x4008_7E90, 0x4029_A7C4), (0x4008_7EA4, 0x4029_A7B4), (0x4008_7EBA, 0x4029_A7A4),
              (0x4008_7ECC, 0x4029_A794), (0x4008_7ED4, 0x4029_A784)]
-# L'intro gira a ~28 fotogrammi/s (PIT 3: prescaler 512, PMR 8593, bus ~125 MHz; vedi re-journal).
+# L'intro gira a ~28 fotogrammi/s (PIT 3: prescaler 512, PMR 8593, bus ~125 MHz; vedi docs/memory-map.md).
 # v0.1 AGGIUNGEVA 120 fotogrammi (~4,2 s) e la macchina si e' bloccata su "PREPARING SAMPLES":
 # ora la durata totale resta quella originale, l'animazione ufficiale cede gli ultimi N fotogrammi.
 SPLASH_FRAMES = 57                                  # ~2 s

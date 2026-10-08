@@ -1,5 +1,5 @@
 #!/bin/sh
-# Rifiuta i commit che contengono firmware Elektron (vedi docs/legal.md).
+# Rifiuta i commit che contengono firmware Elektron (vedi LEGAL.md).
 # Attivazione, una volta per clone:  git config core.hooksPath tools/hooks
 for py in python3 python py; do
     if command -v "$py" >/dev/null 2>&1 && "$py" -c "import sys" >/dev/null 2>&1; then

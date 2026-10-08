@@ -53,7 +53,7 @@ def main() -> int:
     print("pre-commit: commit bloccato, possibile firmware Elektron nello staging:", file=sys.stderr)
     for path, reason in problems:
         print(f"  {path}: {reason}", file=sys.stderr)
-    print("Rimuovilo con: git rm --cached <file>   (vedi docs/legal.md)", file=sys.stderr)
+    print("Rimuovilo con: git rm --cached <file>   (vedi LEGAL.md)", file=sys.stderr)
     return 1
 
 

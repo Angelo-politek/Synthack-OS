@@ -31,7 +31,7 @@ REPO = Path(__file__).resolve().parents[2]
 DEFAULT_BIN = REPO / "third_party" / "elektron-firmware-tool" / "elektron-firmware-tool"
 
 # Sezioni che il nostro tooling non deve MAI riscrivere: sono quelle che
-# permettono il recovery (vedi docs/recovery.md).
+# permettono il recovery (vedi RECOVERY.md).
 PROTECTED_SECTIONS = frozenset({2, 6})
 
 # Sezioni ricompresse nel round-trip semantico: quelle che un giorno patcheremo.

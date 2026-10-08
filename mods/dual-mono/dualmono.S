@@ -1,7 +1,7 @@
 | Dual mono — INPUT L e INPUT R come due ingressi separati (sezione 3, Syntakt OS 1.41)
 |
 | Chiamata da un trampolino al posto del blocco 0x40090872..0x400908F8 della funzione dei
-| guadagni del mixer analogico (0x400903CA). Analisi completa in docs/re-journal.md.
+| guadagni del mixer analogico (0x400903CA). Analisi completa in docs/.
 |
 | Ingresso (impostati dalla funzione originale):
 |   a2 = parametri globali del mixer   a3 = struttura hardware (CV)   d4 = legge di bilanciamento

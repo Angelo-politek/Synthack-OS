@@ -9,7 +9,7 @@ Fonti:
 - codifiche: specifica SLEIGH di Ghidra (68000.sinc) e QEMU (target/m68k);
 - un dettaglio su cui le due fonti divergono (bit dell'accumulatore nella forma
   "MAC con load") e' stato risolto analizzando il flusso dei dati nel codice:
-  vedi docs/re-journal.md.
+  vedi docs/.
 
 Rappresentazione: ogni accumulatore e' un intero Python con segno su 48 bit.
 """

@@ -7,7 +7,7 @@
        0x40090872: jsr dm_hook.l          (6 byte)
        0x40090878: bra.w 0x400908FC       (4 byte, salta il resto del blocco originale)
 
-    python mods/dual-mono/make_patch.py         # richiede binutils m68k in WSL (docs/toolchain.md)
+    python mods/dual-mono/make_patch.py         # richiede binutils m68k in WSL (CONTRIBUTING.md)
 """
 
 from __future__ import annotations

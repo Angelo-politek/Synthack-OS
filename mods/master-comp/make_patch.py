@@ -33,7 +33,7 @@ FREE_END = MODAREA_RAM + MODAREA_SIZE
 HOOK, HOOK_END = 0x4009_053E, 0x4009_0562
 HOOK_ORIG = "0c810000ffff6f06223c0000ffff374100460c830000ffff6f06263c0000ffff37430048"
 
-# ---- interfaccia: id logici nascosti riusati (vedi comp.S e docs/re-journal.md)
+# ---- interfaccia: id logici nascosti riusati (vedi comp.S e docs/)
 DESC = 0x4022_D59C                      # descrittori: 52 B, indice = id logico
 PARAMS = [  # (nome breve, nome lungo, id, massimo)
     ("THR", "Comp Threshold", 144, 0x7F00),

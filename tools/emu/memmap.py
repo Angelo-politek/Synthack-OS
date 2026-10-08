@@ -1,6 +1,6 @@
 """Mappa di memoria della CPU audio (ColdFire #2) e caricamento della sezione 7.
 
-Tutti gli indirizzi qui sotto sono FATTI documentati in docs/re-journal.md e
+Tutti gli indirizzi qui sotto sono FATTI documentati in docs/ e
 docs/emulation.md (verificati in Ghidra o sul reference manual MCF54418RM),
 validi per Syntakt OS 1.41. Per questo il caricatore controlla l'hash della
 sezione: su un altro OS gli indirizzi potrebbero non valere piu'.

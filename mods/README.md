@@ -1,14 +1,12 @@
-# mods/
+# Mods
 
-Una cartella per mod (`mods/<nome>/`), ognuna indipendente e attivabile. Ancora vuota:
-nessuna mod si scrive finché la Fase 0 (round-trip, emulazione, recovery) non è completa.
+| Mod | What | Needs |
+|---|---|---|
+| [master-comp](master-comp) | VCA bus compressor on the analog master, UI on the FX track SYN page | modarea |
+| [dual-mono](dual-mono) | Independent IN L / IN R levels when EXTERNAL IN is mono | — |
+| [splash](splash) | "SyntHack v0.4.3" logo after the official intro | — |
+| [modarea](modarea) | Loads 32 KB of mod code into RAM at boot | — |
+| [mod-zero](mod-zero) | Example: renames a menu entry (smallest possible mod) | — |
 
-Struttura prevista per ogni mod (da definire con la prima, `dual-mono`):
-
-```
-mods/<nome>/
-  README.md        cosa fa, rischi, costo stimato CPU/RAM, sezioni toccate
-  patch.json       tabella di patch (offset, hash atteso della regione, byte nuovi nostri)
-  src/             eventuale codice C/asm nostro
-  tests/           test in emulazione
-```
+Each folder has `make_patch.py` (rebuilds `patch.json` from our sources) and a test in `tests/`.
+`patch.json` = list of `{section, addr, len, expect_sha256, hex}`; `"append": true` for mod-area code.

@@ -1,6 +1,6 @@
 """Genera mods/modarea/patch.json: rilocatore dell'area mod (vedi modarea.S).
 
-    python mods/modarea/make_patch.py         # richiede binutils m68k in WSL (docs/toolchain.md)
+    python mods/modarea/make_patch.py         # richiede binutils m68k in WSL (CONTRIBUTING.md)
 
 Le mod che usano l'area mod dichiarano "requires": ["modarea"], si collegano a RAM + offset e
 mettono il loro codice in una patch accodata ("append") a IMG + offset.

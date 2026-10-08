@@ -1,0 +1,39 @@
+# master-comp
+
+Bus compressor on the **analog master** of the Syntakt.
+
+## Use
+
+FX track → **SYN** page:
+
+| Knob | Range |
+|---|---|
+| THR | threshold, −60 … 0 dB |
+| ATK | attack, 0.1 … 100 ms |
+| REL | release, 10 ms … 2 s |
+| MUP | makeup, 0 … +24 dB (capped by the master volume range) |
+| RAT | **OFF**, 1.5:1, 2:1, 3:1, 4:1, 6:1, 8:1, 16:1, 20:1 |
+| GR | gain-reduction meter (read only, full bar = 18 dB) |
+| DRIVE | unchanged |
+
+Settings are saved **per pattern** (with the kit), or **globally** when *SYN global* is on. Existing projects load with the compressor **OFF**.
+
+## How it works
+
+- **Feed-forward VCA compressor.** Detects on ADC 6/7 (analog mix bus *before* the master VCAs), applies gain by scaling the master VCA control voltages (CV 35/36), once per audio block (~1.5 kHz).
+- **Detector:** per-sample peak → log2 → threshold/ratio → peak-hold with release → attack smoothing, then makeup and exp. Curves match the Digitakt mk1 compressor; all tables are generated from formulas in `dsp.py`.
+- **UI:** 6 hidden parameter ids (144, 72, 91, 101, 127, 59) repurposed and routed to our storage by hooks on the kit get/set functions. Storage: 4 unused words of the external-mixer block of the kit.
+- No dry/wet: impossible on a VCA.
+
+Details: [docs/audio-path.md](../../docs/audio-path.md), [docs/ui-parameters.md](../../docs/ui-parameters.md).
+
+## Known side effect
+
+Toggling *global* for the **external input** mixer also copies these settings (they share that kit block).
+
+## Build / test
+
+```sh
+python mods/master-comp/make_patch.py      # [--thr --atk --rel --mup --rat --no-drive-knob]
+python -m pytest tests/test_master_comp.py
+```

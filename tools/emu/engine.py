@@ -24,7 +24,7 @@ import memmap
 from emac import UnicornEmac
 from periph import Peripherals
 
-# --- indirizzi del codice (sezione 7, OS 1.41) — vedi docs/re-journal.md
+# --- indirizzi del codice (sezione 7, OS 1.41) — vedi docs/
 AUDIO_ISR = 0x4000_0934          # gestore dell'interrupt DTIM0 (vettore 96)
 AUDIO_ISR_RTE = 0x4000_0B1E      # il suo 'rte' finale: ci fermiamo qui (Unicorn non gestisce l'RTE)
 IDLE_LOOP = 0x4000_106E          # "bra.s *" finale di audio_main: avvio concluso

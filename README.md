@@ -1,54 +1,69 @@
-# Syntakt+
+# SyntHack OS
 
-An experimental, modular set of **unofficial** firmware mods for the Elektron Syntakt,
-built as patches applied to the stock OS that each user downloads from elektron.se.
+Unofficial, modular firmware mods for the **Elektron Syntakt** (OS 1.41).
+Each mod is a small patch applied to the stock OS you download from elektron.se — no firmware is distributed here.
 
-> **Not affiliated with, endorsed by or supported by Elektron.** Modified firmware can
-> leave your device unusable and may void your warranty. Read
-> [docs/recovery.md](docs/recovery.md) before flashing anything. Use at your own risk.
+> **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
+> Learn the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.
 
-## Status
+**Status:** `v0.4.3` — four mods running on real hardware.
 
-Phase 0 — foundations. Nothing here is flashable yet.
+## Features
 
-- [x] repo scaffold, safety and legal docs
-- [x] unpack/repack wrapper around [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool)
-- [x] byte-identical round-trip verified on Syntakt OS 1.41
-- [x] emulation approach chosen (see docs/emulation.md)
-- [x] emulation harness: the original audio engine boots and renders audio (see docs/emulation.md)
-- [ ] first map of sections 3 and 7 in Ghidra
+| Feature | Status | What it does |
+|---|---|---|
+| [Master compressor](mods/master-comp) | ✅ v0.4.3 | Bus compressor on the **analog master** (via the master VCAs). Digitakt-style curves. THR · ATK · REL · MUP · RAT (OFF, 1.5:1 … 20:1) + live gain-reduction meter on the FX track SYN page. Saved per pattern, or global with *SYN global*. |
+| [Dual mono input](mods/dual-mono) | ✅ v0.4.3 | With EXTERNAL IN set to mono, **IN L** and **IN R** get independent levels on the External Mixer page. |
+| [Boot splash](mods/splash) | ✅ v0.4.3 | "SyntHack v0.4.3" logo after the official intro. Boot time unchanged. |
+| [Mod area](mods/modarea) | ✅ infra | 32 KB of RAM for mod code, loaded at boot. |
+| Readable parameter values | ⬜ planned | Show real units: ms for attack/release, Hz for cutoff, dB for gain… |
+| PIN lock | ⬜ planned | Optional PIN at power-on, as a theft deterrent. Recovery via OS reflash stays possible. |
+| Dual mono v2 | ⬜ planned | Separate IN L / IN R pages with their own FX sends. |
+| New LFO shapes · 3rd LFO / mod matrix | ⬜ planned | |
+| Master FX suite · beat repeat | ⬜ planned | |
+| Arpeggiator · Euclidean circle UI | ⬜ planned | |
+| Resampling to SP TWINSHOT · advanced sampler | ⬜ planned | |
+| New machines: RISER / DOWNFILTER, SY SWARM+ | ⬜ planned | Requires custom audio-engine code (CPU #2). |
+| Web builder | ⬜ planned | Pick mods in the browser, build your `.syx` locally. |
 
-## What this repo contains — and what it never contains
+## Roadmap
 
-- **Contains:** our own code (MIT), patch tables, tools, documentation.
-- **Never contains:** any byte of Elektron firmware. `.syx` files are git-ignored and a
-  pre-commit hook rejects firmware images. You supply your own stock OS.
-
-## Quick start (Windows + WSL, or Linux)
-
-```sh
-# 1. build the external unpack tool (inside WSL or Linux)
-bash tools/unpack/setup_eft.sh
-
-# 2. enable the anti-firmware commit hook
-git config core.hooksPath tools/hooks
-
-# 3. put your stock OS in firmware/ (see firmware/README.md), then
-python tools/unpack/eft.py info      firmware/Syntakt_OS1.41.syx
-python tools/unpack/eft.py roundtrip firmware/Syntakt_OS1.41.syx
+```mermaid
+flowchart LR
+  A["Foundations ✅<br/>unpack/repack · emulator<br/>build tool · recovery"] --> B["First mods ✅<br/>splash · dual mono<br/>master compressor"]
+  B --> C["UI & usability<br/>readable values · PIN lock<br/>dual mono v2"]
+  C --> D["FX & performance<br/>master FX · beat repeat<br/>arp · euclidean UI · LFOs"]
+  D --> E["Engine mods<br/>new machines · sampler<br/>resampling"]
+  B -.-> W["Web builder"]
 ```
 
-## Docs
+## How it works
 
-- [docs/roadmap.md](docs/roadmap.md) — roadmap and status of every planned mod
-- [docs/recovery.md](docs/recovery.md) — how to recover a device (do this dry run first)
-- [docs/legal.md](docs/legal.md) — licensing, interoperability, what we do not publish
-- [docs/firmware-format.md](docs/firmware-format.md) — `.syx` / ELE3 container notes
-- [docs/hardware-notes.md](docs/hardware-notes.md) — hardware hypotheses
-- [docs/toolchain.md](docs/toolchain.md) — WSL, Ghidra, cross-compiler setup
-- [docs/emulation.md](docs/emulation.md) — how we plan to emulate the audio engine
-- [docs/re-journal.md](docs/re-journal.md) — reverse-engineering log
+- `tools/unpack` — unpack/repack the `.syx` (wraps [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool)).
+- `mods/<name>/patch.json` — *where* to patch, a hash of the expected original bytes, and **our** new bytes.
+- `tools/build/build.py` — stock OS + chosen mods → verified `.syx` (refuses wrong OS, overlaps, protected sections).
+- `tools/emu` — ColdFire emulator (Unicorn + our EMAC model). Every mod is tested against the original code before flashing.
+
+Technical findings: [docs/](docs).
+
+## Build your OS
+
+Requires Python 3, WSL/Linux and your own `Syntakt_OS1.41.syx` (see [firmware/README.md](firmware/README.md)).
+
+```sh
+bash tools/unpack/setup_eft.sh                 # once (WSL/Linux)
+git config core.hooksPath tools/hooks          # once: blocks firmware files from commits
+python tools/build/build.py --stock firmware/Syntakt_OS1.41.syx \
+    mods/splash mods/dual-mono mods/modarea mods/master-comp -o out/synthack.syx
+```
+
+Flash `out/synthack.syx` with Elektron Transfer (USB, *Drop* page). To go back, flash the stock OS the same way.
+
+## Contributing
+
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+Please don't post mods or instructions on Elektronauts (forbidden there); use GitHub.
 
 ## License
 
-MIT for the contents of this repository — see [LICENSE](LICENSE).
+MIT for everything in this repository ([LICENSE](LICENSE)). See [LEGAL.md](LEGAL.md).

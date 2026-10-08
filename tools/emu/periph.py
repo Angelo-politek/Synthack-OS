@@ -2,7 +2,7 @@
 
 Come in una simulazione con modelli comportamentali al posto dei chip veri: ogni
 lettura/scrittura nelle zone periferiche (0xEC.., 0xFC..) passa da qui.
-Registri e significati: reference manual NXP MCF54418RM (vedi docs/re-journal.md).
+Registri e significati: reference manual NXP MCF54418RM (vedi docs/).
 Tutto cio' che non e' modellato si comporta come una semplice memoria.
 """
 

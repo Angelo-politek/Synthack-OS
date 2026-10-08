@@ -1,6 +1,6 @@
 | master-comp — compressore sul master analogico della Syntakt (OS 1.41), "cervello" Digitakt
 |
-| Topologia (vedi docs/re-journal.md): feed-forward VCA.
+| Topologia (vedi docs/): feed-forward VCA.
 |   rilevatore : bus del mixer analogico PRIMA dei VCA del master, digitalizzato dagli ADC 6/7
 |                (gruppo 0x80003950, canali 6 e 7 = 0x80003C50 / 0x80003CD0, 32 campioni)
 |   attuatore  : tensioni di controllo dei VCA del master (hw+70 / hw+72), ricalcolate dalla

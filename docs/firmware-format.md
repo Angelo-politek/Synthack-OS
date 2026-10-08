@@ -1,46 +1,30 @@
-# Formato del firmware `.syx` (Syntakt)
+# Firmware format (`.syx`)
 
-Pagina di sintesi. Le scoperte, con data e fonte, vanno in [re-journal.md](re-journal.md);
-qui teniamo solo lo stato attuale.
+Three layers, handled by [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool):
 
-Legenda: ✅ verificato da noi · 🟡 fonte esterna / ipotesi
+1. **SysEx transport** — 7-bit packed data, per-packet checksum.
+2. **ELE3 container** — header, section table, HMAC-SHA256 over everything. The key is derived from the image itself, so the MAC can be recomputed.
+3. **Sections** — aPLib-style LZ77 compression (some sections raw).
 
-## Strati
+## Syntakt OS 1.41
 
-Un `.syx` è una "matrioska" di tre strati:
+Physical order: 5, 2, 1, 3, 4, 6, 7, 8. Sizes are decompressed.
 
-1. **Trasporto SysEx** — il file è una sequenza di messaggi MIDI SysEx (`F0 … F7`). Il
-   MIDI trasporta solo byte a 7 bit, quindi i dati a 8 bit sono "impacchettati" e ogni
-   pacchetto ha il suo checksum. 🟡
-2. **Container ELE3** — dentro i SysEx c'è un container con un header (modello, versione),
-   una tabella delle sezioni e, in coda, un **digest HMAC-SHA256** su tutto. 🟡
-   La chiave HMAC si ricava dall'immagine stessa: non c'è una firma asimmetrica, quindi
-   chiunque abbia l'immagine può ricalcolare il MAC. `elektron-firmware-tool` lo fa per noi.
-3. **Sezioni** — blocchi compressi con un algoritmo LZ77 in stile **aPLib**. aPLib è un
-   compressore molto semplice, pensato per decomprimere velocemente su CPU piccole. 🟡
-
-## Sezioni di Syntakt OS 1.41 (etichette di elektron-firmware-tool)
-
-Ordine fisico nel container: 5, 2, 1, 3, 4, 6, 7, 8. Dimensioni = byte decompressi.
-
-| id | etichetta | dimensione | compressa | contenuto ipotizzato | noi |
+| id | name | bytes | packed | content | we |
 |---|---|---:|---|---|---|
-| 1 | FPGA | 149 516 | sì | bitstream FPGA (formato non Xilinx standard 🟡) | non toccare |
-| 2 | bootstrap | 30 782 | sì | menu di avvio / OS upgrade (ColdFire) ✅ | **MAI toccare** |
-| 3 | MAIN OS | 3 438 480 | sì | OS principale + mixer/FX (🟡), ColdFire #1, a `0x40000400` ✅ | patch UI/sequencer/master |
-| 4 | updater | 32 776 | no | ? | non toccare |
-| 5 | meta | 15 | no | timestamp di build (ASCII) ✅ | non toccare |
-| 6 | boot | 1 744 | no | stub ColdFire | **MAI toccare** |
-| 7 | blob | 383 760 | **no** | codice ColdFire senza stringhe → motore audio (🟡), a `0x40000400` ✅ | patch DSP (voci/machine) |
-| 8 | (nessuna) | 159 948 | sì | inizia con `FF…`: seconda FPGA? 🟡 | non toccare |
+| 1 | FPGA | 149 516 | yes | FPGA bitstream | never touch |
+| 2 | bootstrap | 30 782 | yes | startup menu / OS upgrade (ColdFire) | **never touch** |
+| 3 | MAIN OS | 3 438 480 | yes | OS, UI, sequencer, mixer, FX (CPU #1), loads at `0x40000400` | patched |
+| 4 | updater | 32 776 | no | ? | never touch |
+| 5 | meta | 15 | no | build timestamp (ASCII) | never touch |
+| 6 | boot | 1 744 | no | ColdFire boot stub | **never touch** |
+| 7 | blob | 383 760 | **no** | voice engine (CPU #2), loads at `0x40000400`, entry `0x40001070` | patchable |
+| 8 | — | 159 948 | yes | second FPGA? | never touch |
 
-Il wrapper salva la sezione 8 come `section_8_unknown.bin`.
+Stock OS 1.41 SHA-256: `8e2488f462c4a5656396a895f113bcd415e9900fa8709340dccf45d4cb9ed19e`.
 
-## Round-trip
+## Notes
 
-- **Byte-esatto** (`-r`): le sezioni vengono copiate così come sono, senza ricompressione.
-  L'output deve essere identico all'input: dimostra che la catena di lettura/scrittura del
-  container non perde nulla.
-- **Semantico** (`-c`): una sezione viene decompressa e ricompressa. I byte compressi
-  possono cambiare (la stessa sezione si può comprimere in più modi validi), ma una volta
-  decompressa deve tornare identica. Questa è la situazione reale delle nostre patch.
+- Section 3 may grow: the bootloader accepts it (used by the [mod area](memory-map.md#mod-area)).
+- Repacking recompresses changed sections; compressed bytes differ, decompressed content is what we verify.
+- The Syntakt accepts rebuilt images (recompressed section 3, recomputed MAC) via USB and MIDI DIN.
