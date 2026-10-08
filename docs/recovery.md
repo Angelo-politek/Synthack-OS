@@ -89,4 +89,5 @@ insegna la procedura quando ancora non serve.
 
 | Data | Interfaccia | Programma | OS inviato | Durata | Esito / note |
 |---|---|---|---|---|---|
-| | | | | | |
+| 2026-10-08 | USB diretto (aggiornamento normale, non recovery) | Elektron Transfer, pagina DROP | 1.40A → 1.41 stock | — | ✅ riuscito |
+| 2026-10-08 | Behringer UMC404HD, MIDI DIN | Elektron Transfer, "OS Upgrade via device startup menu" | 1.41 stock | in corso (molto lento) | 🔄 trasferimento avviato e in avanzamento |

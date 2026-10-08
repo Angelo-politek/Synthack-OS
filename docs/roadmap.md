@@ -15,8 +15,8 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 | Scaffold repo, docs sicurezza/legali | ✅ | [recovery.md](recovery.md), [legal.md](legal.md) |
 | Wrapper unpack/repack + round-trip su OS 1.41 | ✅ | `tools/unpack/eft.py`, byte-esatto e semantico |
 | Procedura di recupero verificata sul manuale | ✅ | manuale OS 1.30 §15.4 |
-| Aggiornamento della Syntakt a 1.41 (USB) | ⬜ | hardware, utente |
-| **Prova di recupero via MIDI DIN** | ⬜ | **prerequisito di qualunque flash modificato** |
+| Aggiornamento della Syntakt a 1.41 (USB) | ✅ | 2026-10-08 |
+| **Prova di recupero via MIDI DIN** | 🔄 | **prerequisito di qualunque flash modificato** |
 | Harness di emulazione sezione 7 | ✅ | [emulation.md](emulation.md): avvio, blocchi audio, EMAC, WAV |
 | Survey dei 12 engine (ID machine ↔ nome) | ✅ | 12 engine identificati (BD MODERN … CP VINTAGE, SY TOY, SY BITS, SY SWARM, SP TWINSHOT); SY CHORD confermato all'ascolto |
 | Mappa sezione 7 in Ghidra | 🔄 | main, interrupt, tabelle engine, contratto CPU #1 ↔ CPU #2 |
@@ -36,7 +36,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 
 | Mod | Stato | Sezione | Emulabile | Note / prerequisiti |
 |---|---|---|---|---|
-| **Input dual mono v1**: L e R come due ingressi separati, ognuno con **volume e pan** | 🔄 analisi | 3 | solo le funzioni modificate, isolate | esiste già un dual mono di serie (interruttore) con controlli unici. Volume: l'hardware ha guadagni separati `extin_left/right`. **Pan per ingresso**: serve una matrice 2×2 (4 guadagni) → possibile se l'ingresso è mixato in software, non se ci sono solo 2 VCA analogici (da verificare: prova hardware "BAL in due mono"). UI: IN LR→VOL L, BAL→PAN L, + VOL R e PAN R su manopole libere. Test su hardware con recupero già provato |
+| **Input dual mono v1**: L e R come due ingressi separati, con **volume indipendente** (+ pan se possibile) | 🔄 analisi | 3 | solo le funzioni modificate, isolate | ✅ volume L/R fattibile: l'hardware ha 2 VCA distinti (`extin_left` = CV 4, `extin_right` = CV 9) scritti dal software e inviati via SPI (DSPI1). ⚠️ pan per ingresso: probabilmente no nel percorso analogico (2 VCA in tutto, ne servirebbero 4). Prossimo: funzione che calcola i due guadagni da IN LR + BAL |
 | Input dual mono **v2**: mandate separate L/R a delay e riverbero | ⬜ | 3 🟡 | solo funzioni isolate | fattibile solo se le mandate dell'ingresso sono calcolate in software (non FPGA/analogico); con v1 restano 1 manopola libera per DEL R/REV R → spostare PRE/POST nelle impostazioni o seconda pagina; salvataggio dei nuovi parametri nei dati del pattern/kit |
 
 ## Fase 2 — Loudness e basi
