@@ -107,13 +107,13 @@ def main() -> None:
     ap.add_argument("--no-drive-knob", action="store_true",
                     help="non copiare il disegno della manopola di DRIVE su THR..MUP")
     a = ap.parse_args()
-    # valori codificati in 32 bit: THR[31:25] ATK[24:18] REL[17:11] MUP[10:4] RAT[3:0], XOR K_DEF
-    k_def = ((a.thr >> 8) << 25) | ((a.atk >> 8) << 18) | ((a.rel >> 8) << 11) | ((a.mup >> 8) << 4)
     params = [a.thr, a.atk, a.rel, a.mup, a.rat]
 
     dt = eft.unpack(REPO / "firmware" / "Digitakt_OS1.54.syx", REPO / "unpacked" / "DT1.54", ids=[3])[3]
     t = Tables(dt)
-    defs = {"C_OCT": C_OCT, "K_DEF": k_def, "GFX_ON": 0 if a.no_drive_knob else 1}
+    # salvataggio: 4 parole = valore XOR default (15 bit) + un bit di RAT ciascuna; zero = default, spento
+    defs = {"C_OCT": C_OCT, "D_THR": a.thr, "D_ATK": a.atk, "D_REL": a.rel, "D_MUP": a.mup,
+            "GFX_ON": 0 if a.no_drive_knob else 1}
     defs.update({f"ID_{n}": i for n, _, i, _ in PARAMS})
     nl = "\n"
     tables = "".join(f"        .long   {', '.join(str(v) for v in tab[k:k + 8])}{nl}"
@@ -165,11 +165,13 @@ def main() -> None:
                        f" RAT={a.rat}",
         "generated_by": "mods/master-comp/make_patch.py",
         "params": [f"{v:#06x}" for v in params],   # THR ATK REL MUP (0..0x7F00), RAT (1..8)
-        "k_def": f"{k_def:#010x}",
+        "storage": {"kit_block": "L2+70 (puntatore 0x800030BC)", "global_block": "0x41B9D3B0",
+                    "word_offsets": [12, 14, 2, 8]},
         "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items())
                     if k in ("comp_hook", "scale", "k_const", "k_state", "k_logt", "k_expt", "k_fallback",
                              "k_ids", "k_dt", "k_off", "kit_hook", "get_hook", "set_hook", "convert",
-                             "fx_page", "stor", "load_p", "store_p")},
+                             "fx_page", "stor", "getv", "setv", "getr", "setr", "rat_fmt", "null_mgr",
+                             "meter", "meter_val", "k_meter", "k_tick", "k_shown", "k_ratstr")},
         "emac_sites": [f"{x:#010x}" for x in emac],
         "patches": [
             {"section": 3, "addr": f"{MODAREA_IMG + CODE_BASE - MODAREA_RAM:#010X}", "len": len(blob),

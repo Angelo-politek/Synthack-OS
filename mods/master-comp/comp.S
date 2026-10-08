@@ -18,10 +18,11 @@
 | make_patch.py) + misuratore GR (59, sola lettura). Tre agganci intercettano per questi id le
 | funzioni centrali dei parametri di kit: "e' di kit?" 0x4000D870, lettura 0x4000D94A,
 | scrittura 0x4000DA32. RAT 0 = compressore spento, 1..8 = 1.5,2,3,4,6,8,16,20:1.
-| Valori (v0.4) impacchettati in 32 bit e salvati nel kit del pattern o, con SYN global, nel
-| contenitore globale: campi THR[31:25] ATK[24:18] REL[17:11] MUP[10:4] RAT[3:0], in XOR con
-| K_DEF (cosi' due parole a zero = preset con compressore spento: i progetti esistenti non
-| cambiano). A ogni blocco comp_hook ne ricava le costanti come la Digitakt.
+| Valori (v0.4.2) in 4 parole libere del blocco "mixer esterno" del kit del pattern (o del
+| contenitore globale con SYN global): per THR ATK REL MUP una parola ciascuna, bit 14..0 =
+| valore (0..0x7F00, piena risoluzione) XOR default; il bit 15 delle 4 parole = RAT (4 bit).
+| Quattro parole a zero = valori di default con compressore spento (progetti esistenti
+| invariati). A ogni blocco comp_hook ne ricava le costanti come la Digitakt.
 | Tabelle della Digitakt (attacco, rilascio, ratio) in k_dt (dt_tables.inc, generato).
 
         .equ    ADC_L,          0x80003C50
@@ -40,11 +41,15 @@
         .equ    METER_DECAY,    111848          | discesa ~20 dB/s (unita' 2^23/dB per blocco)
         .equ    OBJS,           0x41B9FA24      | oggetti per-parametro in RAM (84 B, indice = id)
         .equ    DRIVE_GFX,      0x41B9FA24 + 84*150 + 36   | disegno della manopola di DRIVE
+        .equ    RAT_FMT_OBJ,    0x41B9FA24 + 84*127 + 20   | formattatore del testo di RAT
+        .equ    UI_ROOT,        0x444E1334      | oggetto principale dell'interfaccia (singleton)
+        .equ    UI_DIRTY,       96              | +64 ViewController, +32 "da ridisegnare"
+        .equ    REDRAW_BLOCKS,  24              | al massimo un ridisegno ogni 24 blocchi (~16 ms)
         | salvataggio: 2 parole libere del blocco "mixer esterno" del kit del pattern (L2 +82/+84;
         | L1 +40/+42), oppure le stesse del contenitore globale se SYN global (bit 2) e' attivo.
         .equ    KIT_PTR,        0x800030BC      | kit del pattern attivo (scritto da 0x400A1D18)
-        .equ    KIT_OFF,        82
-        .equ    GLOB_STORE,     0x41B9D3BC      | contenitore globale: blocco esterno 0x41B9D3B0 + 12
+        .equ    KIT_BLK,        70              | blocco esterno nel kit L2 (+70..+87)
+        .equ    GLOB_BLK,       0x41B9D3B0      | blocco esterno nel contenitore globale
         .equ    GLOBAL_FLAGS,   0x43BDE444      | bit 2 = SYN global
 
         .text
@@ -180,54 +185,48 @@ apply:
 
 | ---- costanti del compressore dai parametri (stesse formule della Digitakt, vedi model.Preset)
 convert:
-        bsr.w   load_p                          | d0 = valori decodificati
-        lea     k_const,%a5
-        lea     k_dt,%a1                        | attacco[128], rilascio[128], ratio[8]
-        move.l  %d0,%d3
-        moveq   #25,%d1                         | THR: valore<<16 = campo<<24
-        lsr.l   %d1,%d0
-        moveq   #24,%d1
-        lsl.l   %d1,%d0
+        moveq   #0,%d0                          | THR: valore<<16
+        bsr.w   getv
+        swap    %d0
+        clr.w   %d0
         move.l  #THR_K,%d1
         mac.l   %d1,%d0,%acc0
         movclr.l %acc0,%d0
         sub.l   %d1,%d0
+        lea     k_const,%a5
         move.l  %d0,4(%a5)
-        move.l  %d3,%d0                         | ATK
-        moveq   #18,%d1
-        lsr.l   %d1,%d0
-        moveq   #0x7F,%d1
-        and.l   %d1,%d0
+        moveq   #1,%d0                          | ATK: indice = valore>>8
+        bsr.w   getv
+        lsr.l   #8,%d0
+        lea     k_dt,%a1
         move.l  (%a1,%d0.l*4),%d1
+        lea     k_const,%a5
         move.l  %d1,24(%a5)
         move.l  #0x7FFFFFFF,%d2
         sub.l   %d1,%d2
         move.l  %d2,20(%a5)
-        lea     512(%a1),%a2                    | REL
-        move.l  %d3,%d0
-        moveq   #11,%d1
-        lsr.l   %d1,%d0
-        moveq   #0x7F,%d1
-        and.l   %d1,%d0
-        move.l  (%a2,%d0.l*4),%d1
+        moveq   #2,%d0                          | REL
+        bsr.w   getv
+        lsr.l   #8,%d0
+        lea     k_dt+512,%a1
+        move.l  (%a1,%d0.l*4),%d1
+        lea     k_const,%a5
         move.l  %d1,16(%a5)
         move.l  #0x7FFFFFFF,%d2
         sub.l   %d1,%d2
         move.l  %d2,12(%a5)
-        move.l  %d3,%d0                         | MUP: campo<<24
-        moveq   #4,%d1
-        lsr.l   %d1,%d0
-        moveq   #0x7F,%d1                       | (senza maschera il bit 0 di REL finirebbe nel segno)
-        and.l   %d1,%d0
-        moveq   #24,%d1
-        lsl.l   %d1,%d0
+        moveq   #3,%d0                          | MUP: valore<<16
+        bsr.w   getv
+        swap    %d0
+        clr.w   %d0
         move.l  #MUP_K,%d1
         mac.l   %d1,%d0,%acc0
         movclr.l %acc0,%d0
         sub.l   %d1,%d0
+        lea     k_const,%a5
         move.l  %d0,28(%a5)
-        moveq   #15,%d0                         | RAT: 0 = spento, 1..8 -> ratio[0..7]
-        and.l   %d3,%d0
+        bsr.w   getr                            | RAT: 0 = spento, 1..8 -> ratio[0..7]
+        tst.l   %d0
         seq     %d1
         move.b  %d1,k_off
         tst.l   %d0
@@ -237,12 +236,14 @@ convert:
         cmp.l   %d1,%d0
         ble.s   1f
         move.l  %d1,%d0
-1:      lea     1024(%a1),%a2
-        move.l  (%a2,%d0.l*4),%d1
+1:      lea     k_dt+1024,%a1
+        move.l  (%a1,%d0.l*4),%d1
+        lea     k_const,%a5
         move.l  %d1,8(%a5)
         rts
 
-| ---- misuratore GR con balistica: sale subito, scende a ~20 dB/s (usa d0, d1)
+| ---- misuratore GR con balistica: sale subito, scende a ~20 dB/s; chiede un ridisegno dello
+|      schermo quando il valore mostrato cambia (usa d0, d1, a0)
 meter:  move.l  k_state+4,%d0                   | at <= 0
         neg.l   %d0
         bpl.s   1f
@@ -255,37 +256,115 @@ meter:  move.l  k_state+4,%d0                   | at <= 0
         bge.s   3f
         move.l  %d1,%d0
 3:      move.l  %d0,k_meter
-        rts
+        bsr.w   meter_val
+        addq.l  #1,k_tick
+        cmp.w   k_shown,%d0
+        beq.s   4f
+        moveq   #REDRAW_BLOCKS,%d1
+        cmp.l   k_tick,%d1
+        bgt.s   4f
+        clr.l   k_tick
+        move.w  %d0,k_shown
+        move.l  UI_ROOT,%d1
+        beq.s   4f
+        movea.l %d1,%a0
+        moveq   #1,%d1
+        move.b  %d1,UI_DIRTY(%a0)
+4:      rts
 
-| ---- dove stanno i valori: a0 = indirizzo delle 2 parole (globale con SYN global, se no kit)
+| d0 = valore mostrato dal misuratore (0..0x7F00, barra piena = METER_FS dB) (usa d1)
+meter_val:
+        move.l  k_meter,%d0                     | 2^23 unita' per dB
+        moveq   #12,%d1
+        asr.l   %d1,%d0                         | 2048 per dB
+        move.l  #0x7F00,%d1
+        mulu.l  %d1,%d0
+        move.l  #(METER_FS*2048),%d1
+        divu.l  %d1,%d0
+        cmpi.l  #0x7F00,%d0
+        bls.s   1f
+        move.l  #0x7F00,%d0
+1:      rts
+
+| ---- dove stanno i valori: a0 = inizio del blocco esterno (globale con SYN global, se no kit)
 stor:   moveq   #4,%d1
         and.l   GLOBAL_FLAGS,%d1
         bne.s   1f
         move.l  KIT_PTR,%d1
         beq.s   2f
         movea.l %d1,%a0
-        lea     KIT_OFF(%a0),%a0
+        lea     KIT_BLK(%a0),%a0
         rts
-1:      lea     GLOB_STORE,%a0
+1:      lea     GLOB_BLK,%a0
         rts
 2:      lea     k_fallback,%a0                  | nessun kit ancora: valori in RAM
         rts
 
-| d0 = valori decodificati (usa d1, a0)
-load_p: bsr.s   stor
-        move.w  (%a0),%d0
-        swap    %d0
-        move.w  2(%a0),%d0
-        eor.l   #K_DEF,%d0
+| d0 = indice 0..3 -> d0 = valore 0..0x7F00 (usa d1, a0, a1)
+getv:   move.l  %d0,-(%sp)
+        bsr.w   stor
+        move.l  (%sp)+,%d0
+        lea     k_woff,%a1
+        mvz.b   (%a1,%d0.l),%d1
+        mvz.w   (%a0,%d1.l),%d1                 | parola salvata
+        lea     k_defw,%a1
+        mvz.w   (%a1,%d0.l*2),%d0               | default
+        eor.l   %d1,%d0
+        andi.l  #0x7FFF,%d0
         rts
 
-| d0 = valori decodificati -> memoria (usa d1, a0)
-store_p:
-        eor.l   #K_DEF,%d0
-        bsr.s   stor
-        move.w  %d0,2(%a0)
-        swap    %d0
-        move.w  %d0,(%a0)
+| d0 = indice 0..3, d1 = valore 0..0x7F00 -> memoria (usa d0, d1, d2, a0, a1)
+setv:   move.l  %d1,%d2
+        move.l  %d0,-(%sp)
+        bsr.w   stor
+        move.l  (%sp)+,%d0
+        lea     k_defw,%a1
+        mvz.w   (%a1,%d0.l*2),%d1
+        eor.l   %d1,%d2                         | valore XOR default (15 bit)
+        lea     k_woff,%a1
+        mvz.b   (%a1,%d0.l),%d1
+        adda.l  %d1,%a0
+        mvz.w   (%a0),%d1
+        andi.l  #0x8000,%d1                     | conserva il bit di RAT
+        or.l    %d2,%d1
+        move.w  %d1,(%a0)
+        rts
+
+| -> d0 = RAT 0..15 dai bit 15 delle 4 parole (usa d1, a0, a1)
+getr:   bsr.w   stor
+        moveq   #0,%d0
+        lea     k_woff,%a1
+        moveq   #3,%d1
+1:      lsl.l   #1,%d0
+        move.l  %d1,-(%sp)
+        mvz.b   (%a1,%d1.l),%d1
+        tst.w   (%a0,%d1.l)
+        bpl.s   2f
+        addq.l  #1,%d0
+2:      move.l  (%sp)+,%d1
+        subq.l  #1,%d1
+        bge.s   1b
+        rts
+
+| d0 = RAT 0..15 -> bit 15 delle 4 parole (usa d0, d1, d2, a0, a1)
+setr:   move.l  %d0,%d2
+        bsr.w   stor
+        lea     k_woff,%a1
+        moveq   #0,%d1
+1:      move.l  %d1,-(%sp)
+        mvz.b   (%a1,%d1.l),%d1
+        mvz.w   (%a0,%d1.l),%d0
+        bclr    #15,%d0
+        btst    #0,%d2
+        beq.s   2f
+        bset    #15,%d0
+2:      move.w  %d0,(%a0,%d1.l)
+        lsr.l   #1,%d2
+        move.l  (%sp)+,%d1
+        addq.l  #1,%d1
+        moveq   #4,%d0
+        cmp.l   %d0,%d1
+        blt.s   1b
         rts
 
 | ---- pagina FX Drive: se e' ancora quella originale (DRIVE in H, F e G vuoti) mette i 5 id in A..E
@@ -293,13 +372,13 @@ fx_page:
         lea     FX_SLOTS,%a0
         move.l  28(%a0),%d0
         cmpi.l  #ID_DRIVE,%d0
-        bne.s   2f
+        bne.w   2f
         tst.l   24(%a0)                         | G vuoto
-        bne.s   2f
+        bne.w   2f
         move.l  20(%a0),%d0                     | F vuoto o gia' nostro (GR)
         beq.s   3f
         cmpi.l  #ID_GR,%d0
-        bne.s   2f
+        bne.w   2f
 3:
         lea     k_ids,%a1
         moveq   #N_PAR-1,%d1
@@ -308,11 +387,11 @@ fx_page:
         subq.l  #1,%d1
         bge.s   1b
         tst.b   k_gfx                           | una sola volta: disegno di DRIVE su THR..MUP
-        bne.s   2f
+        bne.w   2f
         moveq   #-1,%d0
         move.b  %d0,k_gfx
         tst.b   k_gfx_on
-        beq.s   2f
+        beq.s   5f
         lea     k_ids,%a1
         moveq   #3,%d1
 4:      mvz.w   (%a1)+,%d0
@@ -325,6 +404,13 @@ fx_page:
         move.l  DRIVE_GFX+12,(%a0)+
         subq.l  #1,%d1
         bge.s   4b
+5:      lea     RAT_FMT_OBJ,%a0                 | formattatore di RAT: "OFF", "4:1"...
+        clr.l   (%a0)+
+        clr.l   (%a0)+
+        move.l  #null_mgr,%d0
+        move.l  %d0,(%a0)+
+        move.l  #rat_fmt,%d0
+        move.l  %d0,(%a0)
 2:      rts
 
 | ---- d0 = id logico -> d1 = indice in k_ids (0..4) oppure -1. Usa a0.
@@ -360,35 +446,17 @@ get_hook:                                       | 0x4000D94A: lettura
         beq.s   5f
         moveq   #IDX_RAT,%d0
         cmp.l   %d0,%d1
-        bne.s   4f
-        bsr.w   load_p                          | RAT: posizione 0..8 -> 0..0x7F00
-        moveq   #15,%d1
-        and.l   %d1,%d0
-        mulu.w  #RAT_STEP,%d0
+        beq.s   4f
+        move.l  %d1,%d0
+        bra.w   getv                            | THR/ATK/REL/MUP
+4:      bsr.w   getr                            | RAT: posizione 0..8 -> 0..0x7F00
+        moveq   #8,%d1
+        cmp.l   %d1,%d0
+        ble.s   6f
+        move.l  %d1,%d0
+6:      mulu.w  #RAT_STEP,%d0
         rts
-4:      move.l  %d2,-(%sp)
-        move.l  %d1,%d2                         | indice
-        bsr.w   load_p
-        lea     k_shift,%a0
-        mvz.b   (%a0,%d2.l),%d1
-        lsr.l   %d1,%d0
-        lea     k_mask,%a0
-        mvz.b   (%a0,%d2.l),%d1
-        and.l   %d1,%d0
-        lsl.l   #8,%d0                          | campo -> valore dell'interfaccia
-        move.l  (%sp)+,%d2
-        rts
-5:      move.l  k_meter,%d0                     | GR (con balistica), 2^23 unita' per dB
-        moveq   #12,%d1
-        asr.l   %d1,%d0                         | 2048 per dB
-        move.l  #0x7F00,%d1
-        mulu.l  %d1,%d0
-        move.l  #(METER_FS*2048),%d1
-        divu.l  %d1,%d0
-        cmpi.l  #0x7F00,%d0
-        bls.s   6f
-        move.l  #0x7F00,%d0
-6:      rts
+5:      bra.w   meter_val                       | GR
 9:      move.l  %d2,-(%sp)
         move.l  8(%sp),%d1
         jmp     0x4000D950
@@ -400,36 +468,22 @@ set_hook:                                       | 0x4000DA32: scrittura
         bmi.s   9f
         moveq   #IDX_GR,%d0                     | il misuratore e' in sola lettura
         cmp.l   %d0,%d1
-        beq.w   8f
+        beq.s   8f
         moveq   #IDX_RAT,%d0
         cmp.l   %d0,%d1
         beq.w   rat_set
-        move.l  12(%sp),%d0
-        lea     -12(%sp),%sp
-        movem.l %d2-%d4,(%sp)
-        move.l  %d1,%d2                         | indice
-        asr.l   #8,%d0                          | valore -> campo, limitato a [0, massimo]
+        move.l  12(%sp),%d0                     | valore limitato a [0, 0x7F00]
         bge.s   1f
         moveq   #0,%d0
-1:      lea     k_mask,%a0
-        mvz.b   (%a0,%d2.l),%d4
-        lea     k_max,%a0
-        mvz.b   (%a0,%d2.l),%d1
-        cmp.l   %d1,%d0
+1:      cmpi.l  #0x7F00,%d0
         ble.s   2f
+        move.l  #0x7F00,%d0
+2:      move.l  %d2,-(%sp)
+        move.l  %d0,%d2                         | d0 = indice, d1 = valore
         move.l  %d1,%d0
-2:      lea     k_shift,%a0
-        mvz.b   (%a0,%d2.l),%d1
-        lsl.l   %d1,%d0                         | nuovo campo in posizione
-        lsl.l   %d1,%d4                         | maschera in posizione
-        move.l  %d0,%d3
-        bsr.w   load_p
-        not.l   %d4
-        and.l   %d4,%d0
-        or.l    %d3,%d0
-        bsr.w   store_p
-        movem.l (%sp),%d2-%d4
-        lea     12(%sp),%sp
+        move.l  %d2,%d1
+        bsr.w   setv
+        move.l  (%sp)+,%d2
 8:      moveq   #0,%d0
         rts
 9:      move.l  %d3,-(%sp)
@@ -449,43 +503,69 @@ rat_set:
 1:      cmpi.l  #0x7F00,%d0
         ble.s   2f
         move.l  #0x7F00,%d0
-2:      move.l  %d0,%d2                         | nuovo valore
-        bsr.w   load_p
-        move.l  %d0,%d4                         | valori decodificati
-        moveq   #15,%d3
-        and.l   %d0,%d3                         | posizione attuale
-        move.l  %d3,%d0
+2:      move.l  %d0,%d4                         | nuovo valore
+        bsr.w   getr
+        moveq   #8,%d1
+        cmp.l   %d1,%d0
+        ble.s   3f
+        move.l  %d1,%d0
+3:      move.l  %d0,%d3                         | posizione attuale
         mulu.w  #RAT_STEP,%d0                   | valore della posizione attuale
-        move.l  %d2,%d1
-        sub.l   %d0,%d1                         | differenza
-        bge.s   3f
+        move.l  %d4,%d1
+        sub.l   %d0,%d1
+        bge.s   4f
         neg.l   %d1
-3:      cmpi.l  #(RAT_STEP/2),%d1
-        blt.s   4f
-        move.l  %d2,%d3                         | salto: posizione piu' vicina
+4:      cmpi.l  #(RAT_STEP/2),%d1
+        blt.s   5f
+        move.l  %d4,%d3                         | salto: posizione piu' vicina
         addi.l  #(RAT_STEP/2),%d3
         move.l  #RAT_STEP,%d1
         divu.l  %d1,%d3
-        bra.s   6f
-4:      cmp.l   %d0,%d2
-        beq.s   6f
-        blt.s   5f
+        bra.s   7f
+5:      cmp.l   %d0,%d4
+        beq.s   7f
+        blt.s   6f
         addq.l  #1,%d3                          | verso l'alto
-        bra.s   6f
-5:      subq.l  #1,%d3                          | verso il basso
-6:      tst.l   %d3
-        bge.s   7f
+        bra.s   7f
+6:      subq.l  #1,%d3                          | verso il basso
+7:      tst.l   %d3
+        bge.s   8f
         moveq   #0,%d3
-7:      moveq   #8,%d1
+8:      moveq   #8,%d1
         cmp.l   %d1,%d3
         ble.s   9f
         move.l  %d1,%d3
-9:      moveq   #-16,%d0
-        and.l   %d4,%d0
-        or.l    %d3,%d0
-        bsr.w   store_p
+9:      move.l  %d3,%d0
+        bsr.w   setr
         movem.l (%sp),%d2-%d4
         lea     12(%sp),%sp
+        moveq   #0,%d0
+        rts
+
+| ---- formattatore del testo di RAT, chiamato come std::function(valore, buffer)
+|      (entrata: 4(sp) = oggetto funzione, 8(sp) = valore 0..0x7F00, 12(sp) = buffer)
+rat_fmt:
+        move.l  8(%sp),%d0
+        bge.s   1f
+        moveq   #0,%d0
+1:      addi.l  #(RAT_STEP/2),%d0
+        move.l  #RAT_STEP,%d1
+        divu.l  %d1,%d0
+        moveq   #8,%d1
+        cmp.l   %d1,%d0
+        ble.s   2f
+        move.l  %d1,%d0
+2:      mulu.w  #6,%d0
+        lea     k_ratstr,%a0
+        adda.l  %d0,%a0
+        movea.l 12(%sp),%a1
+3:      move.b  (%a0)+,%d1
+        move.b  %d1,(%a1)+
+        bne.s   3b
+        rts
+
+| gestore della std::function del formattatore: nessuno stato da copiare o distruggere
+null_mgr:
         moveq   #0,%d0
         rts
 
@@ -508,15 +588,23 @@ scale:  cmpi.l  #CV_MAX,%d0
 k_const:
         .long   C_OCT, 0, 0, 0, 0, 0, 0, 0      | C_OCT, THR, SLOPE, REL1, REL, ATT1, ATT, MK
 k_fallback:
-        .long   0                               | valori (codificati) se non c'e' ancora un kit
+        .space  16                              | blocco esterno di ripiego se non c'e' ancora un kit
 k_ids:
         .word   ID_THR, ID_ATK, ID_REL, ID_MUP, ID_RAT, ID_GR
-k_shift:
-        .byte   25, 18, 11, 4, 0, 0             | posizione del campo nei 32 bit
-k_mask:
-        .byte   0x7F, 0x7F, 0x7F, 0x7F, 0x0F, 0
-k_max:
-        .byte   0x7F, 0x7F, 0x7F, 0x7F, 8, 0    | massimo del campo (RAT 0..8)
+k_woff:
+        .byte   12, 14, 2, 8                    | THR ATK REL MUP: L1 +40 +42 +30 +36 (L2 +82 +84 +72 +78)
+k_defw:
+        .word   D_THR, D_ATK, D_REL, D_MUP
+k_ratstr:
+        .ascii  "OFF\0\0\0"
+        .ascii  "1.5:1\0"
+        .ascii  "2:1\0\0\0"
+        .ascii  "3:1\0\0\0"
+        .ascii  "4:1\0\0\0"
+        .ascii  "6:1\0\0\0"
+        .ascii  "8:1\0\0\0"
+        .ascii  "16:1\0\0"
+        .ascii  "20:1\0\0"
 k_off:
         .byte   0
 k_gfx:
@@ -526,6 +614,11 @@ k_gfx_on:
         .balign 4
 k_meter:
         .long   0
+k_tick:
+        .long   0
+k_shown:
+        .word   0
+        .balign 4
 k_state:
         .long   0, 0
 k_logt:

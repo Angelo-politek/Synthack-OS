@@ -36,8 +36,10 @@ HOOK, AFTER = 0x4009_053E, 0x4009_0562
 ADC_L, ADC_R = 0x8000_3C50, 0x8000_3CD0
 HW, STACK, RET = 0x5000_2000, 0x5001_0000, 0x5000_8000
 FX_SLOTS = 0x41B9_F950
-KIT_PTR, KIT, KIT_OFF = 0x8000_30BC, 0x5000_4000, 82
-GLOB_STORE, GLOBAL_FLAGS = 0x41B9_D3BC, 0x43BD_E444
+KIT_PTR, KIT, KIT_BLK = 0x8000_30BC, 0x5000_4000, 70
+GLOB_BLK, GLOBAL_FLAGS = 0x41B9_D3B0, 0x43BD_E444
+WOFF = {"THR": 12, "ATK": 14, "REL": 2, "MUP": 8}      # parole nel blocco esterno
+UI_ROOT, UI = 0x444E_1334, 0x5000_A000
 IDS = {"THR": 144, "ATK": 72, "REL": 91, "MUP": 101, "RAT": 127, "GR": 59}
 RAT_STEP = 0xFE0
 OBJS = 0x41B9_FA24
@@ -68,6 +70,7 @@ class Machine:
         uc.mem_map(0x5000_0000, 0x2_0000)
         uc.mem_map(0x41B9_D000, 0x7000)                        # globale, pagine, oggetti (BSS)
         uc.mem_map(0x43BD_E000, 0x1000)                        # bit global
+        uc.mem_map(0x444E_1000, 0x1000)                        # puntatore all'interfaccia
         uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
         uc.mem_write(KIT_PTR, struct.pack(">I", KIT if kit else 0))
         uc.mem_write(RET, b"\x4e\x75")
@@ -206,14 +209,26 @@ def test_loud_signal_reduces_cv_and_meter_shows_it(setup):
 def test_values_live_in_the_pattern_kit_words(setup):
     spec, sec3, _ = setup
     m = Machine(spec, sec3)
-    k_def = int(spec["k_def"], 16)
-    m.set("THR", 0x1200)
-    m.set("RAT", 3 * RAT_STEP)
-    raw = m.words(KIT + KIT_OFF) ^ k_def
-    assert (raw >> 25) & 0x7F == 0x12 and raw & 0xF == 3
-    assert m.words(GLOB_STORE) == 0                  # il globale non e' toccato
-    m.uc.mem_write(KIT + KIT_OFF, bytes(4))          # altro kit (parole a zero) -> preset, spento
-    assert m.get("THR") == preset_of(spec)["THR"] and m.get("RAT") == 0
+    d = preset_of(spec)
+    m.set("THR", 0x1234)
+    m.set("RAT", 3 * RAT_STEP)                       # 3 = 0b0011: bit 15 di THR e ATK
+    w = {k: struct.unpack(">H", m.uc.mem_read(KIT + KIT_BLK + o, 2))[0] for k, o in WOFF.items()}
+    assert w["THR"] & 0x7FFF == 0x1234 ^ d["THR"]
+    assert [w[k] >> 15 for k in ("THR", "ATK", "REL", "MUP")] == [1, 1, 0, 0]
+    assert all(w[k] & 0x7FFF == 0 for k in ("ATK", "REL", "MUP"))      # default -> 0
+    assert bytes(m.uc.mem_read(GLOB_BLK, 18)) == bytes(18)             # il globale non e' toccato
+    for o in (12, 14, 2, 8):                         # altro kit (parole a zero) -> default, spento
+        m.uc.mem_write(KIT + KIT_BLK + o, bytes(2))
+    assert m.get("THR") == d["THR"] and m.get("RAT") == 0
+
+
+def test_full_resolution_is_kept(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    for k in ("THR", "ATK", "REL", "MUP"):
+        for v in (0x0001, 0x1234, 0x3F7F, 0x7EFF, 0x7F00):
+            m.set(k, v)
+            assert m.get(k) == v
 
 
 def test_syn_global_uses_the_global_words(setup):
@@ -221,12 +236,12 @@ def test_syn_global_uses_the_global_words(setup):
     m = Machine(spec, sec3)
     m.set("MUP", 0x7F00)
     m.uc.mem_write(GLOBAL_FLAGS, struct.pack(">I", 4))          # SYN global
-    assert m.get("MUP") == preset_of(spec)["MUP"]                # globale ancora a zero = preset
-    m.set("MUP", 0x0500)
-    assert m.get("MUP") == 0x0500
+    assert m.get("MUP") == preset_of(spec)["MUP"]                # globale ancora a zero = default
+    m.set("MUP", 0x0512)
+    assert m.get("MUP") == 0x0512
     m.uc.mem_write(GLOBAL_FLAGS, struct.pack(">I", 0))
     assert m.get("MUP") == 0x7F00                                # il kit ha il suo valore
-    assert m.words(GLOB_STORE) != 0
+    assert bytes(m.uc.mem_read(GLOB_BLK + WOFF["MUP"], 2)) != bytes(2)
 
 
 def test_no_kit_yet_uses_ram_fallback(setup):
@@ -331,3 +346,45 @@ def test_drive_knob_graphics_copied_once(setup):
     m.uc.mem_write(drive, bytes(16))                 # solo la prima volta
     m.block([0] * 32, [0] * 32, 1000, 1000)
     assert bytes(m.uc.mem_read(OBJS + 84 * 144 + 36, 16)) == bytes(range(0xA0, 0xB0))
+
+
+# ----------------------------------------------------------------------------- v0.4.2
+def call_fmt(m, value):
+    """Chiama il formattatore installato in RAT come farebbe l'OS: invoker(funzione, valore, buffer)."""
+    obj = OBJS + 84 * 127 + 20
+    mgr, inv = struct.unpack(">II", m.uc.mem_read(obj + 8, 8))
+    assert mgr != 0                                  # l'OS controlla che ci sia un gestore
+    buf = 0x5000_C000
+    m.uc.mem_write(buf, b"\xEE" * 16)
+    m.call(inv, [obj, value, buf])
+    raw = bytes(m.uc.mem_read(buf, 16))
+    return raw[:raw.index(0)].decode()
+
+
+def test_rat_text(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    m.block([0] * 32, [0] * 32, 1000, 1000)          # installa il formattatore
+    texts = [call_fmt(m, i * RAT_STEP) for i in range(9)]
+    assert texts == ["OFF", "1.5:1", "2:1", "3:1", "4:1", "6:1", "8:1", "16:1", "20:1"]
+    assert call_fmt(m, 0x7F00) == "20:1" and call_fmt(m, 100) == "OFF"
+
+
+def test_meter_asks_for_redraw_only_when_it_changes(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    m.uc.mem_write(UI_ROOT, struct.pack(">I", UI))
+    m.set("RAT", 8 * RAT_STEP)
+    loud = [int(0.9 * 2**31 * math.sin(2 * math.pi * 200 * i / 48000)) for i in range(32)]
+    flagged = 0
+    for _ in range(120):
+        m.uc.mem_write(UI + 96, b"\0")
+        m.block(loud, loud, 30000, 30000)
+        flagged += m.uc.mem_read(UI + 96, 1)[0]
+    assert 1 <= flagged <= 120 // 24 + 1             # al massimo un ridisegno ogni 24 blocchi
+    for _ in range(4000):                            # silenzio: il misuratore scende a 0 e si ferma
+        m.block([0] * 32, [0] * 32, 30000, 30000)
+    m.uc.mem_write(UI + 96, b"\0")
+    for _ in range(100):
+        m.block([0] * 32, [0] * 32, 30000, 30000)
+    assert m.uc.mem_read(UI + 96, 1)[0] == 0         # fermo: nessun ridisegno
