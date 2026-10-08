@@ -33,6 +33,8 @@ PARAMS, HW, STACK = 0x5000_0000, 0x5000_2000, 0x5001_0000
 MIX3 = 0x41B9_F7F0
 STEREO_LAYOUT = [126, 0, 0, 0, 129, 130, 128, 132]
 MONO_LAYOUT = [126, 128, 0, 0, 129, 130, 0, 132]
+DRAW = {i: 0x4022E164 + 52 * i + 20 for i in (69, 70)}
+DEFAULT = {i: 0x4022E164 + 52 * i + 16 for i in (69, 70)}
 NAMES = {68: 0x4022E164 + 52 * 68 + 48, 69: 0x4022E164 + 52 * 69 + 48, 70: 0x4022E164 + 52 * 70 + 48}
 ORIG_NAMES = {68: 0x40253B6E, 69: 0x40266015, 70: 0x40265CC9}
 # istruzioni EMAC del codice originale eseguito (blocco, legge di bilanciamento, seno): da GNU objdump
@@ -72,7 +74,7 @@ class Machine:
         struct.pack_into(">H", p, 0x71A, prepost)
         uc.mem_write(PARAMS, bytes(p))
         uc.mem_write(HW, b"\xAA" * 0x40)
-        uc.mem_write(FLAG, bytes([1 if mono else 0]))
+        uc.mem_write(FLAG, bytes([0 if mono else 1]))       # 0 = mono (verificato sulla macchina)
         uc.reg_write(UC_M68K_REG_SR, 0x2700)
         uc.reg_write(UC_M68K_REG_A7, STACK)
         uc.reg_write(UC_M68K_REG_A2, PARAMS)
@@ -86,6 +88,9 @@ class Machine:
     def layout(self):
         return list(struct.unpack(">8i", self.uc.mem_read(MIX3, 32)))
 
+    def u32(self, addr):
+        return struct.unpack(">I", self.uc.mem_read(addr, 4))[0]
+
     def name_ptr(self, idx):
         return struct.unpack(">I", self.uc.mem_read(NAMES[idx], 4))[0]
 
@@ -96,6 +101,12 @@ def cases(n, seed):
     for _ in range(n):
         yield (rnd.choice(edge + [rnd.randrange(0, 0x7F01)]), rnd.choice(edge + [rnd.randrange(0, 0x7F01)]),
                rnd.randrange(0, 0x7F01), rnd.choice([0, 1]))
+
+
+def test_original_descriptor_fields_are_as_assumed(sec3):
+    u = lambda a: struct.unpack_from(">I", sec3, a - LOAD)[0]                       # noqa: E731
+    assert [u(DRAW[i]) for i in (69, 70)] == [0, 0] and [u(DEFAULT[i]) for i in (69, 70)] == [0x4000] * 2
+    assert u(0x4022E164 + 52 * 68 + 20) == 1 and u(0x4022E164 + 52 * 68 + 16) == 0   # IN LR: barra
 
 
 @pytest.mark.parametrize("macsr", [0x00, 0x20, 0x40, 0x60, 0xA0])
@@ -133,9 +144,11 @@ def test_ui_switches_layout_and_names_and_back(sec3):
     assert bytes(mod.uc.mem_read(inl, 5)) == b"IN L\x00"
     assert bytes(mod.uc.mem_read(mod.name_ptr(70), 5)) == b"IN R\x00"
     assert mod.name_ptr(69) == mod.name_ptr(70)
+    assert all(mod.u32(DRAW[i]) == 1 and mod.u32(DEFAULT[i]) == 0 for i in (69, 70))   # barra
     mod.run(0x4000, 0x4000, 0x4000, 0, mono=False)
     assert mod.layout() == STEREO_LAYOUT
     assert {i: mod.name_ptr(i) for i in NAMES} == ORIG_NAMES
+    assert all(mod.u32(DRAW[i]) == 0 and mod.u32(DEFAULT[i]) == 0x4000 for i in (69, 70))
 
 
 def test_ui_untouched_if_page_is_not_the_expected_one(sec3):
@@ -145,3 +158,4 @@ def test_ui_untouched_if_page_is_not_the_expected_one(sec3):
     mod.run(0x4000, 0x4000, 0x4000, 0, mono=True)
     assert mod.layout() == weird
     assert {i: mod.name_ptr(i) for i in NAMES} == ORIG_NAMES
+    assert all(mod.u32(DRAW[i]) == 0 and mod.u32(DEFAULT[i]) == 0x4000 for i in (69, 70))

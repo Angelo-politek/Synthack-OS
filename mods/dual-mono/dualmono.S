@@ -7,11 +7,13 @@
 |   a2 = parametri globali del mixer   a3 = struttura hardware (CV)   d4 = legge di bilanciamento
 | Registri usati: d0 d1 d2 a0 a1, come il blocco originale (gli altri sono preservati).
 |
-| STEREO (impostazione EXTERNAL IN = stereo): calcolo IDENTICO all'originale.
+| STEREO (impostazione EXTERNAL IN = stereo, flag != 0): calcolo IDENTICO all'originale.
 | MONO:   VCA sinistro = curva(IN LR) al centro, VCA destro = curva(BAL) al centro;
 |         la pagina EXTERNAL MIXER mostra IN L e IN R affiancati (BAL spostato da G a B).
 
-        .equ    DUALMONO_FLAG,  0x80003146      | byte globale: EXTERNAL IN mono (!= 0)
+        .equ    DUALMONO_FLAG,  0x80003146      | byte globale EXTERNAL IN: 0 = MONO, != 0 = stereo
+                                                | (verificato sulla macchina il 2026-10-08: la v1
+                                                |  assumeva il contrario e le modalita' erano invertite)
         .equ    P_LEVEL,        0x70A           | a2: IN LR
         .equ    P_X,            0x740           | a2: parametro della tabella di livello
         .equ    P_PAN,          0x70E           | a2: BAL
@@ -35,12 +37,18 @@
         .equ    ORIG_INLR,      0x40253B6E      | "IN LR"
         .equ    ORIG_PAN,       0x40266015      | "PAN"
         .equ    ORIG_BAL,       0x40265CC9      | "BAL"
+        | aspetto del valore: campo +20 = 1 -> barra (come IN LR), default +16 (0x4000 = centro)
+        .equ    DRAW_PAN,       0x4022E164 + 52*69 + 20
+        .equ    DRAW_BAL,       0x4022E164 + 52*70 + 20
+        .equ    DEF_PAN,        0x4022E164 + 52*69 + 16
+        .equ    DEF_BAL,        0x4022E164 + 52*70 + 16
+        .equ    ORIG_DEF,       0x4000
 
         .text
         .globl  dm_hook
 dm_hook:
         tst.b   DUALMONO_FLAG
-        bne.s   mono
+        beq.s   mono
 | ---- stereo: esattamente il blocco originale
         move.w  P_LEVEL(%a2),%d2
         move.w  P_PAN(%a2),%d1
@@ -131,6 +139,11 @@ ui_mono:
         lea     str_inr,%a1
         move.l  %a1,NAME_BAL
         move.l  %a1,NAME_PAN
+        moveq   #1,%d0                          | IN R disegnato come barra, come IN L
+        move.l  %d0,DRAW_BAL
+        move.l  %d0,DRAW_PAN
+        clr.l   DEF_BAL                         | default 0 (come IN LR)
+        clr.l   DEF_PAN
 6:      rts
 
 ui_stereo:
@@ -145,6 +158,11 @@ ui_stereo:
         move.l  %d0,NAME_BAL
         move.l  #ORIG_PAN,%d0
         move.l  %d0,NAME_PAN
+        clr.l   DRAW_BAL                        | di nuovo la "clessidra" del bilanciamento
+        clr.l   DRAW_PAN
+        move.l  #ORIG_DEF,%d0
+        move.l  %d0,DEF_BAL
+        move.l  %d0,DEF_PAN
 7:      rts
 
         .data
