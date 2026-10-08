@@ -37,7 +37,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 | Mod | Stato | Sezione | Emulabile | Note |
 |---|---|---|---|---|
 | **Mod zero**: cambio di un testo nel menu (stessa lunghezza) | ✅ 2026-10-08 | 3 | non serve | collauda la catena build → `.syx` → flash: sezione 3 ricompressa + MAC ricalcolato accettati dalla macchina |
-| **Splash "SyntHack 0.1"** dopo l'intro ufficiale, logo in ASCII art (figlet *smslant*) | 🔄 pronto da flashare | 3 | ✅ `splash_draw` eseguita in Unicorn, framebuffer = design | 5 elenchi di animazione nuovi {originale, splash ×120, fine} nel riempimento libero `0x40338740`; reindirizzate le 5 `pea` del task dell'intro. Diventa la firma di versione delle build |
+| **Splash "SyntHack 0.1"** dopo l'intro ufficiale, logo in ASCII art (figlet *smslant*) | ✅ 2026-10-08 (v2) | 3 | ✅ `splash_draw` eseguita in Unicorn, framebuffer = design | 5 elenchi di animazione nuovi {originale accorciata di 57 fotogrammi, splash ×57, fine}: durata dell'avvio invariata (la v0.1, più lunga di ~4 s, bloccava su "PREPARING SAMPLES"); logo con righe invertite nel riempimento libero `0x40338740`; reindirizzate le 5 `pea` del task dell'intro. Diventa la firma di versione delle build |
 
 ## Fase 1 — Primo mod reale
 
