@@ -36,6 +36,8 @@ MONO_LAYOUT = [126, 125, 0, 0, 129, 130, 0, 132]     # IN R = alias 125 reso ali
 DESC = 0x4022D59C                                       # descrittori: record da 52 B, indice = id logico
 NAMES = {i: DESC + 52 * i + 48 for i in (125, 126, 127, 128)}
 ORIG_NAMES = {125: 0x4024F8A7, 126: 0x40253B6E, 127: 0x40266015, 128: 0x40265CC9}
+LONG = {i: DESC + 52 * i + 40 for i in (125, 126)}
+ORIG_LONG = {125: 0x40253B4D, 126: 0x40253B60}          # "Input Level", "In Left/Right"
 SWITCHES = (0x4000C8B0, 0x4000C9A4)                     # get/set del valore per id logico 125..132
 # istruzioni EMAC del codice originale eseguito (blocco, legge di bilanciamento, seno): da GNU objdump
 ORIG_EMAC = [0x40090880, 0x40090884, 0x40090892, 0x40090896, 0x400908AA, 0x400908AE, 0x400908B8,
@@ -108,6 +110,7 @@ def test_original_descriptor_fields_are_as_assumed(sec3):
     # alias 125: stesso gruppo/id interno di IN LR, nessun CC/NRPN, nessuna posizione di salvataggio
     assert [u(DESC + 52 * 125 + 4 * k) for k in (0, 1, 6, 7, 8)] == [0x34, 0x23, 0xFFFFFFFF, 0xFFFFFFFF, 0]
     assert [u(DESC + 52 * 128 + 4 * k) for k in (0, 1)] == [0x34, 0x25]               # BAL
+    assert {i: u(LONG[i]) for i in LONG} == ORIG_LONG
     for tab in SWITCHES:                    # voci 125,126 -> campo di IN LR; 127,128 -> campo di BAL
         assert struct.unpack_from(">4h", sec3, tab - LOAD) == (0x10, 0x10, 0x22, 0x22)
 
@@ -159,9 +162,12 @@ def test_ui_switches_layout_and_names_and_back(sec3):
     assert bytes(mod.uc.mem_read(mod.name_ptr(126), 5)) == b"IN L\x00"
     assert bytes(mod.uc.mem_read(mod.name_ptr(125), 5)) == b"IN R\x00"
     assert mod.name_ptr(127) == ORIG_NAMES[127] and mod.name_ptr(128) == ORIG_NAMES[128]
+    assert bytes(mod.uc.mem_read(mod.u32(LONG[126]), 11)) == b"Input Left" + bytes(1)
+    assert bytes(mod.uc.mem_read(mod.u32(LONG[125]), 12)) == b"Input Right" + bytes(1)
     mod.run(0x4000, 0x4000, 0x4000, 0, mono=False)
     assert mod.layout() == STEREO_LAYOUT
     assert {i: mod.name_ptr(i) for i in NAMES} == ORIG_NAMES
+    assert {i: mod.u32(LONG[i]) for i in LONG} == ORIG_LONG
 
 
 def test_ui_untouched_if_page_is_not_the_expected_one(sec3):
@@ -171,3 +177,4 @@ def test_ui_untouched_if_page_is_not_the_expected_one(sec3):
     mod.run(0x4000, 0x4000, 0x4000, 0, mono=True)
     assert mod.layout() == weird
     assert {i: mod.name_ptr(i) for i in NAMES} == ORIG_NAMES
+    assert {i: mod.u32(LONG[i]) for i in LONG} == ORIG_LONG

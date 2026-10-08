@@ -42,6 +42,11 @@
         .equ    ORIG_BAL,       0x40265CC9      | "BAL"
         .equ    NAME_INR,       0x4022E164 + 52*67 + 48 | alias 125
         .equ    ORIG_IN,        0x4024F8A7      | "IN"
+        | nomi lunghi (titolo in alto mentre si gira la manopola): 0x4022D59C + 52*id + 40
+        .equ    LONG_INLR,      0x4022D59C + 52*126 + 40
+        .equ    LONG_INR,       0x4022D59C + 52*125 + 40
+        .equ    ORIG_LONG_INLR, 0x40253B60      | "In Left/Right"
+        .equ    ORIG_LONG_INR,  0x40253B4D      | "Input Level"
 
         .text
         .globl  dm_hook
@@ -137,6 +142,10 @@ ui_mono:
         move.l  %a1,NAME_INLR
         lea     str_inr,%a1
         move.l  %a1,NAME_INR
+        lea     str_long_inl,%a1
+        move.l  %a1,LONG_INLR
+        lea     str_long_inr,%a1
+        move.l  %a1,LONG_INR
 6:      rts
 
 ui_stereo:
@@ -149,8 +158,14 @@ ui_stereo:
         move.l  %d0,NAME_INLR
         move.l  #ORIG_IN,%d0
         move.l  %d0,NAME_INR
+        move.l  #ORIG_LONG_INLR,%d0
+        move.l  %d0,LONG_INLR
+        move.l  #ORIG_LONG_INR,%d0
+        move.l  %d0,LONG_INR
 7:      rts
 
         .data
 str_inl: .asciz "IN L"
 str_inr: .asciz "IN R"
+str_long_inl: .asciz "Input Left"
+str_long_inr: .asciz "Input Right"
