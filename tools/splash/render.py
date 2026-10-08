@@ -87,6 +87,25 @@ class Bitmap:
                 out.append(b)
         return bytes(out)
 
+    def to_bytes_syntakt(self) -> bytes:
+        """Formato del framebuffer Syntakt (verificato su set_pixel 0x400F7140, OS 1.41):
+        per colonne, 8 byte per colonna; byte = fb[x*8 + y//8], bit = 7 - (y % 8), 1 = acceso."""
+        out = bytearray(W * H // 8)
+        for y, row in enumerate(self.px):
+            for x, v in enumerate(row):
+                if v:
+                    out[x * 8 + y // 8] |= 0x80 >> (y % 8)
+        return bytes(out)
+
+    @classmethod
+    def from_bytes_syntakt(cls, raw: bytes) -> "Bitmap":
+        bm = cls.blank()
+        for x in range(W):
+            for y in range(H):
+                if raw[x * 8 + y // 8] & (0x80 >> (y % 8)):
+                    bm.px[y][x] = 1
+        return bm
+
     def to_png(self, path: Path, scale: int = 4) -> None:
         from PIL import Image
         img = Image.new("L", (W, H))

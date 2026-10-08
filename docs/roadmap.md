@@ -37,7 +37,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 | Mod | Stato | Sezione | Emulabile | Note |
 |---|---|---|---|---|
 | **Mod zero**: cambio di un testo nel menu (stessa lunghezza) | ✅ 2026-10-08 | 3 | non serve | collauda la catena build → `.syx` → flash: sezione 3 ricompressa + MAC ricalcolato accettati dalla macchina |
-| **Splash "SyntHack 0.1"** dopo l'intro ufficiale, logo in ASCII art | ⬜ | 3 | il disegno sì (funzioni isolate → PNG del framebuffer) | trampolino alla fine dell'intro (`intro/intro_dither.cpp`); usare le funzioni grafiche dell'OS; display 🟡 128×64 mono (~21×8 caratteri) → ASCII art compatta o "disegnata" come bitmap. Diventa la firma di versione delle build |
+| **Splash "SyntHack 0.1"** dopo l'intro ufficiale, logo in ASCII art (figlet *smslant*) | 🔄 pronto da flashare | 3 | ✅ `splash_draw` eseguita in Unicorn, framebuffer = design | 5 elenchi di animazione nuovi {originale, splash ×120, fine} nel riempimento libero `0x40338740`; reindirizzate le 5 `pea` del task dell'intro. Diventa la firma di versione delle build |
 
 ## Fase 1 — Primo mod reale
 
