@@ -43,8 +43,8 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 
 | Mod | Stato | Sezione | Emulabile | Note / prerequisiti |
 |---|---|---|---|---|
-| **Input dual mono v1**: L e R come due ingressi separati, con **volume indipendente** (+ pan se possibile) | 🔄 analisi | 3 | solo le funzioni modificate, isolate | ✅ volume L/R fattibile: l'hardware ha 2 VCA distinti (`extin_left` = CV 4, `extin_right` = CV 9) scritti dal software e inviati via SPI (DSPI1). ⚠️ pan per ingresso: probabilmente no nel percorso analogico (2 VCA in tutto, ne servirebbero 4). Prossimo: funzione che calcola i due guadagni da IN LR + BAL |
-| Input dual mono **v2**: mandate separate L/R a delay e riverbero | ⬜ | 3 🟡 | solo funzioni isolate | fattibile solo se le mandate dell'ingresso sono calcolate in software (non FPGA/analogico); con v1 restano 1 manopola libera per DEL R/REV R → spostare PRE/POST nelle impostazioni o seconda pagina; salvataggio dei nuovi parametri nei dati del pattern/kit |
+| **Input dual mono v1**: in modalità EXT IN "mono", **IN L e IN R** affiancati sulla pagina EXTERNAL MIXER | 🔄 analisi | 3 | solo le funzioni modificate, isolate | Oggi la pagina ha in riga 1 `IN LR` + 3 posti vuoti, in riga 2 `DEL REV PAN FX`. In mono: riga 1 `IN L | IN R`, riga 2 `DEL REV — FX` (mandate comuni). IN L = valore di IN LR, **IN R = valore di PAN/BAL** (in mono il bilanciamento non serve) → nessun dato nuovo da salvare; effetto collaterale: tornando in stereo il PAN riparte dal valore di IN R. Hardware: 2 VCA `extin_left` (CV 4) / `extin_right` (CV 9). Pan per ingresso non possibile (2 VCA) |
+| Input dual mono **v2** (ideale): **due pagine** IN L e IN R, ciascuna con le sue mandate; la seconda compare solo in modalità mono | ⬜ | 3 🟡 | solo funzioni isolate | richiede: mandate FX dell'ingresso calcolate in software (da verificare), una pagina nuova nel sistema dei menu, salvataggio dei nuovi parametri nei dati del pattern/kit |
 
 ## Fase 2 — Loudness e basi
 
