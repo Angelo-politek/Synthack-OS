@@ -26,8 +26,8 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 
 | Voce | Stato | Serve per |
 |---|---|---|
-| Formato patch `mods/<nome>/patch.json` (indirizzo, hash atteso, dati nuovi) | ⬜ | tutte le mod |
-| `tools/build/build.py`: OS stock + mod → `.syx` verificato (mai sezioni 2/6) | ⬜ | tutte le mod |
+| Formato patch `mods/<nome>/patch.json` (indirizzo, hash atteso, dati nuovi) | ✅ | tutte le mod |
+| `tools/build/build.py`: OS stock + mod → `.syx` verificato (mai sezioni 2/6) | ✅ | tutte le mod |
 | Cross-compiler ColdFire (WSL) + linker script | ⬜ | mod con codice nuovo |
 | Spazio libero in memoria per il nostro codice (sez. 3 e 7) | ⬜ | mod con codice nuovo |
 | Test A/B in emulazione (stock vs modificato) | ⬜ | mod nella sezione 7 |
@@ -36,7 +36,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 
 | Mod | Stato | Sezione | Emulabile | Note |
 |---|---|---|---|---|
-| **Mod zero**: cambio di un testo nel menu (stessa lunghezza) | ⬜ | 3 | non serve | collauda la catena build → `.syx` → flash: sezione 3 ricompressa + MAC ricalcolato accettati dalla macchina |
+| **Mod zero**: cambio di un testo nel menu (stessa lunghezza) | ✅ 2026-10-08 | 3 | non serve | collauda la catena build → `.syx` → flash: sezione 3 ricompressa + MAC ricalcolato accettati dalla macchina |
 | **Splash "SyntHack 0.1"** dopo l'intro ufficiale, logo in ASCII art | ⬜ | 3 | il disegno sì (funzioni isolate → PNG del framebuffer) | trampolino alla fine dell'intro (`intro/intro_dither.cpp`); usare le funzioni grafiche dell'OS; display 🟡 128×64 mono (~21×8 caratteri) → ASCII art compatta o "disegnata" come bitmap. Diventa la firma di versione delle build |
 
 ## Fase 1 — Primo mod reale
