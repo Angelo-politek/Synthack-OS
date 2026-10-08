@@ -42,7 +42,8 @@ PARAMS = [  # (nome breve, nome lungo, id, massimo)
     ("ATK", "Comp Attack", 72, 0x7F00),
     ("REL", "Comp Release", 91, 0x7F00),
     ("MUP", "Comp Makeup", 101, 0x7F00),
-    ("RAT", "Comp Ratio", 127, 0x0700),
+    ("RAT", "Comp Ratio", 127, 0x0800),        # 0 = OFF, 1..8 = 1.5,2,3,4,6,8,16,20:1
+    ("GR", "Gain Reduction", 59, 0x7F00),      # misuratore, sola lettura
 ]
 # agganci alle funzioni centrali dei parametri di kit: (indirizzo, byte originali, simbolo)
 UI_HOOKS = [(0x4000_D870, "2f02747c222f0008", "kit_hook"),
@@ -97,14 +98,17 @@ def build_blob(defs: dict[str, int], incs: dict[str, str]) -> tuple[bytes, dict[
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    for k, v in (("thr", 0x4000), ("atk", 0x1800), ("rel", 0x2000), ("mup", 0x2000), ("rat", 0x300)):
+    for k, v in (("thr", 0x4000), ("atk", 0x1800), ("rel", 0x2000), ("mup", 0x2000)):
         ap.add_argument(f"--{k}", type=lambda s: int(s, 0), default=v)
+    ap.add_argument("--rat", type=int, default=4, help="ratio di default quando acceso (1..8)")
     a = ap.parse_args()
-    params = [a.thr, a.atk, a.rel, a.mup, a.rat, 0, 0, 0x7F00]
+    # valori codificati in 32 bit: THR[31:25] ATK[24:18] REL[17:11] MUP[10:4] RAT[3:0], XOR K_DEF
+    k_def = ((a.thr >> 8) << 25) | ((a.atk >> 8) << 18) | ((a.rel >> 8) << 11) | ((a.mup >> 8) << 4)
+    params = [a.thr, a.atk, a.rel, a.mup, a.rat]
 
     dt = eft.unpack(REPO / "firmware" / "Digitakt_OS1.54.syx", REPO / "unpacked" / "DT1.54", ids=[3])[3]
     t = Tables(dt)
-    defs = {"C_OCT": C_OCT, "P_THR": a.thr, "P_ATK": a.atk, "P_REL": a.rel, "P_MUP": a.mup, "P_RAT": a.rat}
+    defs = {"C_OCT": C_OCT, "K_DEF": k_def}
     defs.update({f"ID_{n}": i for n, _, i, _ in PARAMS})
     nl = "\n"
     tables = "".join(f"        .long   {', '.join(str(v) for v in tab[k:k + 8])}{nl}"
@@ -137,7 +141,7 @@ def main() -> None:
     for addr, orig, sym in UI_HOOKS:
         code = struct.pack(">HI", 0x4EF9, syms[sym]) + (b"Nq" if len(orig) == 16 else b"")
         ui.append(fixed(addr, code, f"aggancio: jmp {sym}" + (" ; nop" if len(orig) == 16 else ""), orig))
-    defaults = {"THR": a.thr, "ATK": a.atk, "REL": a.rel, "MUP": a.mup, "RAT": a.rat}
+    defaults = {"THR": a.thr, "ATK": a.atk, "REL": a.rel, "MUP": a.mup, "RAT": a.rat << 8, "GR": 0}
     for n, ln, i, mx in PARAMS:
         r = DESC + 52 * i
         ui.append(fixed(r + 8, struct.pack(">III", 0, mx, defaults[n]), f"id {i} -> {n}: min, max, default"))
@@ -149,13 +153,18 @@ def main() -> None:
     spec = {
         "name": "master-comp", "os": "1.41", "requires": ["modarea"],
         "description": "Compressore sul master analogico (VCA del master) con l'algoritmo del "
-                       "compressore della Digitakt; preset fisso " +
-                       " ".join(f"{k.upper()}={getattr(a, k):#06x}" for k in ("thr", "atk", "rel", "mup", "rat")),
+                       "compressore della Digitakt; manopole THR ATK REL MUP RAT (0 = OFF) e misuratore GR "
+                       "sulla pagina SYN della FX track; valori salvati nel kit del pattern (o globali con "
+                       "SYN global). Valori di partenza " +
+                       " ".join(f"{k.upper()}={getattr(a, k):#06x}" for k in ("thr", "atk", "rel", "mup")) +
+                       f" RAT={a.rat}",
         "generated_by": "mods/master-comp/make_patch.py",
-        "params": [f"{v:#06x}" for v in params],
+        "params": [f"{v:#06x}" for v in params],   # THR ATK REL MUP (0..0x7F00), RAT (1..8)
+        "k_def": f"{k_def:#010x}",
         "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items())
-                    if k in ("comp_hook", "scale", "k_const", "k_state", "k_logt", "k_expt", "k_params",
-                             "k_ids", "k_dt", "kit_hook", "get_hook", "set_hook", "convert", "fx_page")},
+                    if k in ("comp_hook", "scale", "k_const", "k_state", "k_logt", "k_expt", "k_fallback",
+                             "k_ids", "k_dt", "k_off", "kit_hook", "get_hook", "set_hook", "convert",
+                             "fx_page", "stor", "load_p", "store_p")},
         "emac_sites": [f"{x:#010x}" for x in emac],
         "patches": [
             {"section": 3, "addr": f"{MODAREA_IMG + CODE_BASE - MODAREA_RAM:#010X}", "len": len(blob),
