@@ -1,0 +1,14 @@
+{
+  "name": "mod-zero",
+  "description": "Collaudo della catena build -> flash: cambia l'etichetta di menu 'EXTERNAL IN' (SETTINGS > AUDIO ROUTING) in 'SYNTHACK IN'. Nessun effetto sul suono.",
+  "os": "1.41",
+  "patches": [
+    {
+      "section": 3,
+      "addr": "0x4024F897",
+      "len": 11,
+      "expect_sha256": "30243badfa4e71f7f4f3aaf96c73243cfd0563317874af7b80aa887305edb9fc",
+      "ascii": "SYNTHACK IN"
+    }
+  ]
+}
