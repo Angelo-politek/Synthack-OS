@@ -80,7 +80,7 @@ principale funzioni.
 Si fa **con l'OS stock**, cioè un normale reinstallo ufficiale: rischio minimo, ma ci
 insegna la procedura quando ancora non serve.
 
-- [x] Backup progetti/sound con Transfer
+- [ ] Backup progetti/sound con Transfer (da fare prima del primo flash di una mod)
 - [x] Procedura verificata sul manuale ufficiale (OS 1.30, §15.4) e corretta qui sopra
 - [x] Reinstallo dell'OS stock via **MIDI DIN** riuscito
 - [x] Registrato qui sotto: data, interfaccia, programma usato, durata, problemi
