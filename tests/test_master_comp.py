@@ -39,6 +39,8 @@ FX_SLOTS = 0x41B9_F950
 KIT_PTR, KIT, KIT_OFF = 0x8000_30BC, 0x5000_4000, 82
 GLOB_STORE, GLOBAL_FLAGS = 0x41B9_D3BC, 0x43BD_E444
 IDS = {"THR": 144, "ATK": 72, "REL": 91, "MUP": 101, "RAT": 127, "GR": 59}
+RAT_STEP = 0xFE0
+OBJS = 0x41B9_FA24
 GET, SET, KIT_FN = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
 REGS = [getattr(__import__("unicorn.m68k_const", fromlist=["x"]), f"UC_M68K_REG_{r}")
         for r in ("D0", "D2", "D4", "D5", "D6", "D7", "A0", "A1", "A2", "A4", "A5")]
@@ -64,7 +66,7 @@ class Machine:
             uc.mem_write(dst, bytes.fromhex(p["hex"]))
         uc.mem_map(0x8000_0000, 0x1_0000)
         uc.mem_map(0x5000_0000, 0x2_0000)
-        uc.mem_map(0x41B9_D000, 0x3000)                        # contenitore globale + pagine (BSS)
+        uc.mem_map(0x41B9_D000, 0x7000)                        # globale, pagine, oggetti (BSS)
         uc.mem_map(0x43BD_E000, 0x1000)                        # bit global
         uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
         uc.mem_write(KIT_PTR, struct.pack(">I", KIT if kit else 0))
@@ -115,12 +117,12 @@ class Machine:
 
 def preset_of(spec):
     v = [int(x, 16) for x in spec["params"]]
-    return {"THR": v[0], "ATK": v[1], "REL": v[2], "MUP": v[3], "RAT": v[4] << 8}
+    return {"THR": v[0], "ATK": v[1], "REL": v[2], "MUP": v[3], "RAT": v[4] * RAT_STEP}
 
 
 def model(dt, p):
     from model import Compact, Preset
-    rat_dt = ((p["RAT"] >> 8) - 1) << 8              # RAT 1..8 -> indice 0..7 della Digitakt
+    rat_dt = (p["RAT"] // RAT_STEP - 1) << 8          # RAT 1..8 -> indice 0..7 della Digitakt
     return Compact(Preset(dt, [p["THR"], p["ATK"], p["REL"], p["MUP"], rat_dt, 0, 0, 0x7F00]))
 
 
@@ -174,7 +176,7 @@ def test_parameters_change_the_compressor_like_the_model(setup):
     rnd = random.Random(11)
     for _ in range(6):
         p = {k: rnd.randrange(0, 0x80) << 8 for k in ("THR", "ATK", "REL", "MUP")}
-        p["RAT"] = rnd.randrange(1, 9) << 8
+        p["RAT"] = rnd.randrange(1, 9) * RAT_STEP
         m = Machine(spec, sec3)
         for k, v in p.items():
             m.set(k, v)
@@ -188,7 +190,7 @@ def test_parameters_change_the_compressor_like_the_model(setup):
 def test_loud_signal_reduces_cv_and_meter_shows_it(setup):
     spec, sec3, _ = setup
     m = Machine(spec, sec3)
-    m.set("RAT", 8 << 8)                             # 20:1
+    m.set("RAT", 8 * RAT_STEP)                       # 20:1
     loud = [int(0.9 * 2**31 * math.sin(2 * math.pi * 200 * i / 48000)) for i in range(32)]
     quiet = m.block([0] * 32, [0] * 32, 30000, 30000)[0]
     for _ in range(200):
@@ -206,7 +208,7 @@ def test_values_live_in_the_pattern_kit_words(setup):
     m = Machine(spec, sec3)
     k_def = int(spec["k_def"], 16)
     m.set("THR", 0x1200)
-    m.set("RAT", 0x300)
+    m.set("RAT", 3 * RAT_STEP)
     raw = m.words(KIT + KIT_OFF) ^ k_def
     assert (raw >> 25) & 0x7F == 0x12 and raw & 0xF == 3
     assert m.words(GLOB_STORE) == 0                  # il globale non e' toccato
@@ -237,8 +239,8 @@ def test_no_kit_yet_uses_ram_fallback(setup):
 def test_set_clamps_to_range(setup):
     spec, sec3, _ = setup
     m = Machine(spec, sec3)
-    m.set("RAT", 0x7F00)
-    assert m.get("RAT") == 0x0800
+    m.set("RAT", 0x7FFF)
+    assert m.get("RAT") == 0x7F00
     m.set("ATK", -5)
     assert m.get("ATK") == 0
     m.set("THR", 0x7FFF)
@@ -280,3 +282,52 @@ def test_fx_page_gets_the_knobs_only_if_original(setup):
     m2.uc.mem_write(FX_SLOTS, struct.pack(">8i", *weird))
     m2.block([0] * 32, [0] * 32, 1000, 1000)
     assert list(struct.unpack(">8i", m2.uc.mem_read(FX_SLOTS, 32))) == weird
+
+
+# ----------------------------------------------------------------------------- rifiniture v0.4.1
+def test_rat_moves_one_position_per_small_step_and_fills_the_bar(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    assert m.get("RAT") == 0
+    for i in range(1, 9):                            # manopola verso destra: +0x100 per scatto
+        m.set("RAT", m.get("RAT") + 0x100)
+        assert m.get("RAT") == i * RAT_STEP
+    m.set("RAT", m.get("RAT") + 0x100)               # oltre il massimo: resta a 8
+    assert m.get("RAT") == 0x7F00                    # barra piena
+    for i in range(7, -1, -1):                       # verso sinistra
+        m.set("RAT", m.get("RAT") - 0x40)
+        assert m.get("RAT") == i * RAT_STEP
+    m.set("RAT", 5 * RAT_STEP + 300)                 # salto: posizione piu' vicina
+    assert m.get("RAT") == 5 * RAT_STEP
+
+
+def test_meter_rises_fast_and_falls_slowly(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    m.set("RAT", 8 * RAT_STEP)
+    loud = [int(0.9 * 2**31 * math.sin(2 * math.pi * 200 * (i + 32 * b) / 48000)) for b in range(1) for i in range(32)]
+    for _ in range(100):
+        m.block(loud, loud, 30000, 30000)
+    top = m.get("GR")
+    assert top > 0x2000
+    m.block([0] * 32, [0] * 32, 30000, 30000)
+    after1 = m.get("GR")
+    assert top - 0x400 < after1 <= top               # non crolla in un blocco
+    for _ in range(3000):                            # ~2 s di silenzio
+        m.block([0] * 32, [0] * 32, 30000, 30000)
+    assert m.get("GR") == 0
+
+
+def test_drive_knob_graphics_copied_once(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    drive = OBJS + 84 * 150 + 36
+    m.uc.mem_write(drive, bytes(range(0xA0, 0xB0)))
+    m.block([0] * 32, [0] * 32, 1000, 1000)
+    for i in (144, 72, 91, 101):
+        assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(range(0xA0, 0xB0))
+    for i in (127, 59):                              # RAT e GR restano barre
+        assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(16)
+    m.uc.mem_write(drive, bytes(16))                 # solo la prima volta
+    m.block([0] * 32, [0] * 32, 1000, 1000)
+    assert bytes(m.uc.mem_read(OBJS + 84 * 144 + 36, 16)) == bytes(range(0xA0, 0xB0))

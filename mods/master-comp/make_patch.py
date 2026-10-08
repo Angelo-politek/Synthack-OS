@@ -42,7 +42,7 @@ PARAMS = [  # (nome breve, nome lungo, id, massimo)
     ("ATK", "Comp Attack", 72, 0x7F00),
     ("REL", "Comp Release", 91, 0x7F00),
     ("MUP", "Comp Makeup", 101, 0x7F00),
-    ("RAT", "Comp Ratio", 127, 0x0800),        # 0 = OFF, 1..8 = 1.5,2,3,4,6,8,16,20:1
+    ("RAT", "Comp Ratio", 127, 0x7F00),        # 9 posizioni: 0 = OFF, 1..8 = 1.5..20:1
     ("GR", "Gain Reduction", 59, 0x7F00),      # misuratore, sola lettura
 ]
 # agganci alle funzioni centrali dei parametri di kit: (indirizzo, byte originali, simbolo)
@@ -55,7 +55,10 @@ INIT_FIX = [(0x4018_B986, "41b9d660", "41b9d670", "id 91 +68: renderer clessidra
             (0x4018_C4B0, "2f04", "2f02", "id 127 +4: prototipo bipolare -> come 125/126"),
             (0x4018_C4C4, "41b9df10", "41b9dfb0", "id 127 +20: formattatore pan -> numerico"),
             (0x4018_C4D6, "41b9db80", "41b9dc00", "id 127 +36: come 125/126"),
-            (0x4018_C4E4, "41b9d660", "41b9d5d0", "id 127 +68: renderer clessidra -> barra")]
+            (0x4018_C4E4, "41b9d660", "41b9d5d0", "id 127 +68: renderer clessidra -> barra"),
+            (0x4018_AEE6, "41b9dcd0", "41b9dc00", "id 59 (GR) +36: come IN LR"),
+            (0x4018_AF06, "41b9d5b0", "41b9d5d0", "id 59 (GR) +68: manopola -> barra (come IN LR)")]
+RAT_STEP = 0xFE0
 WSL_BINUTILS = "~/tools/m68k/root"
 
 
@@ -101,6 +104,8 @@ def main() -> None:
     for k, v in (("thr", 0x4000), ("atk", 0x1800), ("rel", 0x2000), ("mup", 0x2000)):
         ap.add_argument(f"--{k}", type=lambda s: int(s, 0), default=v)
     ap.add_argument("--rat", type=int, default=4, help="ratio di default quando acceso (1..8)")
+    ap.add_argument("--no-drive-knob", action="store_true",
+                    help="non copiare il disegno della manopola di DRIVE su THR..MUP")
     a = ap.parse_args()
     # valori codificati in 32 bit: THR[31:25] ATK[24:18] REL[17:11] MUP[10:4] RAT[3:0], XOR K_DEF
     k_def = ((a.thr >> 8) << 25) | ((a.atk >> 8) << 18) | ((a.rel >> 8) << 11) | ((a.mup >> 8) << 4)
@@ -108,7 +113,7 @@ def main() -> None:
 
     dt = eft.unpack(REPO / "firmware" / "Digitakt_OS1.54.syx", REPO / "unpacked" / "DT1.54", ids=[3])[3]
     t = Tables(dt)
-    defs = {"C_OCT": C_OCT, "K_DEF": k_def}
+    defs = {"C_OCT": C_OCT, "K_DEF": k_def, "GFX_ON": 0 if a.no_drive_knob else 1}
     defs.update({f"ID_{n}": i for n, _, i, _ in PARAMS})
     nl = "\n"
     tables = "".join(f"        .long   {', '.join(str(v) for v in tab[k:k + 8])}{nl}"
@@ -141,7 +146,7 @@ def main() -> None:
     for addr, orig, sym in UI_HOOKS:
         code = struct.pack(">HI", 0x4EF9, syms[sym]) + (b"Nq" if len(orig) == 16 else b"")
         ui.append(fixed(addr, code, f"aggancio: jmp {sym}" + (" ; nop" if len(orig) == 16 else ""), orig))
-    defaults = {"THR": a.thr, "ATK": a.atk, "REL": a.rel, "MUP": a.mup, "RAT": a.rat << 8, "GR": 0}
+    defaults = {"THR": a.thr, "ATK": a.atk, "REL": a.rel, "MUP": a.mup, "RAT": a.rat * RAT_STEP, "GR": 0}
     for n, ln, i, mx in PARAMS:
         r = DESC + 52 * i
         ui.append(fixed(r + 8, struct.pack(">III", 0, mx, defaults[n]), f"id {i} -> {n}: min, max, default"))

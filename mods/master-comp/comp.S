@@ -34,6 +34,12 @@
         .equ    ID_DRIVE,       150
         .equ    N_PAR,          6               | THR ATK REL MUP RAT + GR (sola lettura)
         .equ    IDX_GR,         5
+        .equ    IDX_RAT,        4
+        .equ    RAT_STEP,       0xFE0           | RAT: 9 posizioni (0 = OFF) su 0..0x7F00
+        .equ    METER_FS,       18              | misuratore GR: barra piena = 18 dB
+        .equ    METER_DECAY,    111848          | discesa ~20 dB/s (unita' 2^23/dB per blocco)
+        .equ    OBJS,           0x41B9FA24      | oggetti per-parametro in RAM (84 B, indice = id)
+        .equ    DRIVE_GFX,      0x41B9FA24 + 84*150 + 36   | disegno della manopola di DRIVE
         | salvataggio: 2 parole libere del blocco "mixer esterno" del kit del pattern (L2 +82/+84;
         | L1 +40/+42), oppure le stesse del contenitore globale se SYN global (bit 2) e' attivo.
         .equ    KIT_PTR,        0x800030BC      | kit del pattern attivo (scritto da 0x400A1D18)
@@ -56,6 +62,7 @@ comp_hook:
         lea     k_state,%a2                     | spento: stato azzerato, CV originali (G = 1)
         clr.l   (%a2)
         clr.l   4(%a2)
+        bsr.w   meter
         move.l  #4096,%d1
         bra.w   apply
 8:      lea     ADC_L,%a0
@@ -132,6 +139,7 @@ comp_hook:
         bne.w   1b
         move.l  %d5,(%a2)
         move.l  %d6,4(%a2)
+        bsr.w   meter
         | ---- guadagno G (Q12, 65536 = x16) = 2^(16 - v/2^23), v = EXP_K * (MK + at)
         add.l   28(%a5),%d6
         move.l  #EXP_K,%d3
@@ -234,6 +242,21 @@ convert:
         move.l  %d1,8(%a5)
         rts
 
+| ---- misuratore GR con balistica: sale subito, scende a ~20 dB/s (usa d0, d1)
+meter:  move.l  k_state+4,%d0                   | at <= 0
+        neg.l   %d0
+        bpl.s   1f
+        moveq   #0,%d0
+1:      move.l  k_meter,%d1
+        subi.l  #METER_DECAY,%d1
+        bpl.s   2f
+        moveq   #0,%d1
+2:      cmp.l   %d1,%d0
+        bge.s   3f
+        move.l  %d1,%d0
+3:      move.l  %d0,k_meter
+        rts
+
 | ---- dove stanno i valori: a0 = indirizzo delle 2 parole (globale con SYN global, se no kit)
 stor:   moveq   #4,%d1
         and.l   GLOBAL_FLAGS,%d1
@@ -284,6 +307,24 @@ fx_page:
         move.l  %d0,(%a0)+
         subq.l  #1,%d1
         bge.s   1b
+        tst.b   k_gfx                           | una sola volta: disegno di DRIVE su THR..MUP
+        bne.s   2f
+        moveq   #-1,%d0
+        move.b  %d0,k_gfx
+        tst.b   k_gfx_on
+        beq.s   2f
+        lea     k_ids,%a1
+        moveq   #3,%d1
+4:      mvz.w   (%a1)+,%d0
+        mulu.w  #84,%d0
+        addi.l  #(OBJS+36),%d0
+        movea.l %d0,%a0
+        move.l  DRIVE_GFX,(%a0)+
+        move.l  DRIVE_GFX+4,(%a0)+
+        move.l  DRIVE_GFX+8,(%a0)+
+        move.l  DRIVE_GFX+12,(%a0)+
+        subq.l  #1,%d1
+        bge.s   4b
 2:      rts
 
 | ---- d0 = id logico -> d1 = indice in k_ids (0..4) oppure -1. Usa a0.
@@ -317,7 +358,15 @@ get_hook:                                       | 0x4000D94A: lettura
         moveq   #IDX_GR,%d0
         cmp.l   %d0,%d1
         beq.s   5f
-        move.l  %d2,-(%sp)
+        moveq   #IDX_RAT,%d0
+        cmp.l   %d0,%d1
+        bne.s   4f
+        bsr.w   load_p                          | RAT: posizione 0..8 -> 0..0x7F00
+        moveq   #15,%d1
+        and.l   %d1,%d0
+        mulu.w  #RAT_STEP,%d0
+        rts
+4:      move.l  %d2,-(%sp)
         move.l  %d1,%d2                         | indice
         bsr.w   load_p
         lea     k_shift,%a0
@@ -329,15 +378,12 @@ get_hook:                                       | 0x4000D94A: lettura
         lsl.l   #8,%d0                          | campo -> valore dell'interfaccia
         move.l  (%sp)+,%d2
         rts
-5:      move.l  k_state+4,%d0                   | GR: at <= 0, 2^23 unita' per dB
-        neg.l   %d0
-        bpl.s   7f
-        moveq   #0,%d0
-7:      moveq   #12,%d1
+5:      move.l  k_meter,%d0                     | GR (con balistica), 2^23 unita' per dB
+        moveq   #12,%d1
         asr.l   %d1,%d0                         | 2048 per dB
         move.l  #0x7F00,%d1
         mulu.l  %d1,%d0
-        move.l  #(24*2048),%d1                  | barra piena = 24 dB
+        move.l  #(METER_FS*2048),%d1
         divu.l  %d1,%d0
         cmpi.l  #0x7F00,%d0
         bls.s   6f
@@ -354,7 +400,10 @@ set_hook:                                       | 0x4000DA32: scrittura
         bmi.s   9f
         moveq   #IDX_GR,%d0                     | il misuratore e' in sola lettura
         cmp.l   %d0,%d1
-        beq.s   8f
+        beq.w   8f
+        moveq   #IDX_RAT,%d0
+        cmp.l   %d0,%d1
+        beq.w   rat_set
         move.l  12(%sp),%d0
         lea     -12(%sp),%sp
         movem.l %d2-%d4,(%sp)
@@ -388,6 +437,58 @@ set_hook:                                       | 0x4000DA32: scrittura
         move.l  12(%sp),%d1
         jmp     0x4000DA3A
 
+| ---- RAT: 9 posizioni. Piccolo spostamento (manopola) = una posizione nella sua direzione;
+| salto grande (valore assoluto, es. default) = posizione piu' vicina.
+rat_set:
+        move.l  12(%sp),%d0
+        lea     -12(%sp),%sp
+        movem.l %d2-%d4,(%sp)
+        tst.l   %d0
+        bge.s   1f
+        moveq   #0,%d0
+1:      cmpi.l  #0x7F00,%d0
+        ble.s   2f
+        move.l  #0x7F00,%d0
+2:      move.l  %d0,%d2                         | nuovo valore
+        bsr.w   load_p
+        move.l  %d0,%d4                         | valori decodificati
+        moveq   #15,%d3
+        and.l   %d0,%d3                         | posizione attuale
+        move.l  %d3,%d0
+        mulu.w  #RAT_STEP,%d0                   | valore della posizione attuale
+        move.l  %d2,%d1
+        sub.l   %d0,%d1                         | differenza
+        bge.s   3f
+        neg.l   %d1
+3:      cmpi.l  #(RAT_STEP/2),%d1
+        blt.s   4f
+        move.l  %d2,%d3                         | salto: posizione piu' vicina
+        addi.l  #(RAT_STEP/2),%d3
+        move.l  #RAT_STEP,%d1
+        divu.l  %d1,%d3
+        bra.s   6f
+4:      cmp.l   %d0,%d2
+        beq.s   6f
+        blt.s   5f
+        addq.l  #1,%d3                          | verso l'alto
+        bra.s   6f
+5:      subq.l  #1,%d3                          | verso il basso
+6:      tst.l   %d3
+        bge.s   7f
+        moveq   #0,%d3
+7:      moveq   #8,%d1
+        cmp.l   %d1,%d3
+        ble.s   9f
+        move.l  %d1,%d3
+9:      moveq   #-16,%d0
+        and.l   %d4,%d0
+        or.l    %d3,%d0
+        bsr.w   store_p
+        movem.l (%sp),%d2-%d4
+        lea     12(%sp),%sp
+        moveq   #0,%d0
+        rts
+
 | d0 = CV, d1 = G -> d0 = min(65535, CV*G >> 12) (CV negativo: lasciato com'e', come l'originale)
 scale:  cmpi.l  #CV_MAX,%d0
         ble.s   6f
@@ -418,7 +519,13 @@ k_max:
         .byte   0x7F, 0x7F, 0x7F, 0x7F, 8, 0    | massimo del campo (RAT 0..8)
 k_off:
         .byte   0
+k_gfx:
+        .byte   0                               | disegno di DRIVE gia' copiato
+k_gfx_on:
+        .byte   GFX_ON                          | esperimento attivo (make_patch --no-drive-knob)
         .balign 4
+k_meter:
+        .long   0
 k_state:
         .long   0, 0
 k_logt:
