@@ -1,0 +1,29 @@
+{
+  "name": "modarea",
+  "os": "1.41",
+  "description": "Area mod: all'avvio copia 32 KB accodati alla sezione 3 (0x40348000) in RAM a 0x46000000, prima dell'azzeramento del BSS.",
+  "generated_by": "mods/modarea/make_patch.py",
+  "layout": {
+    "img": "0x40348000",
+    "ram": "0x46000000",
+    "size": "0x8000"
+  },
+  "patches": [
+    {
+      "section": 3,
+      "addr": "0X40338D74",
+      "len": 42,
+      "expect_sha256": "094c4931fdb2f2af417c9e0322a9716006e8211fe9017f671ac6e3251300acca",
+      "hex": "2f0941f94034800043f946000000223c0000200022d8538166fa225f4feffff048d700f04ef9400004ba",
+      "what": "modarea_reloc: copia IMG -> RAM, istruzioni sostituite, jmp 0x400004BA"
+    },
+    {
+      "section": 3,
+      "addr": "0X400004B2",
+      "len": 8,
+      "expect_sha256": "02baba67a7ec7d7bdf683fa37f268620e3a694853b398205df521c64128da818",
+      "hex": "4ef940338d744e71",
+      "what": "inizio dell'azzeramento del BSS: jmp modarea_reloc ; nop"
+    }
+  ]
+}

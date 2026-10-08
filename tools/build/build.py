@@ -17,6 +17,10 @@ Formato di mods/<nome>/patch.json:
          "ascii": "SYNTHACK IN"}            # oppure "hex": "4e71..."
       ]
     }
+
+Patch accodate ("append": true, solo "hex"): byte NUOVI oltre la fine della sezione stock (area
+mod, vedi mods/modarea); lo spazio tra la fine stock e "addr" viene riempito di zeri. Non hanno
+impronta (non sostituiscono byte Elektron). Una mod puo' dichiarare "requires": ["modarea"].
 """
 
 from __future__ import annotations
@@ -53,6 +57,7 @@ class Patch:
     addr: int
     data: bytes
     expect_sha256: str
+    append: bool = False
 
     @property
     def offset(self) -> int:
@@ -80,29 +85,42 @@ def load_mod(moddir: Path, os_version: str) -> list[Patch]:
             raise BuildError(f"{name}[{i}]: {len(data)} byte nuovi ma 'len' = {p['len']}")
         if p["section"] not in PATCHABLE:
             raise BuildError(f"{name}[{i}]: sezione {p['section']} non modificabile (solo {sorted(PATCHABLE)})")
-        patches.append(Patch(name, p["section"], int(p["addr"], 16), data, p["expect_sha256"].lower()))
+        if p.get("append"):
+            if "hex" not in p:
+                raise BuildError(f"{name}[{i}]: una patch accodata vuole 'hex'")
+            patches.append(Patch(name, p["section"], int(p["addr"], 16), data, "", append=True))
+        else:
+            patches.append(Patch(name, p["section"], int(p["addr"], 16), data, p["expect_sha256"].lower()))
     return patches
 
 
 def apply_patches(sections: dict[int, bytearray], patches: list[Patch]) -> None:
     """Applica le patch verificando impronte e sovrapposizioni. Modifica 'sections' sul posto."""
     taken: dict[int, list[Patch]] = {}
+    stock_len = {s: len(b) for s, b in sections.items()}
     for p in patches:
         sec = sections.get(p.section)
         if sec is None:
             raise BuildError(f"{p.mod}: sezione {p.section} non caricata")
-        if p.offset < 0 or p.end > len(sec):
-            raise BuildError(f"{p.mod}: {p.addr:#x} fuori dalla sezione {p.section}")
         for q in taken.get(p.section, []):
             if p.offset < q.end and q.offset < p.end:
                 raise BuildError(f"{p.mod} e {q.mod} modificano gli stessi byte ({p.addr:#x})")
-        found = sha256(bytes(sec[p.offset:p.end]))
-        if found != p.expect_sha256:
-            raise BuildError(f"{p.mod}: a {p.addr:#x} i byte originali non sono quelli attesi "
-                             f"(OS diverso o file modificato)")
+        if p.append:
+            if p.offset < stock_len[p.section]:
+                raise BuildError(f"{p.mod}: patch accodata a {p.addr:#x} dentro la sezione stock")
+        else:
+            if p.offset < 0 or p.end > stock_len[p.section]:
+                raise BuildError(f"{p.mod}: {p.addr:#x} fuori dalla sezione {p.section}")
+            found = sha256(bytes(sec[p.offset:p.end]))
+            if found != p.expect_sha256:
+                raise BuildError(f"{p.mod}: a {p.addr:#x} i byte originali non sono quelli attesi "
+                                 f"(OS diverso o file modificato)")
         taken.setdefault(p.section, []).append(p)
     for p in patches:
-        sections[p.section][p.offset:p.end] = p.data
+        sec = sections[p.section]
+        if p.end > len(sec):
+            sec.extend(bytes(p.end - len(sec)))
+        sec[p.offset:p.end] = p.data
 
 
 def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
@@ -112,6 +130,12 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
     version = info.version
     if STOCK_SHA256.get(version) != sha256(Path(stock).read_bytes()):
         raise BuildError(f"{stock}: non e' l'OS stock {version} atteso (impronta diversa)")
+    names = {json.loads((Path(d) / "patch.json").read_text(encoding="utf-8"))["name"] for d in moddirs}
+    for d in moddirs:
+        spec = json.loads((Path(d) / "patch.json").read_text(encoding="utf-8"))
+        missing = set(spec.get("requires", [])) - names
+        if missing:
+            raise BuildError(f"{spec['name']}: richiede anche {sorted(missing)}")
     patches = [p for d in moddirs for p in load_mod(d, version)]
     needed = sorted({p.section for p in patches})
 
@@ -143,11 +167,16 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
                 if old != new:
                     raise BuildError(f"la sezione {sid} e' cambiata ma nessuna patch la tocca")
                 continue
-            diff = [i for i in range(len(old)) if old[i] != new[i]]
-            allowed = {i for p in patches if p.section == sid for i in range(p.offset, p.end)}
-            if len(old) != len(new) or not set(diff) <= allowed:
+            mine = [p for p in patches if p.section == sid]
+            allowed = {i for p in mine for i in range(p.offset, p.end)}
+            diff = [i for i in range(len(old)) if i >= len(new) or old[i] != new[i]]
+            tail = [i for i in range(len(old), len(new)) if new[i] and i not in allowed]
+            if len(new) < len(old) or not set(diff) <= allowed or tail:
                 raise BuildError(f"sezione {sid}: modifiche fuori dalle patch dichiarate")
-            log(f"  sezione {sid}: {len(diff)} byte modificati, tutti dentro le patch")
+            if len(new) > len(old) and not any(p.append for p in mine):
+                raise BuildError(f"sezione {sid}: allungata senza patch accodate")
+            log(f"  sezione {sid}: {len(diff)} byte modificati, tutti dentro le patch"
+                + (f"; accodati {len(new) - len(old)} byte (area mod)" if len(new) > len(old) else ""))
 
     manifest = {
         "os": version,
