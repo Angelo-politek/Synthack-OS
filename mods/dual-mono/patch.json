@@ -1,0 +1,47 @@
+{
+  "name": "dual-mono",
+  "os": "1.41",
+  "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati. Pagina EXTERNAL MIXER: IN L (manopola A) e IN R (manopola B, ex BAL); in stereo tutto come l'originale.",
+  "generated_by": "mods/dual-mono/make_patch.py",
+  "symbols": {
+    "dm_hook": "0x40338be0",
+    "gains": "0x40338c1e",
+    "page_ok": "0x40338c9c",
+    "str_inl": "0x40338d38",
+    "str_inr": "0x40338d3d",
+    "ui_mono": "0x40338ccc",
+    "ui_stereo": "0x40338cfe"
+  },
+  "emac_sites": [
+    "0x40338c28",
+    "0x40338c2c",
+    "0x40338c3a",
+    "0x40338c3e",
+    "0x40338c52",
+    "0x40338c56",
+    "0x40338c60",
+    "0x40338c64",
+    "0x40338c70",
+    "0x40338c74",
+    "0x40338c78",
+    "0x40338c7a"
+  ],
+  "patches": [
+    {
+      "section": 3,
+      "addr": "0X40338BE0",
+      "len": 354,
+      "expect_sha256": "b8ee8f605b48094836514072487ba22a6f735786a337ecd0d5e1549e8eb706fc",
+      "hex": "4a39800031466616342a070a322a070e612c374000083742001260000102342a070a323c4000611637400008342a070e323c4000610837420012600000b0302a0740c5fc7f00d482a4020800a1c24a6a071a670e203c0000658ea4000800a1c260247140e08043f9401dc9e0207c0000ffffa4080800a1c824310c0041f08a00a4080900a1c2714120442f004e90588fa0020900a2820900a1c0a3c10c800000ffff6f06203c0000ffff24010c810000ffff6f06243c0000ffff4e7541f941b9f7f0707eb0906622203c00000081b0a800106616203c00000082b0a80014660a203c00000084b0a8001c4e7561ce662c203c000000802140000442a8001843f940338d3823c94022ef6443f940338d3d23c94022efcc23c94022ef984e75619c663242a80004203c0000008021400018203c40253b6e23c04022ef64203c40265cc923c04022efcc203c4026601523c04022ef984e750000494e204c00494e205200",
+      "what": "routine dual mono (dm_hook, gains, interfaccia) + stringhe IN L / IN R"
+    },
+    {
+      "section": 3,
+      "addr": "0X40090872",
+      "len": 10,
+      "expect_sha256": "b7fe46f104e7b81943d5563825b97ccd06672b56f05657edf0eb41bd0c6b9ebf",
+      "hex": "4eb940338be060000082",
+      "what": "trampolino: jsr dm_hook ; bra.w 0x400908FC (salta il blocco originale)"
+    }
+  ]
+}
