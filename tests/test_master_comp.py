@@ -1,8 +1,8 @@
-"""Mod master-comp (solo branch locale dt-compressor): routine ColdFire vs modello, interfaccia, salvataggio.
+"""Mod master-comp: routine ColdFire vs modello (dsp.py), interfaccia, salvataggio.
 
 Esegue sull'OS Syntakt patchato il tratto 0x4009053E..0x40090562 (trampolino + comp_hook) a ogni
 "blocco", con segnali finti sugli ADC 6/7, e le funzioni centrali dei parametri agganciate.
-Serve l'OS Syntakt 1.41 e l'OS Digitakt 1.54 (per le costanti): saltato se mancano.
+Serve l'OS Syntakt 1.41 (saltato se manca).
 """
 
 import json
@@ -21,15 +21,13 @@ from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A3, UC_M68K_REG_A7,
                                 UC_M68K_REG_SR)
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack"), str(ROOT / "mods" / "dt-comp")]
+sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack"), str(ROOT / "mods" / "master-comp")]
 import eft  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
 SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
-DT = ROOT / "firmware" / "Digitakt_OS1.54.syx"
 SPEC_F = ROOT / "mods" / "master-comp" / "patch.json"
-pytestmark = pytest.mark.skipif(not (SY.exists() and DT.exists() and SPEC_F.exists()),
-                                reason="OS Syntakt/Digitakt o patch assenti")
+pytestmark = pytest.mark.skipif(not (SY.exists() and SPEC_F.exists()), reason="OS Syntakt o patch assenti")
 
 LOAD = 0x4000_0400
 HOOK, AFTER = 0x4009_053E, 0x4009_0562
@@ -50,11 +48,9 @@ REGS = [getattr(__import__("unicorn.m68k_const", fromlist=["x"]), f"UC_M68K_REG_
 
 @pytest.fixture(scope="module")
 def setup():
-    from model import Tables
     spec = json.loads(SPEC_F.read_text(encoding="utf-8"))
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
-    dt = Tables(eft.unpack(DT, ROOT / "unpacked" / "DT1.54", ids=[3])[3])
-    return spec, sec3, dt
+    return spec, sec3, None
 
 
 class Machine:
@@ -123,10 +119,9 @@ def preset_of(spec):
     return {"THR": v[0], "ATK": v[1], "REL": v[2], "MUP": v[3], "RAT": v[4] * RAT_STEP}
 
 
-def model(dt, p):
-    from model import Compact, Preset
-    rat_dt = (p["RAT"] // RAT_STEP - 1) << 8          # RAT 1..8 -> indice 0..7 della Digitakt
-    return Compact(Preset(dt, [p["THR"], p["ATK"], p["REL"], p["MUP"], rat_dt, 0, 0, 0x7F00]))
+def model(_, p):
+    from dsp import Compact, Preset
+    return Compact(Preset(p["THR"], p["ATK"], p["REL"], p["MUP"], p["RAT"] // RAT_STEP - 1))
 
 
 def signal(rnd, n_blocks):
@@ -388,3 +383,16 @@ def test_meter_asks_for_redraw_only_when_it_changes(setup):
     for _ in range(100):
         m.block([0] * 32, [0] * 32, 30000, 30000)
     assert m.uc.mem_read(UI + 96, 1)[0] == 0         # fermo: nessun ridisegno
+
+
+def test_knob_change_asks_for_redraw_like_original_setters(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    m.uc.mem_write(UI_ROOT, struct.pack(">I", UI))
+    for name, value in (("THR", 0x2345), ("RAT", 2 * RAT_STEP)):
+        m.uc.mem_write(UI + 96, b"\0")
+        m.set(name, value)
+        assert m.uc.mem_read(UI + 96, 1)[0] == 1
+    m.uc.mem_write(UI + 96, b"\0")
+    m.set("GR", 0x1000)                              # sola lettura: niente
+    assert m.uc.mem_read(UI + 96, 1)[0] == 0

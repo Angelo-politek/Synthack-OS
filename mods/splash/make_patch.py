@@ -1,4 +1,4 @@
-"""Genera mods/splash/patch.json: splash "SyntHack 0.1" dopo l'animazione d'avvio ufficiale.
+"""Genera mods/splash/patch.json: splash "SyntHack <versione>" dopo l'animazione d'avvio ufficiale.
 
 Come funziona (dettagli in docs/re-journal.md, 2026-10-08):
 - il task dell'intro sceglie a caso una di 5 voci {segmenti...} con 5 istruzioni `pea <voce>`;
@@ -37,7 +37,7 @@ PEA_SITES = [(0x4008_7E90, 0x4029_A7C4), (0x4008_7EA4, 0x4029_A7B4), (0x4008_7EB
 SPLASH_FRAMES = 57                                  # ~2 s
 # Orientamento dello schermo durante l'intro (v0.1 appariva capovolto): "none" | "v" | "h" | "vh"
 FLIP = "v"
-FIGLET_FONT, VERSION = "smslant", "v0.1"
+FIGLET_FONT, VERSION = "smslant", "v0.4.3"
 WSL_BINUTILS = "~/tools/m68k/root"
 
 

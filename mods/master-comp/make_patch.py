@@ -1,11 +1,9 @@
-"""Genera mods/master-comp/patch.json: compressore sui VCA del master con il cervello della Digitakt.
+"""Genera mods/master-comp/patch.json: compressore sui VCA del master (vedi README.md).
 
-SOLO LOCALE (branch dt-compressor): le costanti del preset (coefficienti di attacco/rilascio,
-pendenza del ratio) sono lette dall'OS Digitakt dell'utente e finiscono nel patch.json.
+    python mods/master-comp/make_patch.py [--thr 0x4000 --atk 0x1800 --rel 0x2000 --mup 0x2000 --rat 4]
 
-    python mods/master-comp/make_patch.py [--thr 0x4000 --atk 0x1800 --rel 0x2000 --mup 0x2000 --rat 0x300]
-
-Valori come nell'interfaccia della Digitakt (0..0x7F00; RAT 0x000..0x700 = 1.5,2,3,4,6,8,16,20:1).
+Valori di default delle manopole (0..0x7F00) e ratio di default quando acceso (1..8).
+Tabelle e costanti da dsp.py (formule, nessun dato Elektron). Richiede binutils m68k in WSL.
 """
 
 from __future__ import annotations
@@ -23,9 +21,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "mods" / "dt-comp")]
+sys.path[:0] = [str(REPO / "tools" / "unpack"), str(HERE)]
 import eft  # noqa: E402
-from model import C_OCT, EXP_T, LOG_T, Tables  # noqa: E402
+from dsp import ATTACK, C_OCT, EXP_T, LOG_T, RATIO, RELEASE  # noqa: E402
 
 LOAD = 0x4000_0400
 # area mod (mods/modarea): collegato in RAM a 0x46000000, byte accodati alla sezione 3 a 0x40348000
@@ -109,15 +107,13 @@ def main() -> None:
     a = ap.parse_args()
     params = [a.thr, a.atk, a.rel, a.mup, a.rat]
 
-    dt = eft.unpack(REPO / "firmware" / "Digitakt_OS1.54.syx", REPO / "unpacked" / "DT1.54", ids=[3])[3]
-    t = Tables(dt)
     # salvataggio: 4 parole = valore XOR default (15 bit) + un bit di RAT ciascuna; zero = default, spento
     defs = {"C_OCT": C_OCT, "D_THR": a.thr, "D_ATK": a.atk, "D_REL": a.rel, "D_MUP": a.mup,
             "GFX_ON": 0 if a.no_drive_knob else 1}
     defs.update({f"ID_{n}": i for n, _, i, _ in PARAMS})
     nl = "\n"
     tables = "".join(f"        .long   {', '.join(str(v) for v in tab[k:k + 8])}{nl}"
-                     for tab in (t.attack, t.release, t.ratio) for k in range(0, len(tab), 8))
+                     for tab in (ATTACK, RELEASE, RATIO) for k in range(0, len(tab), 8))
     names = "".join(f'n_{n.lower()}_s: .asciz "{n}"{nl}n_{n.lower()}_l: .asciz "{ln}"{nl}'
                     for n, ln, _, _ in PARAMS)
     incs = {"dt_tables.inc": tables, "names.inc": names}
@@ -158,7 +154,7 @@ def main() -> None:
     spec = {
         "name": "master-comp", "os": "1.41", "requires": ["modarea"],
         "description": "Compressore sul master analogico (VCA del master) con l'algoritmo del "
-                       "compressore della Digitakt; manopole THR ATK REL MUP RAT (0 = OFF) e misuratore GR "
+                       "compressore in stile Digitakt; manopole THR ATK REL MUP RAT (0 = OFF) e misuratore GR "
                        "sulla pagina SYN della FX track; valori salvati nel kit del pattern (o globali con "
                        "SYN global). Valori di partenza " +
                        " ".join(f"{k.upper()}={getattr(a, k):#06x}" for k in ("thr", "atk", "rel", "mup")) +

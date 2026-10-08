@@ -484,6 +484,7 @@ set_hook:                                       | 0x4000DA32: scrittura
         move.l  %d2,%d1
         bsr.w   setv
         move.l  (%sp)+,%d2
+        bsr.w   ui_dirty                        | come i setter originali: ridisegno subito
 8:      moveq   #0,%d0
         rts
 9:      move.l  %d3,-(%sp)
@@ -539,8 +540,18 @@ rat_set:
         bsr.w   setr
         movem.l (%sp),%d2-%d4
         lea     12(%sp),%sp
+        bsr.w   ui_dirty
         moveq   #0,%d0
         rts
+
+| ---- chiede il ridisegno dello schermo al prossimo frame (flag del ViewController; usa d0, a0)
+ui_dirty:
+        move.l  UI_ROOT,%d0
+        beq.s   1f
+        movea.l %d0,%a0
+        moveq   #1,%d0
+        move.b  %d0,UI_DIRTY(%a0)
+1:      rts
 
 | ---- formattatore del testo di RAT, chiamato come std::function(valore, buffer)
 |      (entrata: 4(sp) = oggetto funzione, 8(sp) = valore 0..0x7F00, 12(sp) = buffer)
