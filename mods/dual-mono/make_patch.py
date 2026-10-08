@@ -99,13 +99,28 @@ def main() -> None:
         raise SystemExit("lo spazio libero non e' a zero")
     check_transcription(sec3, blob, syms)
 
+    # IN R = alias 125 ("Input Level"): nessuna pagina, nessun CC/NRPN, e il suo oggetto in RAM
+    # usa gli stessi prototipi di IN LR (renderer a barra). Lo facciamo diventare un alias di BAL:
+    #  - id interno 0x23 (IN LR) -> 0x25 (BAL) nel descrittore (0x4022D59C + 52*125 + 4);
+    #  - lettura/scrittura del valore: switch sull'id logico 125..132 in 0x4000C87E (get) e
+    #    0x4000C922 (set); voce 125 = 0x0010 (campo di IN LR) -> 0x0022 (campo di BAL, come 127/128).
+    alias_id = 0x4022D59C + 52 * 125 + 4
+    if sec3[alias_id - LOAD:alias_id - LOAD + 4] != bytes.fromhex("00000023"):
+        raise SystemExit("l'alias 125 non ha l'id interno atteso (0x23)")
+    switches = {"lettura": 0x4000C8B0, "scrittura": 0x4000C9A4}      # tabelle: 8 voci .w (id 125..132)
+    for what, tab in switches.items():
+        entries = struct.unpack(">8h", sec3[tab - LOAD:tab - LOAD + 16])
+        if entries[:4] != (0x10, 0x10, 0x22, 0x22):
+            raise SystemExit(f"switch di {what} a {tab:#x}: voci inattese {entries[:4]}")
+
     hook = syms["dm_hook"]
     tramp = struct.pack(">HIHH", 0x4EB9, hook, 0x6000, BLOCK_END - (BLOCK_START + 8))  # jsr.l / bra.w
     site = sec3[BLOCK_START - LOAD:BLOCK_START - LOAD + len(tramp)]
     spec = {
         "name": "dual-mono", "os": "1.41",
         "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati. "
-                       "Pagina EXTERNAL MIXER: IN L (manopola A) e IN R (manopola B, ex BAL); "
+                       "Pagina EXTERNAL MIXER: IN L (manopola A) e IN R (manopola B: alias 125 "
+                       "reso alias di BAL, disegnato a barra); "
                        "in stereo tutto come l'originale.",
         "generated_by": "mods/dual-mono/make_patch.py",
         "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items()) if k in
@@ -118,6 +133,14 @@ def main() -> None:
             {"section": 3, "addr": f"{BLOCK_START:#010X}", "len": len(tramp),
              "expect_sha256": sha(site), "hex": tramp.hex(),
              "what": "trampolino: jsr dm_hook ; bra.w 0x400908FC (salta il blocco originale)"},
+            {"section": 3, "addr": f"{alias_id:#010X}", "len": 4,
+             "expect_sha256": sha(sec3[alias_id - LOAD:alias_id - LOAD + 4]), "hex": "00000025",
+             "what": "alias 125 'Input Level': id interno 0x23 (IN LR) -> 0x25 (BAL), usato come IN R"},
+        ] + [
+            {"section": 3, "addr": f"{tab:#010X}", "len": 2,
+             "expect_sha256": sha(sec3[tab - LOAD:tab - LOAD + 2]), "hex": "0022",
+             "what": f"switch di {what} per id logico 125..132: voce 125 -> ramo di BAL (come 127/128)"}
+            for what, tab in switches.items()
         ],
     }
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

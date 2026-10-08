@@ -1,16 +1,16 @@
 {
   "name": "dual-mono",
   "os": "1.41",
-  "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati. Pagina EXTERNAL MIXER: IN L (manopola A) e IN R (manopola B, ex BAL); in stereo tutto come l'originale.",
+  "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati. Pagina EXTERNAL MIXER: IN L (manopola A) e IN R (manopola B: alias 125 reso alias di BAL, disegnato a barra); in stereo tutto come l'originale.",
   "generated_by": "mods/dual-mono/make_patch.py",
   "symbols": {
     "dm_hook": "0x40338be0",
     "gains": "0x40338c1e",
     "page_ok": "0x40338c9c",
-    "str_inl": "0x40338d70",
-    "str_inr": "0x40338d75",
+    "str_inl": "0x40338d20",
+    "str_inr": "0x40338d25",
     "ui_mono": "0x40338ccc",
-    "ui_stereo": "0x40338d18"
+    "ui_stereo": "0x40338cf4"
   },
   "emac_sites": [
     "0x40338c28",
@@ -30,9 +30,9 @@
     {
       "section": 3,
       "addr": "0X40338BE0",
-      "len": 410,
-      "expect_sha256": "69609dc1dbcade8177a4518bd189503ae36f8eb041f1c7e4eff3800c3f98b48a",
-      "hex": "4a39800031466716342a070a322a070e612c37400008374200126000011c342a070a323c4000611637400008342a070e323c4000610837420012600000b0302a0740c5fc7f00d482a4020800a1c24a6a071a670e203c0000658ea4000800a1c260247140e08043f9401dc9e0207c0000ffffa4080800a1c824310c0041f08a00a4080900a1c2714120442f004e90588fa0020900a2820900a1c0a3c10c800000ffff6f06203c0000ffff24010c810000ffff6f06243c0000ffff4e7541f941b9f7f0707eb0906622203c00000081b0a800106616203c00000082b0a80014660a203c00000084b0a8001c4e7561ce6646203c000000802140000442a8001843f940338d7023c94022ef6443f940338d7523c94022efcc23c94022ef98700123c04022efb023c04022ef7c42b94022efac42b94022ef784e756182665042a80004203c0000008021400018203c40253b6e23c04022ef64203c40265cc923c04022efcc203c4026601523c04022ef9842b94022efb042b94022ef7c203c0000400023c04022efac23c04022ef784e750000494e204c00494e205200",
+      "len": 330,
+      "expect_sha256": "a365b37a503f29488c93f2656419e7d591002904360f6bdeb2ef2067fff23741",
+      "hex": "4a39800031466716342a070a322a070e612c3740000837420012600000f8342a070a323c4000611637400008342a070e323c4000610837420012600000b0302a0740c5fc7f00d482a4020800a1c24a6a071a670e203c0000658ea4000800a1c260247140e08043f9401dc9e0207c0000ffffa4080800a1c824310c0041f08a00a4080900a1c2714120442f004e90588fa0020900a2820900a1c0a3c10c800000ffff6f06203c0000ffff24010c810000ffff6f06243c0000ffff4e7541f941b9f7f0707eb0906622203c00000081b0a800106616203c00000082b0a80014660a203c00000084b0a8001c4e7561ce6622707d2140000442a8001843f940338d2023c94022ef6443f940338d2523c94022ef304e7561a6662642a80004203c0000008021400018203c40253b6e23c04022ef64203c4024f8a723c04022ef304e75494e204c00494e205200",
       "what": "routine dual mono (dm_hook, gains, interfaccia) + stringhe IN L / IN R"
     },
     {
@@ -42,6 +42,30 @@
       "expect_sha256": "b7fe46f104e7b81943d5563825b97ccd06672b56f05657edf0eb41bd0c6b9ebf",
       "hex": "4eb940338be060000082",
       "what": "trampolino: jsr dm_hook ; bra.w 0x400908FC (salta il blocco originale)"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EF04",
+      "len": 4,
+      "expect_sha256": "6870f86f6560dd5b0d0a47d0ae89df6a96b6a47a6258940060d75ff759634158",
+      "hex": "00000025",
+      "what": "alias 125 'Input Level': id interno 0x23 (IN LR) -> 0x25 (BAL), usato come IN R"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000C8B0",
+      "len": 2,
+      "expect_sha256": "0298d122906dcfc10892cb53a73992fc5b9f493ea4c9badb27b791b4127a7fe7",
+      "hex": "0022",
+      "what": "switch di lettura per id logico 125..132: voce 125 -> ramo di BAL (come 127/128)"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000C9A4",
+      "len": 2,
+      "expect_sha256": "0298d122906dcfc10892cb53a73992fc5b9f493ea4c9badb27b791b4127a7fe7",
+      "hex": "0022",
+      "what": "switch di scrittura per id logico 125..132: voce 125 -> ramo di BAL (come 127/128)"
     }
   ]
 }

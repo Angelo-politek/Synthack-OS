@@ -43,7 +43,7 @@ delle voci su CPU #2). 🟡 = ipotesi da verificare.
 
 | Mod | Stato | Sezione | Emulabile | Note / prerequisiti |
 |---|---|---|---|---|
-| **Input dual mono v1**: in modalità EXT IN mono, **IN L e IN R** affiancati sulla pagina EXTERNAL MIXER, volumi indipendenti | 🔄 pronto da flashare | 3 | ✅ funzione dei guadagni: originale vs mod in Unicorn (stereo bit per bit, mono atteso), interfaccia commutata | trampolino a `0x40090872` → `dm_hook` (`0x40338BE0`); pagina MIX3 in RAM `0x41B9F7F0` riscritta in mono `[126,128,0,0,129,130,0,132]`; nomi "IN L"/"IN R". 🟡 da verificare: visualizzazione del valore di IN R (BAL è bipolare). Pan per ingresso non possibile (2 VCA) |
+| **Input dual mono v1**: in modalità EXT IN mono, **IN L e IN R** affiancati sulla pagina EXTERNAL MIXER, volumi indipendenti | ✅ funziona sulla macchina (2026-10-08) | 3 | ✅ funzione dei guadagni: originale vs mod in Unicorn (stereo bit per bit, mono atteso), interfaccia commutata, patch delle tabelle di salto | trampolino a `0x40090872` → `dm_hook` (`0x40338BE0`); pagina MIX3 in RAM `0x41B9F7F0` riscritta in mono `[126,125,0,0,129,130,0,132]`; IN R = alias 125 reso alias di BAL (id interno + 2 tabelle di salto) → grafico a barra; nomi "IN L"/"IN R". Pan per ingresso non possibile (2 VCA) |
 | Input dual mono **v2** (ideale): **due pagine** IN L e IN R, ciascuna con le sue mandate; la seconda compare solo in modalità mono | ⬜ | 3 🟡 | solo funzioni isolate | richiede: mandate FX dell'ingresso calcolate in software (da verificare), una pagina nuova nel sistema dei menu, salvataggio dei nuovi parametri nei dati del pattern/kit |
 
 ## Fase 2 — Loudness e basi

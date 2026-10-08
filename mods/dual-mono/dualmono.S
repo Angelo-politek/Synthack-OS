@@ -9,7 +9,9 @@
 |
 | STEREO (impostazione EXTERNAL IN = stereo, flag != 0): calcolo IDENTICO all'originale.
 | MONO:   VCA sinistro = curva(IN LR) al centro, VCA destro = curva(BAL) al centro;
-|         la pagina EXTERNAL MIXER mostra IN L e IN R affiancati (BAL spostato da G a B).
+|         la pagina EXTERNAL MIXER mostra IN L e IN R affiancati. IN R e' l'alias 125
+|         ("Input Level", disegnato a barra) con id interno reso 0x25 da make_patch.py, cosi'
+|         legge e scrive il valore di BAL (BAL ha il grafico "clessidra", non modificabile).
 
         .equ    DUALMONO_FLAG,  0x80003146      | byte globale EXTERNAL IN: 0 = MONO, != 0 = stereo
                                                 | (verificato sulla macchina il 2026-10-08: la v1
@@ -27,6 +29,7 @@
         .equ    MIX3_SLOTS,     0x41B9F7F0
         .equ    ID_INLR,        126
         .equ    ID_BAL,         128
+        .equ    ID_INR,         125             | alias "Input Level" (barra), id interno reso 0x25 = BAL
         .equ    ID_DEL,         129
         .equ    ID_REV,         130
         .equ    ID_FXROUT,      132
@@ -37,12 +40,8 @@
         .equ    ORIG_INLR,      0x40253B6E      | "IN LR"
         .equ    ORIG_PAN,       0x40266015      | "PAN"
         .equ    ORIG_BAL,       0x40265CC9      | "BAL"
-        | aspetto del valore: campo +20 = 1 -> barra (come IN LR), default +16 (0x4000 = centro)
-        .equ    DRAW_PAN,       0x4022E164 + 52*69 + 20
-        .equ    DRAW_BAL,       0x4022E164 + 52*70 + 20
-        .equ    DEF_PAN,        0x4022E164 + 52*69 + 16
-        .equ    DEF_BAL,        0x4022E164 + 52*70 + 16
-        .equ    ORIG_DEF,       0x4000
+        .equ    NAME_INR,       0x4022E164 + 52*67 + 48 | alias 125
+        .equ    ORIG_IN,        0x4024F8A7      | "IN"
 
         .text
         .globl  dm_hook
@@ -131,19 +130,13 @@ ui_mono:
         bsr.s   page_ok
         bne.s   6f
         | (il ColdFire non ammette move.l #imm verso memoria indirizzata: passiamo da d0/a1)
-        move.l  #ID_BAL,%d0
-        move.l  %d0,4(%a0)                      | manopola B: BAL (= IN R)
-        clr.l   24(%a0)                         | manopola G: vuota
+        moveq   #ID_INR,%d0
+        move.l  %d0,4(%a0)                      | manopola B: alias 125 (barra) = valore di BAL
+        clr.l   24(%a0)                         | manopola G: vuota (BAL non serve in mono)
         lea     str_inl,%a1
         move.l  %a1,NAME_INLR
         lea     str_inr,%a1
-        move.l  %a1,NAME_BAL
-        move.l  %a1,NAME_PAN
-        moveq   #1,%d0                          | IN R disegnato come barra, come IN L
-        move.l  %d0,DRAW_BAL
-        move.l  %d0,DRAW_PAN
-        clr.l   DEF_BAL                         | default 0 (come IN LR)
-        clr.l   DEF_PAN
+        move.l  %a1,NAME_INR
 6:      rts
 
 ui_stereo:
@@ -154,15 +147,8 @@ ui_stereo:
         move.l  %d0,24(%a0)
         move.l  #ORIG_INLR,%d0
         move.l  %d0,NAME_INLR
-        move.l  #ORIG_BAL,%d0
-        move.l  %d0,NAME_BAL
-        move.l  #ORIG_PAN,%d0
-        move.l  %d0,NAME_PAN
-        clr.l   DRAW_BAL                        | di nuovo la "clessidra" del bilanciamento
-        clr.l   DRAW_PAN
-        move.l  #ORIG_DEF,%d0
-        move.l  %d0,DEF_BAL
-        move.l  %d0,DEF_PAN
+        move.l  #ORIG_IN,%d0
+        move.l  %d0,NAME_INR
 7:      rts
 
         .data

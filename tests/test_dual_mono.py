@@ -32,11 +32,11 @@ FLAG = 0x8000_3146
 PARAMS, HW, STACK = 0x5000_0000, 0x5000_2000, 0x5001_0000
 MIX3 = 0x41B9_F7F0
 STEREO_LAYOUT = [126, 0, 0, 0, 129, 130, 128, 132]
-MONO_LAYOUT = [126, 128, 0, 0, 129, 130, 0, 132]
-DRAW = {i: 0x4022E164 + 52 * i + 20 for i in (69, 70)}
-DEFAULT = {i: 0x4022E164 + 52 * i + 16 for i in (69, 70)}
-NAMES = {68: 0x4022E164 + 52 * 68 + 48, 69: 0x4022E164 + 52 * 69 + 48, 70: 0x4022E164 + 52 * 70 + 48}
-ORIG_NAMES = {68: 0x40253B6E, 69: 0x40266015, 70: 0x40265CC9}
+MONO_LAYOUT = [126, 125, 0, 0, 129, 130, 0, 132]     # IN R = alias 125 reso alias di BAL
+DESC = 0x4022D59C                                       # descrittori: record da 52 B, indice = id logico
+NAMES = {i: DESC + 52 * i + 48 for i in (125, 126, 127, 128)}
+ORIG_NAMES = {125: 0x4024F8A7, 126: 0x40253B6E, 127: 0x40266015, 128: 0x40265CC9}
+SWITCHES = (0x4000C8B0, 0x4000C9A4)                     # get/set del valore per id logico 125..132
 # istruzioni EMAC del codice originale eseguito (blocco, legge di bilanciamento, seno): da GNU objdump
 ORIG_EMAC = [0x40090880, 0x40090884, 0x40090892, 0x40090896, 0x400908AA, 0x400908AE, 0x400908B8,
              0x400908BC, 0x400908CA, 0x400908CE, 0x400908D2, 0x400908D4,
@@ -105,8 +105,24 @@ def cases(n, seed):
 
 def test_original_descriptor_fields_are_as_assumed(sec3):
     u = lambda a: struct.unpack_from(">I", sec3, a - LOAD)[0]                       # noqa: E731
-    assert [u(DRAW[i]) for i in (69, 70)] == [0, 0] and [u(DEFAULT[i]) for i in (69, 70)] == [0x4000] * 2
-    assert u(0x4022E164 + 52 * 68 + 20) == 1 and u(0x4022E164 + 52 * 68 + 16) == 0   # IN LR: barra
+    # alias 125: stesso gruppo/id interno di IN LR, nessun CC/NRPN, nessuna posizione di salvataggio
+    assert [u(DESC + 52 * 125 + 4 * k) for k in (0, 1, 6, 7, 8)] == [0x34, 0x23, 0xFFFFFFFF, 0xFFFFFFFF, 0]
+    assert [u(DESC + 52 * 128 + 4 * k) for k in (0, 1)] == [0x34, 0x25]               # BAL
+    for tab in SWITCHES:                    # voci 125,126 -> campo di IN LR; 127,128 -> campo di BAL
+        assert struct.unpack_from(">4h", sec3, tab - LOAD) == (0x10, 0x10, 0x22, 0x22)
+
+
+def test_alias_125_becomes_bal_alias(sec3):
+    patched = bytearray(sec3)
+    for p in SPEC["patches"]:
+        a = int(p["addr"], 16) - LOAD
+        patched[a:a + p["len"]] = bytes.fromhex(p["hex"])
+    rec = lambda b, i: struct.unpack_from(">13I", b, DESC + 52 * i - LOAD)            # noqa: E731
+    assert rec(patched, 125)[1] == rec(patched, 128)[1] == 0x25
+    assert rec(patched, 126) == rec(sec3, 126) and rec(patched, 128) == rec(sec3, 128)
+    for tab in SWITCHES:
+        assert struct.unpack_from(">8h", patched, tab - LOAD)[:4] == (0x22, 0x10, 0x22, 0x22)
+        assert patched[tab - LOAD + 2:tab - LOAD + 16] == sec3[tab - LOAD + 2:tab - LOAD + 16]
 
 
 @pytest.mark.parametrize("macsr", [0x00, 0x20, 0x40, 0x60, 0xA0])
@@ -140,15 +156,12 @@ def test_ui_switches_layout_and_names_and_back(sec3):
     mod = Machine(sec3, True, 0xA0)
     mod.run(0x4000, 0x4000, 0x4000, 0, mono=True)
     assert mod.layout() == MONO_LAYOUT
-    inl = mod.name_ptr(68)
-    assert bytes(mod.uc.mem_read(inl, 5)) == b"IN L\x00"
-    assert bytes(mod.uc.mem_read(mod.name_ptr(70), 5)) == b"IN R\x00"
-    assert mod.name_ptr(69) == mod.name_ptr(70)
-    assert all(mod.u32(DRAW[i]) == 1 and mod.u32(DEFAULT[i]) == 0 for i in (69, 70))   # barra
+    assert bytes(mod.uc.mem_read(mod.name_ptr(126), 5)) == b"IN L\x00"
+    assert bytes(mod.uc.mem_read(mod.name_ptr(125), 5)) == b"IN R\x00"
+    assert mod.name_ptr(127) == ORIG_NAMES[127] and mod.name_ptr(128) == ORIG_NAMES[128]
     mod.run(0x4000, 0x4000, 0x4000, 0, mono=False)
     assert mod.layout() == STEREO_LAYOUT
     assert {i: mod.name_ptr(i) for i in NAMES} == ORIG_NAMES
-    assert all(mod.u32(DRAW[i]) == 0 and mod.u32(DEFAULT[i]) == 0x4000 for i in (69, 70))
 
 
 def test_ui_untouched_if_page_is_not_the_expected_one(sec3):
@@ -158,4 +171,3 @@ def test_ui_untouched_if_page_is_not_the_expected_one(sec3):
     mod.run(0x4000, 0x4000, 0x4000, 0, mono=True)
     assert mod.layout() == weird
     assert {i: mod.name_ptr(i) for i in NAMES} == ORIG_NAMES
-    assert all(mod.u32(DRAW[i]) == 0 and mod.u32(DEFAULT[i]) == 0x4000 for i in (69, 70))
