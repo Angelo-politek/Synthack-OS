@@ -28,8 +28,10 @@ import eft  # noqa: E402
 from model import C_OCT, EXP_T, LOG_T, Preset, Tables  # noqa: E402
 
 LOAD = 0x4000_0400
-CODE_BASE = 0x4033_8D74                 # dopo dual-mono (fino a 0x40338D71), stesso riempimento libero
-FREE_END = 0x4033_9000
+# area mod (mods/modarea): collegato in RAM a 0x46000000, byte accodati alla sezione 3 a 0x40348000
+MODAREA_RAM, MODAREA_IMG, MODAREA_SIZE = 0x4600_0000, 0x4034_8000, 0x8000
+CODE_BASE = MODAREA_RAM + 0x0000        # offset 0 dell'area mod
+FREE_END = MODAREA_RAM + MODAREA_SIZE
 HOOK, HOOK_END = 0x4009_053E, 0x4009_0562
 HOOK_ORIG = "0c810000ffff6f06223c0000ffff374100460c830000ffff6f06263c0000ffff37430048"
 WSL_BINUTILS = "~/tools/m68k/root"
@@ -91,15 +93,13 @@ def main() -> None:
     end = CODE_BASE + len(blob)
     if end > FREE_END:
         raise SystemExit(f"non ci sta: {len(blob)} B (liberi {FREE_END - CODE_BASE})")
-    if any(sec3[CODE_BASE - LOAD:end - LOAD]):
-        raise SystemExit("lo spazio libero non e' a zero")
     site = sec3[HOOK - LOAD:HOOK_END - LOAD]
     if site.hex() != HOOK_ORIG:
         raise SystemExit("i byte del punto d'aggancio non sono quelli attesi")
     tramp = struct.pack(">HIHH", 0x4EB9, syms["comp_hook"], 0x6000, HOOK_END - (HOOK + 8))
 
     spec = {
-        "name": "master-comp", "os": "1.41",
+        "name": "master-comp", "os": "1.41", "requires": ["modarea"],
         "description": "Compressore sul master analogico (VCA del master) con l'algoritmo del "
                        "compressore della Digitakt; preset fisso " +
                        " ".join(f"{k.upper()}={getattr(a, k):#06x}" for k in ("thr", "atk", "rel", "mup", "rat")),
@@ -109,9 +109,9 @@ def main() -> None:
                     if k in ("comp_hook", "scale", "k_const", "k_state", "k_logt", "k_expt")},
         "emac_sites": [f"{x:#010x}" for x in emac],
         "patches": [
-            {"section": 3, "addr": f"{CODE_BASE:#010X}", "len": len(blob),
-             "expect_sha256": sha(sec3[CODE_BASE - LOAD:end - LOAD]), "hex": blob.hex(),
-             "what": "routine del compressore + costanti del preset + stato + tabelline log/exp"},
+            {"section": 3, "addr": f"{MODAREA_IMG + CODE_BASE - MODAREA_RAM:#010X}", "len": len(blob),
+             "append": True, "hex": blob.hex(), "ram": f"{CODE_BASE:#010x}",
+             "what": "(area mod) routine del compressore + costanti del preset + stato + tabelline"},
             {"section": 3, "addr": f"{HOOK:#010X}", "len": len(tramp),
              "expect_sha256": sha(sec3[HOOK - LOAD:HOOK - LOAD + len(tramp)]), "hex": tramp.hex(),
              "what": "trampolino: jsr comp_hook ; bra.w 0x40090562 (sostituisce limite e scrittura dei CV del master)"},
@@ -120,7 +120,7 @@ def main() -> None:
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (REPO / "out" / "master-comp").mkdir(parents=True, exist_ok=True)
     (REPO / "out" / "master-comp" / "comp.lst").write_text(dis, encoding="utf-8")
-    print(f"patch.json: {len(blob)} B a {CODE_BASE:#x}..{end:#x} (liberi ancora {FREE_END - end} B), "
+    print(f"patch.json: {len(blob)} B in area mod a {CODE_BASE:#x}..{end:#x} (liberi ancora {FREE_END - end} B), "
           f"{len(emac)} istruzioni EMAC; trampolino {tramp.hex()}")
 
 

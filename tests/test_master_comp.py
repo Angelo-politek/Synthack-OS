@@ -53,8 +53,10 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
+        uc.mem_map(0x4600_0000, 0x1_0000)                      # area mod (dopo la rilocazione)
         for p in spec["patches"]:
-            uc.mem_write(int(p["addr"], 16), bytes.fromhex(p["hex"]))
+            dst = int(p["ram"], 16) if p.get("append") else int(p["addr"], 16)
+            uc.mem_write(dst, bytes.fromhex(p["hex"]))
         uc.mem_map(0x8000_0000, 0x1_0000)
         uc.mem_map(0x5000_0000, 0x2_0000)
         self.emac = UnicornEmac(uc, [int(a, 16) for a in spec["emac_sites"]])
