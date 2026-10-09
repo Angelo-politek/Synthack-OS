@@ -450,7 +450,6 @@ void rv_invoke(const void *fn, s32 value, char *buf)
         break;
     case 112:                           /* delay -> reverb */
     case 114:                           /* delay mix */
-    case 122:                           /* reverb mix (alias) */
     case 123:                           /* reverb mix */
         db_square(buf, v);
         break;
@@ -467,6 +466,7 @@ void rv_invoke(const void *fn, s32 value, char *buf)
         db_vol(buf, v);
         break;
     case 78:                            /* mandate DEL/REV: tracce, FX track, ingresso esterno */
+    case 72:                            /* SND3 (mods/fx3) */
     case 79:
     case 151:
     case 152:

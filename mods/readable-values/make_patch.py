@@ -41,6 +41,7 @@ PROTO_OPERANDS = {
     67: (0x4018_B1D0, P_TIME),    # filtro: REL
     70: (0x4018_B2C8, P_PLAIN),   # filtro base-width: BASE
     71: (0x4018_B318, P_PLAIN),   # filtro base-width: WDTH
+    72: (0x4018_B368, P_PLAIN),   # SND3: mandata della terza FX (mods/fx3)
     73: (0x4018_B3BC, P_PLAIN),   # ampiezza: ATK (move.l)
     74: (0x4018_B40C, P_HOLD),    # ampiezza: HOLD
     75: (0x4018_B45C, P_TIME),    # ampiezza: DEC
@@ -58,7 +59,6 @@ PROTO_OPERANDS = {
     119: (0x4018_C240, P_NUM),    # reverb: GAIN dello shelving
     120: (0x4018_C292, P_NUM),    # reverb HPF
     121: (0x4018_C2E4, P_NUM),    # reverb LPF
-    122: (0x4018_C33A, P_NUM),    # reverb mix (alias, move.l)
     123: (0x4018_C38C, P_NUM),    # reverb mix
     125: (0x4018_C430, P_NUM),    # IN (alias; IN R in dual mono)
     126: (0x4018_C47A, P_NUM),    # IN LR

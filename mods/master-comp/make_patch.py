@@ -78,7 +78,7 @@ HOOK_ORIG = "0c810000ffff6f06223c0000ffff374100460c830000ffff6f06263c0000ffff374
 DESC = 0x4022_D59C                      # descrittori: 52 B, indice = id logico
 PARAMS = [  # (nome breve, nome lungo, id, massimo)
     ("THR", "Comp Threshold", 144, 0x7F00),
-    ("ATK", "Comp Attack", 72, 0x7F00),
+    ("ATK", "Comp Attack", 122, 0x7F00),     # alias nascosto del mix del reverb
     ("REL", "Comp Release", 91, 0x7F00),
     ("MUP", "Comp Makeup", 101, 0x7F00),
     ("RAT", "Comp Ratio", 127, 0x7F00),        # 9 posizioni: 0 = OFF, 1..8 = 1.5..20:1
@@ -97,6 +97,7 @@ INIT_FIX = [(0x4018_B986, "41b9d660", "41b9d670", "id 91 +68: renderer clessidra
             (0x4018_AEE6, "41b9dcd0", "41b9dc00", "id 59 (GR) +36: come IN LR"),
             (0x4018_AF06, "41b9d5b0", "41b9d5d0", "id 59 (GR) +68: manopola -> barra (come IN LR)")]
 RAT_STEP = 0xFE0
+PAGE_HOOK, PAGE_ORIG = 0x4019_5156, "42b941b9f968"      # clr.l 0x41B9F968 (ultima casella vuota, all'avvio)
 WSL_BINUTILS = "~/tools/m68k/root"
 
 
@@ -189,6 +190,8 @@ def main() -> None:
         ui.append(fixed(r + 48, struct.pack(">I", syms[f"n_{n.lower()}_s"]), f"id {i}: nome breve '{n}'"))
     for addr, orig, new, what in INIT_FIX:
         ui.append(fixed(addr, bytes.fromhex(new), what, orig))
+    ui.append(fixed(PAGE_HOOK, struct.pack(">HI", 0x4EB9, syms["comp_page_stub"]),
+                    "pagina SYN della FX track all'avvio: caselle A..G e init (jsr comp_page_stub)", PAGE_ORIG))
 
     spec = {
         "name": "master-comp", "os": "1.41", "requires": ["modarea", "vparams"],
@@ -205,8 +208,8 @@ def main() -> None:
         "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items())
                     if k in ("comp_hook", "scale", "k_const", "k_state", "k_logt", "k_expt", "k_fallback",
                              "k_ids", "k_dt", "k_off", "kit_hook", "get_hook", "set_hook", "convert",
-                             "fx_page", "stor", "getv", "setv", "getr", "setr", "tab_fmt", "null_mgr",
-                             "comp_init", "k_fmts", "meter", "meter_val", "k_meter", "k_tick", "k_shown", "k_init", "k_on")},
+                             "comp_page_stub", "changed", "k_seen", "stor", "getv", "setv", "getr", "setr", "tab_fmt", "null_mgr",
+                             "comp_init", "k_fmts", "meter", "meter_val", "k_meter", "k_tick", "k_shown", "k_on")},
         "emac_sites": [f"{x:#010x}" for x in emac],
         "patches": [
             {"section": 3, "addr": f"{MODAREA_IMG + CODE_BASE - MODAREA_RAM:#010X}", "len": len(blob),

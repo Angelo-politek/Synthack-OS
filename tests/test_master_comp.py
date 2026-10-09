@@ -38,7 +38,7 @@ KIT_PTR, KIT, KIT_BLK = 0x8000_30BC, 0x5000_4000, 70
 GLOB_BLK, GLOBAL_FLAGS = 0x41B9_D3B0, 0x43BD_E444
 WOFF = {"THR": 12, "ATK": 14, "REL": 2, "MUP": 8}      # parole nel blocco esterno
 UI_ROOT, UI = 0x444E_1334, 0x5000_A000
-IDS = {"THR": 144, "ATK": 72, "REL": 91, "MUP": 101, "RAT": 127, "GR": 59, "COMP": 115}
+IDS = {"THR": 144, "ATK": 122, "REL": 91, "MUP": 101, "RAT": 127, "GR": 59, "COMP": 115}
 RAT_STEP = 0xFE0
 OBJS = 0x41B9_FA24
 GET, SET, KIT_FN = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
@@ -288,16 +288,41 @@ def test_other_ids_resume_original_code_identically(setup, fn, resume):
     assert states[0] == states[1]
 
 
-def test_fx_page_gets_the_knobs_only_if_original(setup):
+def test_page_stub_sets_the_knobs_at_boot(setup):
     spec, sec3, _ = setup
     m = Machine(spec, sec3)
-    m.block([0] * 32, [0] * 32, 1000, 1000)
-    assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == [144, 72, 91, 101, 127, 59, 115, 150]
-    m2 = Machine(spec, sec3)
+    m.uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
+    m.uc.reg_write(UC_M68K_REG_D0, 0x1234)
+    m.call(int(spec["symbols"]["comp_page_stub"], 16), [])
+    assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == [144, 122, 91, 101, 127, 59, 115, 150]
+    assert m.uc.reg_read(UC_M68K_REG_D0) == 0x1234
+    sec = {int(p["addr"], 16): p for p in spec["patches"] if not p.get("append")}
+    assert 0x4019_5156 in sec                                   # al posto dell'ultimo clr.l delle caselle
+
+
+def test_audio_block_leaves_the_page_alone(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
     weird = [1, 2, 3, 4, 5, 6, 7, 8]
-    m2.uc.mem_write(FX_SLOTS, struct.pack(">8i", *weird))
-    m2.block([0] * 32, [0] * 32, 1000, 1000)
-    assert list(struct.unpack(">8i", m2.uc.mem_read(FX_SLOTS, 32))) == weird
+    m.uc.mem_write(FX_SLOTS, struct.pack(">8i", *weird))
+    m.block([0] * 32, [0] * 32, 1000, 1000)                     # niente interfaccia nell'interrupt audio
+    assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == weird
+
+
+def test_constants_follow_stored_values_without_recomputing_every_block(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    m.set("RAT", 8 * RAT_STEP)
+    loud = [int(0.9 * 2**31 * math.sin(2 * math.pi * 200 * i / 48000)) for i in range(32)]
+    for _ in range(50):
+        m.block(loud, loud, 30000, 30000)
+    on = m.block(loud, loud, 30000, 30000)
+    m.set("RAT", 0)                                             # spento: CV originali dal blocco dopo
+    assert m.block(loud, loud, 30000, 30000) == (30000, 30000)
+    m.set("RAT", 8 * RAT_STEP)
+    for _ in range(50):
+        m.block(loud, loud, 30000, 30000)
+    assert m.block(loud, loud, 30000, 30000) == on
 
 
 # ----------------------------------------------------------------------------- rifiniture v0.4.1
@@ -335,8 +360,8 @@ def test_meter_rises_fast_and_falls_slowly(setup):
 
 
 def comp_init(m, spec):
-    """Prima pagina valida: fx_page installa una volta formattatori e disegno (non all'avvio)."""
-    m.block([0] * 32, [0] * 32, 1000, 1000)
+    """All'avvio lo stub della pagina installa formattatori e disegno."""
+    m.call(int(spec["symbols"]["comp_page_stub"], 16), [])
 
 
 def test_init_copies_drive_knob_graphics(setup):
@@ -345,25 +370,10 @@ def test_init_copies_drive_knob_graphics(setup):
     drive = OBJS + 84 * 150 + 36
     m.uc.mem_write(drive, bytes(range(0xA0, 0xB0)))
     comp_init(m, spec)
-    for i in (144, 72, 91, 101):
+    for i in (144, 122, 91, 101):
         assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(range(0xA0, 0xB0))
     for i in (127, 59):                              # RAT e GR restano barre
         assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(16)
-
-
-def test_init_runs_once_and_only_on_our_page(setup):
-    spec, sec3, _ = setup
-    m = Machine(spec, sec3)
-    m.uc.mem_write(FX_SLOTS, struct.pack(">8i", 1, 2, 3, 4, 5, 6, 7, 8))     # pagina altrui: niente
-    m.block([0] * 32, [0] * 32, 1000, 1000)
-    assert bytes(m.uc.mem_read(OBJS + 84 * 127 + 20, 16)) == bytes(16)
-    m.uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
-    drive = OBJS + 84 * 150 + 36
-    m.uc.mem_write(drive, bytes(range(0xA0, 0xB0)))
-    comp_init(m, spec)
-    m.uc.mem_write(drive, bytes(16))                 # solo la prima volta
-    m.block([0] * 32, [0] * 32, 1000, 1000)
-    assert bytes(m.uc.mem_read(OBJS + 84 * 144 + 36, 16)) == bytes(range(0xA0, 0xB0))
 
 
 def test_formatters_ignore_the_function_data(setup):

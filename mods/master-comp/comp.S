@@ -14,7 +14,7 @@
 | Scrive hw+70/hw+72; preserva tutti i registri (d1/d3 non servono dopo), MACSR e ACC puliti.
 |
 | Interfaccia (v0.3): 5 parametri "virtuali" THR ATK REL MUP RAT sulla pagina SYN della FX
-| track (FX Drive), con gli id logici nascosti 144, 72, 91, 101, 127 (descrittori riscritti da
+| track (FX Drive), con gli id logici nascosti 144, 122, 91, 101, 127 (descrittori riscritti da
 | make_patch.py) + misuratore GR (59, sola lettura). Tre agganci intercettano per questi id le
 | funzioni centrali dei parametri di kit: "e' di kit?" 0x4000D870, lettura 0x4000D94A,
 | scrittura 0x4000DA32. RAT 0 = compressore spento, 1..8 = 1.5,2,3,4,6,8,16,20:1.
@@ -60,8 +60,10 @@ comp_hook:
         move.l  %macsr,%d0
         move.l  %d0,-(%sp)                      | 0(sp) = MACSR; 4(sp).. = d0..
         move.l  #0xA0,%macsr                    | frazionario con segno, saturazione (come la DT)
-        bsr.w   fx_page
+        bsr.w   changed                         | costanti ricalcolate solo se i valori cambiano
+        beq.s   9f
         bsr.w   convert
+9:
         tst.b   k_off
         beq.s   8f
         lea     k_state,%a2                     | spento: stato azzerato, CV originali (G = 1)
@@ -370,34 +372,54 @@ setr:   move.l  %d0,%d2
         blt.s   1b
         rts
 
-| ---- pagina FX Drive: se e' ancora quella originale (DRIVE in H, F e G vuoti) mette i 5 id in A..E
-fx_page:
-        lea     FX_SLOTS,%a0
-        move.l  28(%a0),%d0
-        cmpi.l  #ID_DRIVE,%d0
-        bne.w   2f
-        move.l  24(%a0),%d0                     | G vuoto o gia' nostro (ON/OFF)
-        beq.s   4f
-        cmpi.l  #ID_COMP,%d0
-        bne.w   2f
-4:
-        move.l  20(%a0),%d0                     | F vuoto o gia' nostro (GR)
+| ---- Z = 0 se i valori salvati (4 parole), il contenitore (kit, globale o ripiego) o l'interruttore
+|      sono cambiati dall'ultimo blocco; aggiorna la copia (usa d0, d1, a0, a1)
+changed:
+        bsr.w   stor
+        lea     k_seen,%a1
+        moveq   #0,%d1
+        move.l  %a0,%d0
+        cmp.l   (%a1),%d0
+        beq.s   1f
+        moveq   #1,%d1
+        move.l  %d0,(%a1)
+1:      move.l  12(%a0),%d0                     | parole +12 +14 (THR, ATK)
+        cmp.l   4(%a1),%d0
+        beq.s   2f
+        moveq   #1,%d1
+        move.l  %d0,4(%a1)
+2:      move.w  2(%a0),%d0                      | +2 (REL) e +8 (MUP)
+        swap    %d0
+        move.w  8(%a0),%d0
+        cmp.l   8(%a1),%d0
         beq.s   3f
-        cmpi.l  #ID_GR,%d0
-        bne.w   2f
-3:
+        moveq   #1,%d1
+        move.l  %d0,8(%a1)
+3:      mvz.b   k_on,%d0
+        cmp.l   12(%a1),%d0
+        beq.s   4f
+        moveq   #1,%d1
+        move.l  %d0,12(%a1)
+4:      tst.l   %d1
+        rts
+
+| ---- all'avvio, al posto di clr.l 0x41B9F968 (ultima casella vuota della pagina "SYN / FX Drive"):
+|      i 7 id nelle caselle A..G e, a oggetti dei parametri gia' costruiti, grafica e formattatori
+        .globl  comp_page_stub
+comp_page_stub:
+        lea     -16(%sp),%sp
+        movem.l %d0-%d1/%a0-%a1,(%sp)
+        lea     FX_SLOTS,%a0
         lea     k_ids,%a1
         moveq   #N_PAR-1,%d1
 1:      mvz.w   (%a1)+,%d0
         move.l  %d0,(%a0)+
         subq.l  #1,%d1
         bge.s   1b
-        tst.b   k_init                          | una sola volta, a OS gia' avviato
-        bne.s   2f
-        moveq   #-1,%d0
-        move.b  %d0,k_init
         bsr.w   comp_init
-2:      rts
+        movem.l (%sp),%d0-%d1/%a0-%a1
+        lea     16(%sp),%sp
+        rts
 
 | ---- d0 = id logico -> d1 = indice in k_ids (0..6) oppure -1. Usa a0.
 find:   lea     k_ids,%a0
@@ -596,12 +618,12 @@ fmt_copy:
         bne.s   3b
         rts
 
-| ---- una tantum (da fx_page): disegno della manopola di DRIVE su THR..MUP e formattatori
+| ---- una tantum (dallo stub della pagina): disegno della manopola di DRIVE su THR..MUP e formattatori
 |      con le unita' reali
         .globl  comp_init
 comp_init:
-        lea     -8(%sp),%sp
-        movem.l %d2/%a2,(%sp)
+        lea     -12(%sp),%sp
+        movem.l %d2/%a1-%a2,(%sp)
         tst.b   k_gfx_on
         beq.s   3f
         lea     k_ids,%a2
@@ -629,8 +651,8 @@ comp_init:
         move.l  (%a2)+,(%a0)                    | esecutore
         subq.l  #1,%d2
         bge.s   4b
-        movem.l (%sp),%d2/%a2
-        lea     8(%sp),%sp
+        movem.l (%sp),%d2/%a1-%a2
+        lea     12(%sp),%sp
         rts
 
 | gestore della std::function del formattatore: nessuno stato da copiare o distruggere
@@ -666,8 +688,6 @@ k_defw:
         .word   D_THR, D_ATK, D_REL, D_MUP
 k_off:
         .byte   0
-k_init:
-        .byte   0                               | formattatori e disegno gia' installati
 k_on:
         .byte   -1                              | interruttore ON/OFF (non salvato: riparte acceso)
 k_s_on:
@@ -686,6 +706,8 @@ k_shown:
         .balign 4
 k_state:
         .long   0, 0
+k_seen:
+        .long   -1, 0, 0, 0                     | contenitore, parole, interruttore visti (-1: mai)
 k_logt:
         .long   LOG_T0, LOG_T1, LOG_T2, LOG_T3, LOG_T4, LOG_T5, LOG_T6, LOG_T7, LOG_T8
         .long   LOG_T9, LOG_T10, LOG_T11, LOG_T12, LOG_T13, LOG_T14, LOG_T15, LOG_T16
