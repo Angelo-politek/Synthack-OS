@@ -6,7 +6,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 > **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
 > Learn the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.
 
-**Status:** `v0.5.0` — five mods running on real hardware.
+**Status:** `v0.5.1` — five mods running on real hardware.
 
 ## Features
 
@@ -15,7 +15,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 | [Master compressor](mods/master-comp) | ✅ v0.5.0 | Bus compressor on the **analog master** (via the master VCAs). Digitakt-style curves. THR · ATK · REL · MUP · RAT + gain-reduction meter + ON/OFF switch on the FX track SYN page, values in dB / ms / ratio. Saved per pattern, or global with *SYN global*. |
 | [Dual mono input](mods/dual-mono) | ✅ v0.5.0 | With EXTERNAL IN set to mono, **IN L** and **IN R** get independent levels on the External Mixer page. |
 | [Boot splash](mods/splash) | ✅ v0.5.0 | "SyntHack v0.5.0" logo after the official intro. Boot time unchanged. |
-| [Mod area](mods/modarea) | ✅ infra | 32 KB of RAM for mod code, loaded at boot. |
+| [Mod area](mods/modarea) | ✅ infra | 64 KB of RAM for mod code, stored compressed and unpacked at boot. |
 | [Readable parameter values](mods/readable-values) | ✅ v0.5.0 | Hz, dB, ms and % instead of 0–127: filters, envelopes, levels, sends, delay and reverb, on every track and the FX track. Computed from the same data the DSP uses; analog parts measured on the device. |
 | PIN lock | ⬜ planned | Optional PIN at power-on, as a theft deterrent. Recovery via OS reflash stays possible. |
 | Dual mono v2 | ⬜ planned | Separate IN L / IN R pages with their own FX sends. |
