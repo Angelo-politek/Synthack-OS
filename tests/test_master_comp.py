@@ -59,7 +59,8 @@ class Machine:
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
         uc.mem_map(0x4600_0000, 0x1_0000)                      # area mod (dopo la rilocazione)
-        for p in spec["patches"]:
+        vp = json.loads((ROOT / "mods" / "vparams" / "patch.json").read_text(encoding="utf-8"))
+        for p in spec["patches"] + vp["patches"]:          # i parametri virtuali passano da vparams
             dst = int(p["ram"], 16) if p.get("append") else int(p["addr"], 16)
             uc.mem_write(dst, bytes.fromhex(p["hex"]))
         uc.mem_map(0x8000_0000, 0x1_0000)

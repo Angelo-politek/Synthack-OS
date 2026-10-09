@@ -1,0 +1,54 @@
+{
+  "name": "vparams",
+  "os": "1.41",
+  "requires": [
+    "modarea"
+  ],
+  "description": "Parametri virtuali delle mod: agganci alle funzioni centrali dei parametri di kit e tabella di registrazione in RAM.",
+  "generated_by": "mods/vparams/make_patch.py",
+  "layout": {
+    "table": "0x46008000",
+    "entries": 32
+  },
+  "symbols": {
+    "vp_kit": "0x46007e1a",
+    "vp_get": "0x46007e36",
+    "vp_set": "0x46007e52",
+    "vp_find": "0x46007e00"
+  },
+  "patches": [
+    {
+      "section": 3,
+      "addr": "0X4034FE00",
+      "len": 112,
+      "append": true,
+      "hex": "43f946008000721fb051670a43e9000c53816cf493c922094e75202f0008670861de670470014e752f02747c222f00084ef94000d878202f0008670a61c26706206900044ed02f02222f00084ef94000d950202f0008670a61a66706206900084ed02f032f02222f000c4ef94000da3a",
+      "ram": "0x46007e00",
+      "what": "(area mod) vp_kit, vp_get, vp_set"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000D870",
+      "len": 8,
+      "expect_sha256": "9543cb23f5dfdfba7a01beb7c6d94be848abc0d9daabf2597886638ffc3b5b29",
+      "hex": "4ef946007e1a4e71",
+      "what": "aggancio: jmp vp_kit ; nop"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000D94A",
+      "len": 6,
+      "expect_sha256": "d6c9f1f60272197a17511f496fc19dd21ddd7df5f1f1ec0cab7a16cad60b0609",
+      "hex": "4ef946007e36",
+      "what": "aggancio: jmp vp_get"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000DA32",
+      "len": 8,
+      "expect_sha256": "f537d32566bd64115d10ae86f44d24d947ff5cf58a554cf0b67ab60a34ad6e4d",
+      "hex": "4ef946007e524e71",
+      "what": "aggancio: jmp vp_set ; nop"
+    }
+  ]
+}

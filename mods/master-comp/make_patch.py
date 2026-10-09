@@ -17,6 +17,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import importlib.util
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -24,6 +25,9 @@ REPO = HERE.parents[1]
 sys.path[:0] = [str(REPO / "tools" / "unpack"), str(HERE)]
 import eft  # noqa: E402
 from dsp import ATTACK, C_OCT, EXP_T, LOG_T, RATIO, RELEASE  # noqa: E402
+_vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
+vparams = importlib.util.module_from_spec(_vp)
+_vp.loader.exec_module(vparams)
 
 RAT_NAMES = ["OFF", "1.5:1", "2:1", "3:1", "4:1", "6:1", "8:1", "16:1", "20:1"]
 
@@ -82,9 +86,7 @@ PARAMS = [  # (nome breve, nome lungo, id, massimo)
     ("COMP", "Compressor On/Off", 115, 0x100),  # interruttore (era "Delay FX Routing", nascosto)
 ]
 # agganci alle funzioni centrali dei parametri di kit: (indirizzo, byte originali, simbolo)
-UI_HOOKS = [(0x4000_D870, "2f02747c222f0008", "kit_hook"),
-            (0x4000_D94A, "2f02222f0008", "get_hook"),
-            (0x4000_DA32, "2f032f02222f000c", "set_hook")]
+VP_SLOT0 = 0                            # posti nella tabella di vparams: 0..6
 # inizializzatore degli oggetti per-parametro: grafico a barra per 91, 101 e 127 (127 = come 125)
 INIT_FIX = [(0x4018_B986, "41b9d660", "41b9d670", "id 91 +68: renderer clessidra -> barra (come 144)"),
             (0x4018_BCA4, "41b9d660", "41b9d670", "id 101 +68: renderer clessidra -> barra"),
@@ -177,9 +179,8 @@ def main() -> None:
                 "expect_sha256": sha(old), "hex": new.hex(), "what": what}
 
     ui = []
-    for addr, orig, sym in UI_HOOKS:
-        code = struct.pack(">HI", 0x4EF9, syms[sym]) + (b"Nq" if len(orig) == 16 else b"")
-        ui.append(fixed(addr, code, f"aggancio: jmp {sym}" + (" ; nop" if len(orig) == 16 else ""), orig))
+    for slot, (n, _, i, _) in enumerate(PARAMS):      # parametri virtuali (mods/vparams), posti 0..6
+        ui.append(vparams.entry(VP_SLOT0 + slot, i, syms["get_hook"], syms["set_hook"], f"master-comp {n}"))
     defaults = {"THR": a.thr, "ATK": a.atk, "REL": a.rel, "MUP": a.mup, "RAT": a.rat * RAT_STEP, "GR": 0, "COMP": 0x100}
     for n, ln, i, mx in PARAMS:
         r = DESC + 52 * i
@@ -190,7 +191,7 @@ def main() -> None:
         ui.append(fixed(addr, bytes.fromhex(new), what, orig))
 
     spec = {
-        "name": "master-comp", "os": "1.41", "requires": ["modarea"],
+        "name": "master-comp", "os": "1.41", "requires": ["modarea", "vparams"],
         "description": "Compressore sul master analogico (VCA del master) con l'algoritmo del "
                        "compressore in stile Digitakt; manopole THR ATK REL MUP RAT (0 = OFF) e misuratore GR "
                        "sulla pagina SYN della FX track; valori salvati nel kit del pattern (o globali con "
