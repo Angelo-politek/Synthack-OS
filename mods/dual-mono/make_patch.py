@@ -1,11 +1,10 @@
 """Genera mods/dual-mono/patch.json: INPUT L e INPUT R come due ingressi separati.
 
 1. assembla dualmono.S e lo collega all'indirizzo CODE_BASE (spazio libero della sezione 3);
-2. verifica che la routine `gains` sia una trascrizione fedele del blocco originale
-   0x40090872..0x400908F8 (stessi byte, a parte le differenze attese e documentate);
-3. scrive patch.json: codice+dati nello spazio libero e il trampolino al posto del blocco:
-       0x40090872: jsr dm_hook.l          (6 byte)
-       0x40090878: bra.w 0x400908FC       (4 byte, salta il resto del blocco originale)
+2. scrive patch.json: codice+dati nello spazio libero e due agganci attorno al blocco originale
+   (che resta al suo posto):
+       0x40090872: jsr pre_hook.l ; nop   (al posto di due move.w, rieseguite da pre_hook)
+       0x400908FC: jsr post_hook.l        (al posto di move.l #32639,d1, rieseguita da post_hook)
 
     python mods/dual-mono/make_patch.py         # richiede binutils m68k in WSL (CONTRIBUTING.md)
 """
@@ -31,6 +30,8 @@ LOAD = 0x4000_0400
 CODE_BASE = 0x4033_8BE0                 # dopo lo splash (0x40338740..0x40338BD8), stesso riempimento libero
 FREE_END = 0x4033_9000
 BLOCK_START, BLOCK_END = 0x4009_0872, 0x4009_08FC
+ENTRY_ORIG = "342a070a302a0740"         # move.w 1802(a2),d2 ; move.w 1856(a2),d0
+EXIT_ORIG = "223c00007f7f"              # move.l #32639,d1
 WSL_BINUTILS = "~/tools/m68k/root"
 
 
@@ -68,26 +69,6 @@ def build_blob() -> tuple[bytes, dict[str, int], list[int], str]:
     return blob, syms, emac, dis
 
 
-def check_transcription(sec3: bytes, blob: bytes, syms: dict[str, int]) -> None:
-    """gains deve avere gli stessi byte del blocco originale salvo: lettura del pan (da d1),
-    spiazzamenti dei salti brevi/indirizzi uguali, rts finale. Confronto istruzione per istruzione
-    sulle parti identiche."""
-    orig = sec3[BLOCK_START - LOAD:BLOCK_END - LOAD]
-    g = blob[syms["gains"] - CODE_BASE:syms["page_ok"] - CODE_BASE]
-    # 1) dall'inizio fino alla lettura del pan (0x400908BE): identico
-    n1 = 0x400908BE - BLOCK_START
-    # nell'originale il blocco inizia con "move.w P_LEVEL(a2),d2" (4 B) che nella routine e' fuori da gains
-    if g[:n1 - 4] != orig[4:n1]:
-        raise SystemExit("gains: la prima parte non coincide con l'originale")
-    # 2) lettura del pan: originale 'mvs.w 0x70E(a2),d0' (716a 070e) -> nostro 'mvs.w d1,d0' (7141)
-    if orig[n1:n1 + 4] != bytes.fromhex("716a070e") or g[n1 - 4:n1 - 2] != bytes.fromhex("7141"):
-        raise SystemExit("gains: la sostituzione della lettura del pan non e' quella attesa")
-    # 3) dal 'movea.l d4,a0' fino a prima della prima scrittura in hw: identico
-    o2, o3 = n1 + 4, 0x400908E4 - BLOCK_START
-    if g[n1 - 2:n1 - 2 + (o3 - o2)] != orig[o2:o3]:
-        raise SystemExit("gains: la parte centrale non coincide con l'originale")
-
-
 def main() -> None:
     stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
@@ -97,7 +78,10 @@ def main() -> None:
         raise SystemExit(f"non ci sta: {len(blob)} B")
     if any(sec3[CODE_BASE - LOAD:end - LOAD]):
         raise SystemExit("lo spazio libero non e' a zero")
-    check_transcription(sec3, blob, syms)
+    entry = sec3[BLOCK_START - LOAD:BLOCK_START - LOAD + 8]
+    exit_ = sec3[BLOCK_END - LOAD:BLOCK_END - LOAD + 6]
+    if entry.hex() != ENTRY_ORIG or exit_.hex() != EXIT_ORIG:
+        raise SystemExit("i byte dei punti d'aggancio non sono quelli attesi")
 
     # IN R = alias 125 ("Input Level"): nessuna pagina, nessun CC/NRPN, e il suo oggetto in RAM
     # usa gli stessi prototipi di IN LR (renderer a barra). Lo facciamo diventare un alias di BAL:
@@ -113,9 +97,8 @@ def main() -> None:
         if entries[:4] != (0x10, 0x10, 0x22, 0x22):
             raise SystemExit(f"switch di {what} a {tab:#x}: voci inattese {entries[:4]}")
 
-    hook = syms["dm_hook"]
-    tramp = struct.pack(">HIHH", 0x4EB9, hook, 0x6000, BLOCK_END - (BLOCK_START + 8))  # jsr.l / bra.w
-    site = sec3[BLOCK_START - LOAD:BLOCK_START - LOAD + len(tramp)]
+    t_in = struct.pack(">HIH", 0x4EB9, syms["pre_hook"], 0x4E71)        # jsr.l pre_hook ; nop
+    t_out = struct.pack(">HI", 0x4EB9, syms["post_hook"])               # jsr.l post_hook
     spec = {
         "name": "dual-mono", "os": "1.41",
         "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati. "
@@ -124,15 +107,19 @@ def main() -> None:
                        "in stereo tutto come l'originale.",
         "generated_by": "mods/dual-mono/make_patch.py",
         "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items()) if k in
-                    ("dm_hook", "gains", "page_ok", "ui_mono", "ui_stereo", "str_inl", "str_inr")},
+                    ("pre_hook", "post_hook", "page_ok", "ui_mono", "ui_stereo", "dm_pass", "dm_save_lr",
+                     "dm_save_bal", "dm_save_l", "str_inl", "str_inr")},
         "emac_sites": [f"{a:#010x}" for a in emac],
         "patches": [
             {"section": 3, "addr": f"{CODE_BASE:#010X}", "len": len(blob),
              "expect_sha256": sha(sec3[CODE_BASE - LOAD:end - LOAD]), "hex": blob.hex(),
-             "what": "routine dual mono (dm_hook, gains, interfaccia) + stringhe IN L / IN R"},
-            {"section": 3, "addr": f"{BLOCK_START:#010X}", "len": len(tramp),
-             "expect_sha256": sha(site), "hex": tramp.hex(),
-             "what": "trampolino: jsr dm_hook ; bra.w 0x400908FC (salta il blocco originale)"},
+             "what": "agganci del dual mono (pre_hook, post_hook), interfaccia, stringhe IN L / IN R"},
+            {"section": 3, "addr": f"{BLOCK_START:#010X}", "len": 8,
+             "expect_sha256": sha(entry), "hex": t_in.hex(),
+             "what": "ingresso del blocco originale: jsr pre_hook ; nop"},
+            {"section": 3, "addr": f"{BLOCK_END:#010X}", "len": 6,
+             "expect_sha256": sha(exit_), "hex": t_out.hex(),
+             "what": "uscita del blocco originale: jsr post_hook"},
             {"section": 3, "addr": f"{alias_id:#010X}", "len": 4,
              "expect_sha256": sha(sec3[alias_id - LOAD:alias_id - LOAD + 4]), "hex": "00000025",
              "what": "alias 125 'Input Level': id interno 0x23 (IN LR) -> 0x25 (BAL), usato come IN R"},
@@ -146,8 +133,8 @@ def main() -> None:
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (REPO / "out" / "dual-mono").mkdir(parents=True, exist_ok=True)
     (REPO / "out" / "dual-mono" / "dualmono.lst").write_text(dis, encoding="utf-8")
-    print(f"patch.json: {len(blob)} B a {CODE_BASE:#x}..{end:#x}, dm_hook={hook:#x}, "
-          f"{len(emac)} istruzioni EMAC; trampolino {tramp.hex()} a {BLOCK_START:#x}")
+    print(f"patch.json: {len(blob)} B a {CODE_BASE:#x}..{end:#x}; agganci {t_in.hex()} a {BLOCK_START:#x}, "
+          f"{t_out.hex()} a {BLOCK_END:#x}; {len(emac)} istruzioni EMAC nel nostro codice")
 
 
 if __name__ == "__main__":

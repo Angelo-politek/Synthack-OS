@@ -4,44 +4,43 @@
   "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati. Pagina EXTERNAL MIXER: IN L (manopola A) e IN R (manopola B: alias 125 reso alias di BAL, disegnato a barra); in stereo tutto come l'originale.",
   "generated_by": "mods/dual-mono/make_patch.py",
   "symbols": {
-    "dm_hook": "0x40338be0",
-    "gains": "0x40338c1e",
-    "page_ok": "0x40338c9c",
-    "str_inl": "0x40338d50",
-    "str_inr": "0x40338d55",
-    "ui_mono": "0x40338ccc",
-    "ui_stereo": "0x40338d0c"
+    "dm_pass": "0x40338d34",
+    "dm_save_bal": "0x40338d38",
+    "dm_save_l": "0x40338d3a",
+    "dm_save_lr": "0x40338d36",
+    "page_ok": "0x40338c80",
+    "post_hook": "0x40338c20",
+    "pre_hook": "0x40338be0",
+    "str_inl": "0x40338d3c",
+    "str_inr": "0x40338d41",
+    "ui_mono": "0x40338cb0",
+    "ui_stereo": "0x40338cf0"
   },
-  "emac_sites": [
-    "0x40338c28",
-    "0x40338c2c",
-    "0x40338c3a",
-    "0x40338c3e",
-    "0x40338c52",
-    "0x40338c56",
-    "0x40338c60",
-    "0x40338c64",
-    "0x40338c70",
-    "0x40338c74",
-    "0x40338c78",
-    "0x40338c7a"
-  ],
+  "emac_sites": [],
   "patches": [
     {
       "section": 3,
       "addr": "0X40338BE0",
-      "len": 401,
-      "expect_sha256": "d11a56fc18e3f3a3bffb12d651c0d1946e83e19a78408b761b7652f02ebb4042",
-      "hex": "4a39800031466716342a070a322a070e612c374000083742001260000110342a070a323c4000611637400008342a070e323c4000610837420012600000b0302a0740c5fc7f00d482a4020800a1c24a6a071a670e203c0000658ea4000800a1c260247140e08043f9401dc9e0207c0000ffffa4080800a1c824310c0041f08a00a4080900a1c2714120442f004e90588fa0020900a2820900a1c0a3c10c800000ffff6f06203c0000ffff24010c810000ffff6f06243c0000ffff4e7541f941b9f7f0707eb0906622203c00000081b0a800106616203c00000082b0a80014660a203c00000084b0a8001c4e7561ce663a707d2140000442a8001843f940338d5023c94022ef6443f940338d5523c94022ef3043f940338d5a23c94022ef5c43f940338d6523c94022ef284e75618e663e42a80004203c0000008021400018203c40253b6e23c04022ef64203c4024f8a723c04022ef30203c40253b6023c04022ef5c203c40253b4d23c04022ef284e75494e204c00494e205200496e707574204c65667400496e70757420526967687400",
-      "what": "routine dual mono (dm_hook, gains, interfaccia) + stringhe IN L / IN R"
+      "len": 381,
+      "expect_sha256": "a3c240211e3b1e5ca41d1fad946fcde3fcd20035d6f78a0cef748b4c3355c67d",
+      "hex": "4a3940338d34662e4a39800031466622610000be302a070a33c040338d36302a070e33c040338d38303c40003540070e6004610000dc342a070a302a07404e754a398000314666504a3940338d346624302b000833c040338d3a303940338d383540070a700113c040338d34588f4ef940090872303940338d3a37400008303940338d363540070a303940338d383540070e423940338d34223c00007f7f4e7541f941b9f7f0707eb0906622203c00000081b0a800106616203c00000082b0a80014660a203c00000084b0a8001c4e7561ce663a707d2140000442a8001843f940338d3c23c94022ef6443f940338d4123c94022ef3043f940338d4623c94022ef5c43f940338d5123c94022ef284e75618e663e42a80004203c0000008021400018203c40253b6e23c04022ef64203c4024f8a723c04022ef30203c40253b6023c04022ef5c203c40253b4d23c04022ef284e750000000000000000494e204c00494e205200496e707574204c65667400496e70757420526967687400",
+      "what": "agganci del dual mono (pre_hook, post_hook), interfaccia, stringhe IN L / IN R"
     },
     {
       "section": 3,
       "addr": "0X40090872",
-      "len": 10,
-      "expect_sha256": "b7fe46f104e7b81943d5563825b97ccd06672b56f05657edf0eb41bd0c6b9ebf",
-      "hex": "4eb940338be060000082",
-      "what": "trampolino: jsr dm_hook ; bra.w 0x400908FC (salta il blocco originale)"
+      "len": 8,
+      "expect_sha256": "29a36373c4208916a3242e07eb816250cf4c1584ed82a6816c18b8c96d588de2",
+      "hex": "4eb940338be04e71",
+      "what": "ingresso del blocco originale: jsr pre_hook ; nop"
+    },
+    {
+      "section": 3,
+      "addr": "0X400908FC",
+      "len": 6,
+      "expect_sha256": "98b283ca1cace777e623dcb23123a1fee8d30b6313ba845ba4c9f03fe7ec01d2",
+      "hex": "4eb940338c20",
+      "what": "uscita del blocco originale: jsr post_hook"
     },
     {
       "section": 3,

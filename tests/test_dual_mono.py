@@ -26,7 +26,8 @@ pytestmark = pytest.mark.skipif(not STOCK.exists(), reason="firmware stock assen
 
 SPEC = json.loads((ROOT / "mods" / "dual-mono" / "patch.json").read_text(encoding="utf-8"))
 LOAD = 0x4000_0400
-BLOCK, AFTER = 0x4009_0872, 0x4009_08FC
+BLOCK = 0x4009_0872
+AFTER = 0x4009_0902          # dopo l'istruzione all'uscita del blocco (sostituita da jsr post_hook)
 PANLAW = 0x400A_171A
 FLAG = 0x8000_3146
 PARAMS, HW, STACK = 0x5000_0000, 0x5000_2000, 0x5001_0000
@@ -85,6 +86,7 @@ class Machine:
         uc.emu_start(BLOCK, AFTER, count=100_000)
         assert self.emac.error is None, self.emac.error
         hw = bytes(uc.mem_read(HW, 0x40))
+        self.params = bytes(uc.mem_read(PARAMS, 0x800))
         return struct.unpack_from(">H", hw, 8)[0], struct.unpack_from(">H", hw, 0x12)[0], hw
 
     def layout(self):
@@ -178,3 +180,17 @@ def test_ui_untouched_if_page_is_not_the_expected_one(sec3):
     assert mod.layout() == weird
     assert {i: mod.name_ptr(i) for i in NAMES} == ORIG_NAMES
     assert {i: mod.u32(LONG[i]) for i in LONG} == ORIG_LONG
+
+
+def test_mono_restores_the_mixer_parameters(sec3):
+    """In mono il blocco originale gira due volte con parametri modificati: alla fine a2 torna com'era."""
+    mod = Machine(sec3, True, 0xA0)
+    for level, pan, x, prepost in cases(30, 5):
+        mod.run(level, pan, x, prepost, mono=True)
+        assert struct.unpack_from(">H", mod.params, 0x70A)[0] == level
+        assert struct.unpack_from(">H", mod.params, 0x70E)[0] == pan
+
+
+def test_original_block_is_not_copied(sec3):
+    """Il nostro codice non contiene il calcolo dei guadagni: nessuna istruzione EMAC."""
+    assert SPEC["emac_sites"] == []

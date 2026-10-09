@@ -7,8 +7,8 @@ With **SETTINGS → AUDIO ROUTING → EXTERNAL IN = mono**, the two inputs get i
 
 ## How it works
 
-- Trampoline over the external-input block of the gain function (`0x40090872–0x400908F8`): `jsr dm_hook; bra.w 0x400908FC`.
-- `dm_hook` reads the EXTERNAL IN flag (`0x80003146`, 0 = mono). Stereo: original math. Mono: two independent gains (IN LR → left VCA, BAL → right VCA), each with the balance law centred.
+- Two hooks around the **original** external-input block of the gain function (`0x40090872–0x400908FC`); no Elektron code is copied.
+- Stereo: the block runs once, unchanged. Mono (`0x80003146` = 0): it runs twice with the balance centred — pass 1 with IN LR (→ left VCA), pass 2 with BAL (→ right VCA) — then the original parameters are restored.
 - IN R is the hidden alias 125 turned into a BAL alias (internal id + two jump-table entries), so it draws as a bar. Long/short names switch to *Input Left/Right*, *IN L/IN R* and back.
 - Code at `0x40338BE0` (free fill). Per-input pan isn't possible: the input has only two VCAs.
 
