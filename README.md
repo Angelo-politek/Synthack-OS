@@ -6,7 +6,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 > **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
 > Learn the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.
 
-**Status:** `v0.6.0` — six mods running on real hardware.
+**Status:** `v0.7.0` — seven mods running on real hardware.
 
 ## Features
 
@@ -14,14 +14,15 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 |---|---|---|
 | [Master compressor](mods/master-comp) | ✅ v0.5.0 | Bus compressor on the **analog master** (via the master VCAs). Digitakt-style curves. THR · ATK · REL · MUP · RAT + gain-reduction meter + ON/OFF switch on the FX track SYN page, values in dB / ms / ratio. Saved per pattern, or global with *SYN global*. |
 | [Dual mono input](mods/dual-mono) | ✅ v0.5.0 | With EXTERNAL IN set to mono, **IN L** and **IN R** get independent levels on the External Mixer page. |
-| [Boot splash](mods/splash) | ✅ v0.5.0 | "SyntHack v0.5.0" logo after the official intro. Boot time unchanged. |
+| [Boot splash](mods/splash) | ✅ v0.7.0 | "SyntHack" logo and version after the official intro. Boot time unchanged. |
 | [Mod area](mods/modarea) | ✅ infra | 64 KB of RAM for mod code, stored compressed and unpacked at boot. |
 | [Readable parameter values](mods/readable-values) | ✅ v0.5.0 | Hz, dB, ms and % instead of 0–127: filters, envelopes, levels, sends, delay and reverb, on every track and the FX track. Computed from the same data the DSP uses; analog parts measured on the device. |
 | [Beat repeat](mods/beat-repeat) | ✅ v0.6.0 | Sequencer stutter on **all tracks** (analog too): hold retrig keys 13/14 on the FX track to loop the last 1/16 … 1 bar (rates RPT1/RPT2 on the TRIG page) and resume in time. |
+| [Third send FX](mods/fx3) | ✅ v0.7.0 | **SND3** on every track (AMP page 2) into a stereo **chorus**, with its own page (REVERB tab, page 2), independent return level and a send into the delay. More effect types planned. |
 | PIN lock | ⬜ planned | Optional PIN at power-on, as a theft deterrent. Recovery via OS reflash stays possible. |
 | Dual mono v2 | ⬜ planned | Separate IN L / IN R pages with their own FX sends. |
 | New LFO shapes · 3rd LFO / mod matrix | ⬜ planned | |
-| Third send FX (chorus, flanger, crusher…) | ⬜ planned | A new per-track send with a selectable effect, keeping delay and reverb. |
+| More FX3 types (flanger, phaser, crusher…) · saved FX3 page | ⬜ planned | |
 | Arpeggiator · Euclidean circle UI | ⬜ planned | |
 | Resampling to SP TWINSHOT · advanced sampler | ⬜ planned | |
 | New machines: RISER / DOWNFILTER, SY SWARM+ | ⬜ planned | Requires custom audio-engine code (CPU #2). |
@@ -33,7 +34,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 flowchart LR
   A["Foundations ✅<br/>unpack/repack · emulator<br/>build tool · recovery"] --> B["First mods ✅<br/>splash · dual mono<br/>master compressor"]
   B --> C["UI & usability<br/>readable values ✅ · PIN lock<br/>dual mono v2"]
-  C --> D["FX & performance<br/>beat repeat ✅ · third send FX<br/>arp · euclidean UI · LFOs"]
+  C --> D["FX & performance<br/>beat repeat ✅ · third send FX ✅<br/>arp · euclidean UI · LFOs"]
   D --> E["Engine mods<br/>new machines · sampler<br/>resampling"]
   B -.-> W["Web builder"]
 ```
@@ -55,7 +56,8 @@ Requires Python 3, WSL/Linux and your own `Syntakt_OS1.41.syx` (see [firmware/RE
 bash tools/unpack/setup_eft.sh                 # once (WSL/Linux)
 git config core.hooksPath tools/hooks          # once: blocks firmware files from commits
 python tools/build/build.py --stock firmware/Syntakt_OS1.41.syx \
-    mods/splash mods/dual-mono mods/modarea mods/vparams mods/master-comp mods/readable-values mods/beat-repeat \n    -o out/synthack.syx
+    mods/splash mods/dual-mono mods/modarea mods/vparams mods/master-comp mods/readable-values mods/beat-repeat \
+    mods/fx3 -o out/synthack.syx
 ```
 
 Flash `out/synthack.syx` with Elektron Transfer (USB, *Drop* page). To go back, flash the stock OS the same way.
