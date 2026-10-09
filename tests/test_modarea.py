@@ -25,7 +25,7 @@ import eft  # noqa: E402
 import lz  # noqa: E402
 
 STOCK = ROOT / "firmware" / "Syntakt_OS1.41.syx"
-MODS = [ROOT / "mods" / m for m in ("modarea", "vparams", "master-comp", "readable-values", "beat-repeat")]
+MODS = [ROOT / "mods" / m for m in ("modarea", "vparams", "master-comp", "readable-values", "beat-repeat", "fx3")]
 pytestmark = pytest.mark.skipif(not STOCK.exists() or not all((m / "patch.json").exists() for m in MODS),
                                 reason="firmware stock o patch assenti")
 LOAD = 0x4000_0400
