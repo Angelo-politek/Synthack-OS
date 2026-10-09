@@ -21,6 +21,9 @@ Formato di mods/<nome>/patch.json:
 Patch accodate ("append": true, solo "hex"): byte NUOVI oltre la fine della sezione stock (area
 mod, vedi mods/modarea); lo spazio tra la fine stock e "addr" viene riempito di zeri. Non hanno
 impronta (non sostituiscono byte Elektron). Una mod puo' dichiarare "requires": ["modarea"].
+
+Controllo di avvio (bootcheck.py): il bootstrap decomprime la sezione 3 quasi sul posto; se il
+margine scende sotto bootcheck.MIN_MARGIN l'immagine non si avvierebbe e il build la scarta.
 """
 
 from __future__ import annotations
@@ -36,6 +39,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO / "tools" / "unpack"))
 import eft  # noqa: E402
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import bootcheck  # noqa: E402
 
 LOAD_ADDR = 0x4000_0400                 # sezioni 3 e 7 si caricano qui (vedi docs/)
 PATCHABLE = {3, 7}
@@ -158,6 +164,12 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
         built = eft.info(out)
         if not built.checksums_ok or built.version != version:
             raise BuildError("il .syx prodotto non passa la verifica dei checksum")
+        size, margin = bootcheck.check(out)
+        if margin < bootcheck.MIN_MARGIN:
+            out.unlink()
+            raise BuildError(f"la sezione 3 non si decomprimerebbe all'avvio: margine {margin} B "
+                             f"(minimo {bootcheck.MIN_MARGIN}); la Syntakt resterebbe sul logo")
+        log(f"  avvio: margine di decompressione {margin} B (minimo {bootcheck.MIN_MARGIN})")
         all_ids = [s.id for s in info.sections]
         a = eft.unpack(stock, tmp / "a", ids=all_ids)
         b = eft.unpack(out, tmp / "b", ids=all_ids)
@@ -184,6 +196,7 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
         "mods": [json.loads((Path(d) / "patch.json").read_text(encoding="utf-8"))["name"] for d in moddirs],
         "output": out.name,
         "output_sha256": sha256(out.read_bytes()),
+        "boot_margin": margin,
     }
     out.with_suffix(".json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest

@@ -25,6 +25,15 @@ Stock OS 1.41 SHA-256: `8e2488f462c4a5656396a895f113bcd415e9900fa8709340dccf45d4
 
 ## Notes
 
-- Section 3 may grow: the bootloader accepts it (used by the [mod area](memory-map.md#mod-area)).
+- Section 3 may grow (used by the [mod area](memory-map.md#mod-area)), within the decompression margin below.
+
+## Boot decompression limit ⚠️
+
+The bootstrap (`0x80000210`, runs in SRAM) loads the **compressed** section 3 at `0x40200000` and unpacks it to `0x40000400`. Output chases input: if it catches up, it overwrites compressed bytes not yet read and the device hangs on the Elektron logo.
+
+- Rule: *decompressed − compressed* must stay below ~`0x1FFC00` at every point of the stream.
+- Margins: stock 1.41 +99 938 B · v0.5.0 +16 220 B · a build padded with zeros to `0x40350000`: −8 751 B → **did not boot** (tested twice).
+- Zero padding is the worst case (compresses to nothing). Already-compressed data *raises* the margin.
+- `tools/build/bootcheck.py` replays the unpacking; `build.py` refuses images below 4 KB of margin.
 - Repacking recompresses changed sections; compressed bytes differ, decompressed content is what we verify.
 - The Syntakt accepts rebuilt images (recompressed section 3, recomputed MAC) via USB and MIDI DIN.

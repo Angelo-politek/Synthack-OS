@@ -71,5 +71,7 @@ def test_build_mod_zero(tmp_path):
     lines = []
     m = build.build(STOCK, [ROOT / "mods" / "mod-zero"], out, log=lines.append)
     assert m["mods"] == ["mod-zero"]
-    assert lines == ["  sezione 3: 8 byte modificati, tutti dentro le patch"]
+    assert lines[0].startswith("  avvio: margine di decompressione ")
+    assert m["boot_margin"] >= 4096
+    assert lines[1:] == ["  sezione 3: 8 byte modificati, tutti dentro le patch"]
     assert build.eft.info(out).checksums_ok
