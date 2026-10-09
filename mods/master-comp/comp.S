@@ -33,7 +33,8 @@
         .equ    MUP_K,          202017810       | makeup: mk = MUP_K*(MUP<<16) - MUP_K
         .equ    FX_SLOTS,       0x41B9F950      | pagina "SYN / FX Drive" (oggetto in BSS)
         .equ    ID_DRIVE,       150
-        .equ    N_PAR,          6               | THR ATK REL MUP RAT + GR (sola lettura)
+        .equ    N_PAR,          7               | THR ATK REL MUP RAT + GR (sola lettura) + ON
+        .equ    IDX_ON,         6
         .equ    IDX_GR,         5
         .equ    IDX_RAT,        4
         .equ    RAT_STEP,       0xFE0           | RAT: 9 posizioni (0 = OFF) su 0..0x7F00
@@ -41,7 +42,6 @@
         .equ    METER_DECAY,    111848          | discesa ~20 dB/s (unita' 2^23/dB per blocco)
         .equ    OBJS,           0x41B9FA24      | oggetti per-parametro in RAM (84 B, indice = id)
         .equ    DRIVE_GFX,      0x41B9FA24 + 84*150 + 36   | disegno della manopola di DRIVE
-        .equ    RAT_FMT_OBJ,    0x41B9FA24 + 84*127 + 20   | formattatore del testo di RAT
         .equ    UI_ROOT,        0x444E1334      | oggetto principale dell'interfaccia (singleton)
         .equ    UI_DIRTY,       96              | +64 ViewController, +32 "da ridisegnare"
         .equ    REDRAW_BLOCKS,  24              | al massimo un ridisegno ogni 24 blocchi (~16 ms)
@@ -228,7 +228,10 @@ convert:
         bsr.w   getr                            | RAT: 0 = spento, 1..8 -> ratio[0..7]
         tst.l   %d0
         seq     %d1
-        move.b  %d1,k_off
+        tst.b   k_on                            | interruttore ON/OFF (confronto)
+        bne.s   0f
+        moveq   #-1,%d1
+0:      move.b  %d1,k_off
         tst.l   %d0
         beq.s   1f
         subq.l  #1,%d0
@@ -373,8 +376,11 @@ fx_page:
         move.l  28(%a0),%d0
         cmpi.l  #ID_DRIVE,%d0
         bne.w   2f
-        tst.l   24(%a0)                         | G vuoto
+        move.l  24(%a0),%d0                     | G vuoto o gia' nostro (ON/OFF)
+        beq.s   4f
+        cmpi.l  #ID_COMP,%d0
         bne.w   2f
+4:
         move.l  20(%a0),%d0                     | F vuoto o gia' nostro (GR)
         beq.s   3f
         cmpi.l  #ID_GR,%d0
@@ -386,34 +392,14 @@ fx_page:
         move.l  %d0,(%a0)+
         subq.l  #1,%d1
         bge.s   1b
-        tst.b   k_gfx                           | una sola volta: disegno di DRIVE su THR..MUP
-        bne.w   2f
+        tst.b   k_init                          | una sola volta, a OS gia' avviato
+        bne.s   2f
         moveq   #-1,%d0
-        move.b  %d0,k_gfx
-        tst.b   k_gfx_on
-        beq.s   5f
-        lea     k_ids,%a1
-        moveq   #3,%d1
-4:      mvz.w   (%a1)+,%d0
-        mulu.w  #84,%d0
-        addi.l  #(OBJS+36),%d0
-        movea.l %d0,%a0
-        move.l  DRIVE_GFX,(%a0)+
-        move.l  DRIVE_GFX+4,(%a0)+
-        move.l  DRIVE_GFX+8,(%a0)+
-        move.l  DRIVE_GFX+12,(%a0)+
-        subq.l  #1,%d1
-        bge.s   4b
-5:      lea     RAT_FMT_OBJ,%a0                 | formattatore di RAT: "OFF", "4:1"...
-        clr.l   (%a0)+
-        clr.l   (%a0)+
-        move.l  #null_mgr,%d0
-        move.l  %d0,(%a0)+
-        move.l  #rat_fmt,%d0
-        move.l  %d0,(%a0)
+        move.b  %d0,k_init
+        bsr.w   comp_init
 2:      rts
 
-| ---- d0 = id logico -> d1 = indice in k_ids (0..4) oppure -1. Usa a0.
+| ---- d0 = id logico -> d1 = indice in k_ids (0..6) oppure -1. Usa a0.
 find:   lea     k_ids,%a0
         moveq   #N_PAR-1,%d1
 1:      cmp.w   (%a0,%d1.l*2),%d0
@@ -447,8 +433,16 @@ get_hook:                                       | 0x4000D94A: lettura
         moveq   #IDX_RAT,%d0
         cmp.l   %d0,%d1
         beq.s   4f
+        moveq   #IDX_ON,%d0
+        cmp.l   %d0,%d1
+        beq.s   3f
         move.l  %d1,%d0
         bra.w   getv                            | THR/ATK/REL/MUP
+3:      moveq   #0,%d0                          | ON/OFF: 0 o 0x100
+        tst.b   k_on
+        beq.s   2f
+        move.l  #0x100,%d0
+2:      rts
 4:      bsr.w   getr                            | RAT: posizione 0..8 -> 0..0x7F00
         moveq   #8,%d1
         cmp.l   %d1,%d0
@@ -456,7 +450,10 @@ get_hook:                                       | 0x4000D94A: lettura
         move.l  %d1,%d0
 6:      mulu.w  #RAT_STEP,%d0
         rts
-5:      bra.w   meter_val                       | GR
+5:      bsr.w   meter_val                       | GR: barra piena = nessuna riduzione,
+        neg.l   %d0                             | si svuota dall'alto quanto il volume scende
+        addi.l  #0x7F00,%d0
+        rts
 9:      move.l  %d2,-(%sp)
         move.l  8(%sp),%d1
         jmp     0x4000D950
@@ -472,6 +469,9 @@ set_hook:                                       | 0x4000DA32: scrittura
         moveq   #IDX_RAT,%d0
         cmp.l   %d0,%d1
         beq.w   rat_set
+        moveq   #IDX_ON,%d0
+        cmp.l   %d0,%d1
+        beq.s   7f
         move.l  12(%sp),%d0                     | valore limitato a [0, 0x7F00]
         bge.s   1f
         moveq   #0,%d0
@@ -486,6 +486,12 @@ set_hook:                                       | 0x4000DA32: scrittura
         move.l  (%sp)+,%d2
         bsr.w   ui_dirty                        | come i setter originali: ridisegno subito
 8:      moveq   #0,%d0
+        rts
+7:      tst.l   12(%sp)                         | ON/OFF: solo in RAM (riparte acceso)
+        sne     %d0
+        move.b  %d0,k_on
+        bsr.w   ui_dirty
+        moveq   #0,%d0
         rts
 9:      move.l  %d3,-(%sp)
         move.l  %d2,-(%sp)
@@ -553,26 +559,78 @@ ui_dirty:
         move.b  %d0,UI_DIRTY(%a0)
 1:      rts
 
-| ---- formattatore del testo di RAT, chiamato come std::function(valore, buffer)
-|      (entrata: 4(sp) = oggetto funzione, 8(sp) = valore 0..0x7F00, 12(sp) = buffer)
-rat_fmt:
+| ---- formattatori: testo da una tabella di 128 voci da 6 byte (valore >> 8 = indice).
+|      Chiamati come std::function(valore, buffer): 8(sp) = valore 0..0x7F00, 12(sp) = buffer.
+|      Un trampolino per parametro sceglie la tabella: non dipendono dai dati della std::function.
+fmt_thr: lea     t_thr,%a0
+        bra.s   tab_fmt
+fmt_atk: lea     t_atk,%a0
+        bra.s   tab_fmt
+fmt_rel: lea     t_rel,%a0
+        bra.s   tab_fmt
+fmt_mup: lea     t_mup,%a0
+        bra.s   tab_fmt
+fmt_rat: lea     t_rat,%a0
+        bra.s   tab_fmt
+fmt_on:  lea     k_s_off,%a0
+        tst.l   8(%sp)
+        beq.s   fmt_copy
+        lea     k_s_on,%a0
+        bra.s   fmt_copy
+fmt_gr:  lea     t_gr,%a0
+tab_fmt:
         move.l  8(%sp),%d0
         bge.s   1f
         moveq   #0,%d0
-1:      addi.l  #(RAT_STEP/2),%d0
-        move.l  #RAT_STEP,%d1
-        divu.l  %d1,%d0
-        moveq   #8,%d1
+1:      asr.l   #8,%d0
+        moveq   #127,%d1
         cmp.l   %d1,%d0
         ble.s   2f
         move.l  %d1,%d0
 2:      mulu.w  #6,%d0
-        lea     k_ratstr,%a0
         adda.l  %d0,%a0
+fmt_copy:
         movea.l 12(%sp),%a1
 3:      move.b  (%a0)+,%d1
         move.b  %d1,(%a1)+
         bne.s   3b
+        rts
+
+| ---- una tantum (da fx_page): disegno della manopola di DRIVE su THR..MUP e formattatori
+|      con le unita' reali
+        .globl  comp_init
+comp_init:
+        lea     -8(%sp),%sp
+        movem.l %d2/%a2,(%sp)
+        tst.b   k_gfx_on
+        beq.s   3f
+        lea     k_ids,%a2
+        moveq   #3,%d2
+1:      mvz.w   (%a2)+,%d0
+        mulu.w  #84,%d0
+        addi.l  #(OBJS+36),%d0
+        movea.l %d0,%a0
+        move.l  DRIVE_GFX,(%a0)+
+        move.l  DRIVE_GFX+4,(%a0)+
+        move.l  DRIVE_GFX+8,(%a0)+
+        move.l  DRIVE_GFX+12,(%a0)+
+        subq.l  #1,%d2
+        bge.s   1b
+3:      lea     k_fmts,%a2                      | {id, formattatore} x 7
+        moveq   #6,%d2
+4:      move.l  (%a2)+,%d0
+        mulu.w  #84,%d0
+        addi.l  #(OBJS+20),%d0
+        movea.l %d0,%a0
+        clr.l   (%a0)+                          | nessun dato
+        clr.l   (%a0)+
+        move.l  #null_mgr,%d0
+        move.l  %d0,(%a0)+                      | gestore (l'OS controlla che non sia nullo)
+        move.l  (%a2)+,(%a0)                    | esecutore
+        subq.l  #1,%d2
+        bge.s   4b
+        movem.l (%sp),%d2/%a2
+        lea     8(%sp),%sp
         rts
 
 | gestore della std::function del formattatore: nessuno stato da copiare o distruggere
@@ -601,25 +659,21 @@ k_const:
 k_fallback:
         .space  16                              | blocco esterno di ripiego se non c'e' ancora un kit
 k_ids:
-        .word   ID_THR, ID_ATK, ID_REL, ID_MUP, ID_RAT, ID_GR
+        .word   ID_THR, ID_ATK, ID_REL, ID_MUP, ID_RAT, ID_GR, ID_COMP
 k_woff:
         .byte   12, 14, 2, 8                    | THR ATK REL MUP: L1 +40 +42 +30 +36 (L2 +82 +84 +72 +78)
 k_defw:
         .word   D_THR, D_ATK, D_REL, D_MUP
-k_ratstr:
-        .ascii  "OFF\0\0\0"
-        .ascii  "1.5:1\0"
-        .ascii  "2:1\0\0\0"
-        .ascii  "3:1\0\0\0"
-        .ascii  "4:1\0\0\0"
-        .ascii  "6:1\0\0\0"
-        .ascii  "8:1\0\0\0"
-        .ascii  "16:1\0\0"
-        .ascii  "20:1\0\0"
 k_off:
         .byte   0
-k_gfx:
-        .byte   0                               | disegno di DRIVE gia' copiato
+k_init:
+        .byte   0                               | formattatori e disegno gia' installati
+k_on:
+        .byte   -1                              | interruttore ON/OFF (non salvato: riparte acceso)
+k_s_on:
+        .asciz  "ON"
+k_s_off:
+        .asciz  "OFF"
 k_gfx_on:
         .byte   GFX_ON                          | esperimento attivo (make_patch --no-drive-knob)
         .balign 4
@@ -638,6 +692,10 @@ k_logt:
 k_expt:
         .long   EXP_T0, EXP_T1, EXP_T2, EXP_T3, EXP_T4, EXP_T5, EXP_T6, EXP_T7, EXP_T8
         .long   EXP_T9, EXP_T10, EXP_T11, EXP_T12, EXP_T13, EXP_T14, EXP_T15, EXP_T16
+k_fmts:
+        .long   ID_THR, fmt_thr, ID_ATK, fmt_atk, ID_REL, fmt_rel, ID_MUP, fmt_mup, ID_RAT, fmt_rat, ID_GR, fmt_gr, ID_COMP, fmt_on
+        .include "fmt_tables.inc"
+        .balign 4
 k_dt:
         .include "dt_tables.inc"
 k_names:

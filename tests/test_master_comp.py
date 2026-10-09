@@ -38,7 +38,7 @@ KIT_PTR, KIT, KIT_BLK = 0x8000_30BC, 0x5000_4000, 70
 GLOB_BLK, GLOBAL_FLAGS = 0x41B9_D3B0, 0x43BD_E444
 WOFF = {"THR": 12, "ATK": 14, "REL": 2, "MUP": 8}      # parole nel blocco esterno
 UI_ROOT, UI = 0x444E_1334, 0x5000_A000
-IDS = {"THR": 144, "ATK": 72, "REL": 91, "MUP": 101, "RAT": 127, "GR": 59}
+IDS = {"THR": 144, "ATK": 72, "REL": 91, "MUP": 101, "RAT": 127, "GR": 59, "COMP": 115}
 RAT_STEP = 0xFE0
 OBJS = 0x41B9_FA24
 GET, SET, KIT_FN = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
@@ -114,6 +114,11 @@ class Machine:
         return struct.unpack(">I", self.uc.mem_read(addr, 4))[0]
 
 
+def reduction(m):
+    """Riduzione mostrata dal misuratore GR: la barra e' piena a 0 dB e si svuota."""
+    return 0x7F00 - m.get("GR")
+
+
 def preset_of(spec):
     v = [int(x, 16) for x in spec["params"]]
     return {"THR": v[0], "ATK": v[1], "REL": v[2], "MUP": v[3], "RAT": v[4] * RAT_STEP}
@@ -151,7 +156,7 @@ def test_new_kit_reads_preset_and_compressor_is_off(setup):
     loud = [int(0.9 * 2**31 * math.sin(2 * math.pi * 200 * i / 48000)) for i in range(32)]
     for _ in range(20):
         assert m.block(loud, loud, 30000, 70000) == (30000, 65535)   # CV originali (limitati)
-    assert m.get("GR") == 0
+    assert reduction(m) == 0
 
 
 # ----------------------------------------------------------------------------- compressore acceso
@@ -194,10 +199,10 @@ def test_loud_signal_reduces_cv_and_meter_shows_it(setup):
     for _ in range(200):
         got = m.block(loud, loud, 30000, 30000)[0]
     assert got < quiet / 2
-    gr = m.get("GR")
+    gr = reduction(m)
     assert 0x1000 < gr <= 0x7F00                     # riduzione di qualche dB visibile
     m.set("GR", 0)                                   # sola lettura: ignorato
-    assert m.get("GR") == gr
+    assert reduction(m) == gr
 
 
 # ----------------------------------------------------------------------------- salvataggio
@@ -286,7 +291,7 @@ def test_fx_page_gets_the_knobs_only_if_original(setup):
     spec, sec3, _ = setup
     m = Machine(spec, sec3)
     m.block([0] * 32, [0] * 32, 1000, 1000)
-    assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == [144, 72, 91, 101, 127, 59, 0, 150]
+    assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == [144, 72, 91, 101, 127, 59, 115, 150]
     m2 = Machine(spec, sec3)
     weird = [1, 2, 3, 4, 5, 6, 7, 8]
     m2.uc.mem_write(FX_SLOTS, struct.pack(">8i", *weird))
@@ -318,39 +323,67 @@ def test_meter_rises_fast_and_falls_slowly(setup):
     loud = [int(0.9 * 2**31 * math.sin(2 * math.pi * 200 * (i + 32 * b) / 48000)) for b in range(1) for i in range(32)]
     for _ in range(100):
         m.block(loud, loud, 30000, 30000)
-    top = m.get("GR")
+    top = reduction(m)
     assert top > 0x2000
     m.block([0] * 32, [0] * 32, 30000, 30000)
-    after1 = m.get("GR")
+    after1 = reduction(m)
     assert top - 0x400 < after1 <= top               # non crolla in un blocco
     for _ in range(3000):                            # ~2 s di silenzio
         m.block([0] * 32, [0] * 32, 30000, 30000)
-    assert m.get("GR") == 0
+    assert reduction(m) == 0
 
 
-def test_drive_knob_graphics_copied_once(setup):
+def comp_init(m, spec):
+    """Prima pagina valida: fx_page installa una volta formattatori e disegno (non all'avvio)."""
+    m.block([0] * 32, [0] * 32, 1000, 1000)
+
+
+def test_init_copies_drive_knob_graphics(setup):
     spec, sec3, _ = setup
     m = Machine(spec, sec3)
     drive = OBJS + 84 * 150 + 36
     m.uc.mem_write(drive, bytes(range(0xA0, 0xB0)))
-    m.block([0] * 32, [0] * 32, 1000, 1000)
+    comp_init(m, spec)
     for i in (144, 72, 91, 101):
         assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(range(0xA0, 0xB0))
     for i in (127, 59):                              # RAT e GR restano barre
         assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(16)
+
+
+def test_init_runs_once_and_only_on_our_page(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    m.uc.mem_write(FX_SLOTS, struct.pack(">8i", 1, 2, 3, 4, 5, 6, 7, 8))     # pagina altrui: niente
+    m.block([0] * 32, [0] * 32, 1000, 1000)
+    assert bytes(m.uc.mem_read(OBJS + 84 * 127 + 20, 16)) == bytes(16)
+    m.uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
+    drive = OBJS + 84 * 150 + 36
+    m.uc.mem_write(drive, bytes(range(0xA0, 0xB0)))
+    comp_init(m, spec)
     m.uc.mem_write(drive, bytes(16))                 # solo la prima volta
     m.block([0] * 32, [0] * 32, 1000, 1000)
     assert bytes(m.uc.mem_read(OBJS + 84 * 144 + 36, 16)) == bytes(range(0xA0, 0xB0))
 
 
+def test_formatters_ignore_the_function_data(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    comp_init(m, spec)
+    for name in ("THR", "RAT"):                      # anche se l'OS copia la std::function senza dati
+        obj = OBJS + 84 * IDS[name] + 20
+        before = call_fmt(m, 0x4000, name)
+        m.uc.mem_write(obj, bytes.fromhex("deadbeef") * 2)
+        assert call_fmt(m, 0x4000, name) == before
+
+
 # ----------------------------------------------------------------------------- v0.4.2
-def call_fmt(m, value):
-    """Chiama il formattatore installato in RAT come farebbe l'OS: invoker(funzione, valore, buffer)."""
-    obj = OBJS + 84 * 127 + 20
+def call_fmt(m, value, name="RAT"):
+    """Chiama il formattatore di un parametro come farebbe l'OS: invoker(funzione, valore, buffer)."""
+    obj = OBJS + 84 * IDS[name] + 20
     mgr, inv = struct.unpack(">II", m.uc.mem_read(obj + 8, 8))
     assert mgr != 0                                  # l'OS controlla che ci sia un gestore
     buf = 0x5000_C000
-    m.uc.mem_write(buf, b"\xEE" * 16)
+    m.uc.mem_write(buf, bytes([0xEE]) * 16)
     m.call(inv, [obj, value, buf])
     raw = bytes(m.uc.mem_read(buf, 16))
     return raw[:raw.index(0)].decode()
@@ -359,10 +392,40 @@ def call_fmt(m, value):
 def test_rat_text(setup):
     spec, sec3, _ = setup
     m = Machine(spec, sec3)
-    m.block([0] * 32, [0] * 32, 1000, 1000)          # installa il formattatore
+    comp_init(m, spec)
     texts = [call_fmt(m, i * RAT_STEP) for i in range(9)]
     assert texts == ["OFF", "1.5:1", "2:1", "3:1", "4:1", "6:1", "8:1", "16:1", "20:1"]
     assert call_fmt(m, 0x7F00) == "20:1" and call_fmt(m, 100) == "OFF"
+
+
+@pytest.mark.parametrize("name, cases", [
+    ("THR", {0: "-60dB", 0x4000: "-30dB", 0x7F00: "0dB"}),
+    ("ATK", {0: "0.1ms", 0x7F00: "100ms"}),
+    ("REL", {0: "10ms", 0x7F00: "2.0s"}),
+    ("MUP", {0: "0dB", 0x4000: "+12dB", 0x7F00: "+24dB"}),
+    ("GR", {0x7F00: "0dB", 0: "-18dB"}),
+])
+def test_unit_texts(setup, name, cases):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    comp_init(m, spec)
+    for v, txt in cases.items():
+        assert call_fmt(m, v, name) == txt
+    assert call_fmt(m, -5, name) == call_fmt(m, 0, name)          # fuori range: limitato
+    assert call_fmt(m, 0x9000, name) == call_fmt(m, 0x7F00, name)
+
+
+def test_unit_texts_match_the_formulas_for_every_step(setup):
+    spec, sec3, _ = setup
+    import importlib.util
+    mp = importlib.util.spec_from_file_location("comp_make_patch", ROOT / "mods" / "master-comp" / "make_patch.py")
+    mod = importlib.util.module_from_spec(mp)
+    mp.loader.exec_module(mod)
+    tabs = mod.unit_tables()
+    m = Machine(spec, sec3)
+    comp_init(m, spec)
+    for name in ("THR", "ATK", "REL", "MUP", "GR"):
+        assert [call_fmt(m, i << 8, name) for i in range(128)] == tabs[name.lower()]
 
 
 def test_meter_asks_for_redraw_only_when_it_changes(setup):
@@ -396,3 +459,36 @@ def test_knob_change_asks_for_redraw_like_original_setters(setup):
     m.uc.mem_write(UI + 96, b"\0")
     m.set("GR", 0x1000)                              # sola lettura: niente
     assert m.uc.mem_read(UI + 96, 1)[0] == 0
+
+
+# ----------------------------------------------------------------------------- v0.5: interruttore ON/OFF
+def test_on_off_switch_bypasses_and_restores(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    assert m.get("COMP") == 0x100                    # acceso all'avvio
+    m.set("RAT", 8 * RAT_STEP)
+    loud = [int(0.9 * 2**31 * math.sin(2 * math.pi * 200 * i / 48000)) for i in range(32)]
+    for _ in range(50):
+        on = m.block(loud, loud, 30000, 30000)
+    assert on[0] < 30000                             # comprime
+    m.set("COMP", 0)
+    assert m.get("COMP") == 0 and m.get("RAT") == 8 * RAT_STEP   # RAT resta impostato
+    for _ in range(20):
+        assert m.block(loud, loud, 30000, 70000) == (30000, 65535)   # come RAT = OFF
+    for _ in range(3000):                            # il misuratore torna a ~20 dB/s
+        m.block(loud, loud, 30000, 30000)
+    assert reduction(m) == 0
+    m.set("COMP", 0x100)
+    for _ in range(50):
+        again = m.block(loud, loud, 30000, 30000)
+    assert again[0] < 30000
+
+
+def test_on_off_text_and_page_slot(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    comp_init(m, spec)
+    assert call_fmt(m, 0x100, "COMP") == "ON" and call_fmt(m, 0, "COMP") == "OFF"
+    m.set("COMP", 0)
+    m.block([0] * 32, [0] * 32, 1000, 1000)          # la casella resta nostra anche da spento
+    assert struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))[6] == 115

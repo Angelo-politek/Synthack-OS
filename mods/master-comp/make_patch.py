@@ -25,6 +25,43 @@ sys.path[:0] = [str(REPO / "tools" / "unpack"), str(HERE)]
 import eft  # noqa: E402
 from dsp import ATTACK, C_OCT, EXP_T, LOG_T, RATIO, RELEASE  # noqa: E402
 
+RAT_NAMES = ["OFF", "1.5:1", "2:1", "3:1", "4:1", "6:1", "8:1", "16:1", "20:1"]
+
+
+def unit_tables() -> dict[str, list[str]]:
+    """Testi con le unita' reali per ogni indice 0..127 (valore >> 8), dalle formule di dsp.py."""
+    def ms(t: float) -> str:
+        if t < 10:
+            return f"{t:.1f}ms"
+        if t < 1000:
+            return f"{round(t)}ms"
+        return f"{t / 1000:.1f}s"
+
+    def db(x: float, plus: bool = False) -> str:
+        r = round(x)
+        return f"{'+' if plus and r > 0 else ''}{r}dB"
+
+    tabs = {}
+    tabs["thr"] = [db(60 * (i << 8) / 32768 - 60) for i in range(128)]
+    tabs["atk"] = [ms(0.1 + 99.9 * (i / 127) ** 2) for i in range(128)]
+    tabs["rel"] = [ms(10 + 1990 * (i / 127) ** 2.5) for i in range(128)]
+    tabs["mup"] = [db(24.08 * (i << 8) / 32768, plus=True) for i in range(128)]
+    tabs["rat"] = [RAT_NAMES[min(8, ((i << 8) + 0xFE0 // 2) // 0xFE0)] for i in range(128)]
+    tabs["gr"] = [db(-18 * (0x7F00 - (i << 8)) / 0x7F00) for i in range(128)]   # barra piena = 0 dB
+    for k, v in tabs.items():
+        assert all(len(t) <= 5 for t in v), (k, max(v, key=len))
+    return tabs
+
+
+def fmt_include() -> str:
+    out = []
+    for k, texts in unit_tables().items():
+        out.append(f"t_{k}:")
+        for t in texts:
+            b = t.encode("ascii").ljust(6, b"\x00")
+            out.append("        .byte   " + ", ".join(str(x) for x in b))
+    return "\n".join(out) + "\n"
+
 LOAD = 0x4000_0400
 # area mod (mods/modarea): collegato in RAM a 0x46000000, byte accodati alla sezione 3 a 0x40348000
 MODAREA_RAM, MODAREA_IMG, MODAREA_SIZE = 0x4600_0000, 0x4034_8000, 0x8000
@@ -42,6 +79,7 @@ PARAMS = [  # (nome breve, nome lungo, id, massimo)
     ("MUP", "Comp Makeup", 101, 0x7F00),
     ("RAT", "Comp Ratio", 127, 0x7F00),        # 9 posizioni: 0 = OFF, 1..8 = 1.5..20:1
     ("GR", "Gain Reduction", 59, 0x7F00),      # misuratore, sola lettura
+    ("COMP", "Compressor On/Off", 115, 0x100),  # interruttore (era "Delay FX Routing", nascosto)
 ]
 # agganci alle funzioni centrali dei parametri di kit: (indirizzo, byte originali, simbolo)
 UI_HOOKS = [(0x4000_D870, "2f02747c222f0008", "kit_hook"),
@@ -116,7 +154,7 @@ def main() -> None:
                      for tab in (ATTACK, RELEASE, RATIO) for k in range(0, len(tab), 8))
     names = "".join(f'n_{n.lower()}_s: .asciz "{n}"{nl}n_{n.lower()}_l: .asciz "{ln}"{nl}'
                     for n, ln, _, _ in PARAMS)
-    incs = {"dt_tables.inc": tables, "names.inc": names}
+    incs = {"dt_tables.inc": tables, "names.inc": names, "fmt_tables.inc": fmt_include()}
     defs.update({f"LOG_T{i}": v for i, v in enumerate(LOG_T)})
     defs.update({f"EXP_T{i}": v for i, v in enumerate(EXP_T)})
 
@@ -142,7 +180,7 @@ def main() -> None:
     for addr, orig, sym in UI_HOOKS:
         code = struct.pack(">HI", 0x4EF9, syms[sym]) + (b"Nq" if len(orig) == 16 else b"")
         ui.append(fixed(addr, code, f"aggancio: jmp {sym}" + (" ; nop" if len(orig) == 16 else ""), orig))
-    defaults = {"THR": a.thr, "ATK": a.atk, "REL": a.rel, "MUP": a.mup, "RAT": a.rat * RAT_STEP, "GR": 0}
+    defaults = {"THR": a.thr, "ATK": a.atk, "REL": a.rel, "MUP": a.mup, "RAT": a.rat * RAT_STEP, "GR": 0, "COMP": 0x100}
     for n, ln, i, mx in PARAMS:
         r = DESC + 52 * i
         ui.append(fixed(r + 8, struct.pack(">III", 0, mx, defaults[n]), f"id {i} -> {n}: min, max, default"))
@@ -166,8 +204,8 @@ def main() -> None:
         "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items())
                     if k in ("comp_hook", "scale", "k_const", "k_state", "k_logt", "k_expt", "k_fallback",
                              "k_ids", "k_dt", "k_off", "kit_hook", "get_hook", "set_hook", "convert",
-                             "fx_page", "stor", "getv", "setv", "getr", "setr", "rat_fmt", "null_mgr",
-                             "meter", "meter_val", "k_meter", "k_tick", "k_shown", "k_ratstr")},
+                             "fx_page", "stor", "getv", "setv", "getr", "setr", "tab_fmt", "null_mgr",
+                             "comp_init", "k_fmts", "meter", "meter_val", "k_meter", "k_tick", "k_shown", "k_init", "k_on")},
         "emac_sites": [f"{x:#010x}" for x in emac],
         "patches": [
             {"section": 3, "addr": f"{MODAREA_IMG + CODE_BASE - MODAREA_RAM:#010X}", "len": len(blob),
