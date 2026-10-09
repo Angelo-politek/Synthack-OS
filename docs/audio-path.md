@@ -42,6 +42,20 @@ Engine copy of the kit (or global) blocks, base `0x800021B0`, written by `0x400A
 
 **The final mix is analog.** Digital buses go out through DACs (TDM, 8 slots, ring `0x80000000`) into the analog mixer; nothing digital sits after the master VCAs.
 
+### Sends, returns and routing
+
+- Per-track loop at `0x4008F21E` (t = 0–11, track struct `a3`): send targets = level/pan gain × (v/32768)² (DEL +118, REV +120), 0 if the track is muted (mask at `fp−508`). Ramp increments `(target − current) >> 5`, applied per sample.
+- Summing routines `f(dst, src, gains, increments)`, 32 samples, `dst` step 8 B (one side of a stereo bus), EMAC *msac with load* (result = −Σ g·x): 10 ch `0x4008EF14`, 9 ch `0x4008EFAC`, 8 ch `0x4008F03E`, 6 ch `0x4008F0C6`, 4 ch `0x4008F13A`. Source channels at 128 B steps.
+- Delay bus `0x8000DBD0` (digital + analog) → delay → `0x8000DCD0`. Reverb bus (tracks + delay→reverb) → reverb → `0x8000DDD0`.
+- Returns are copied to channels 8/9 of the track buffer (`0x80004150`, `0x800041D0`) and summed with the tracks into **one** bus each: `0x8000DAD0` (direct) or `0x8000DFD0` (through the analog FX block) by their *FX Routing* flag (delay `a2+1782`, reverb `a2+1800`).
+- Engine word **+106** (internal id 39, hidden param 72) is saved per track and unused by the OS: SND3 of [fx3](../mods/fx3).
+
+### CPU load
+
+- Everything above runs in the audio interrupt `0x400A3856` (`rte` at `0x400A54A8`), once per block. Free-running counter: DTIM0 `0xFC07000C`.
+- Measured with the fx3 test meter (`make_patch.py --meter`): **~89 % of the CPU at rest**, sequencer stopped. The UI only gets what is left: a few % more per block is enough to freeze it under load.
+- Reference costs per block (instructions, emulator): reverb ~8 200; our master compressor 100 off / ~2 000 on; fx3 ~300 idle, ~3 100 with 12 tracks sending, ~3 800 worst case.
+
 ## Track parameters, envelopes and filters
 
 - Engine copy per track: `0x800021B0 + 142·t` (t = 0–11), word offset = **28 + 2 × internal id** (filter FREQ +84, ENV +88, amp ATK +108 … VOL +124). CPU #1 sends CPU #2 the shared block at `0x80002000` (0x1B0 B per interrupt).

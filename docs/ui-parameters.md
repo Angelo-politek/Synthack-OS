@@ -13,7 +13,7 @@ Table at `0x4022D59C`, **505 records × 52 B, index = logical id**.
 | +36 | capability flags (e.g. `0xE00` → listed as modulation destination) |
 | +40 / +48 | long / short name pointers |
 
-Aliases share group + internal id. Ids 270–504 are machine parameters; hidden leftovers include 59, 72, 91, 101, 127, 144, 115 (on/off), 124 (on/off).
+Aliases share group + internal id. Ids 270–504 are machine parameters; hidden ids and their use by the mods: see [below](#hidden-ids-used-by-the-mods).
 
 ## Pages
 
@@ -25,6 +25,33 @@ Static C++ initializer `0x401885D2–0x401968F4` builds page objects in BSS (44 
 | FX track SYN (FX Drive) | `0x41B9F948` | `– ×7 · 150 (DRIVE)` |
 
 Slots are read at draw time: changing them at runtime changes the page.
+
+- Page elements: array of 37 at `0x41B9F3C8` (44 B each), index → element `0x4007B9D0`. Page 25 ("OB8 / Outbox 8") is a Digitakt leftover, always empty: fx3 uses it.
+- **Tabs** are page widgets built from constant arrays of page indices + count (`0x4017DA3A`), e.g. DELAY `{20}` at `0x401C7FAC`, REVERB `{21}` at `0x401C7FA8` (built at `0x40035890`), generic class `0x40042B58`. A tab with N pages cycles them on its key; widget +124 = page vector, +144 = current position. The page's virtual +188 returns the id under an encoder.
+- Per-object fields before the prototypes: +0 type (0 = plain value, others change the encoder step: MIDI-track ids use 4/5, toggles 12), +4 value prototype (`d3` = discrete/standard, as in LFO MODE).
+
+## Drawing
+
+- Each slot asks a parameter model (by descriptor group: 61/55 trig, 49–54 FX/global, 63 special, else track sound) to draw: +36 graphic called as `invoker(fn, value, ctx, x, y)`; the slot box is about x−1…x+18, y…y+16.
+- +68 empty = no style: the default renderer (as LFO MODE, COND). Text: `0x400F8C18(ctx, font, x, y, centred, 0, width template, fmt, ...)` (vsprintf); fonts `0x402A9DC4` (3×6), `0x402A91C0` (4×6), `0x402A7354`.
+- Images: 1-bit, 28 B (`+4` width, `+8` height, `+12` words per row, `+16` pixels, `+20` mask, MSB = left), blitted by `0x400F8DAC(ctx, image, x, y, centred)`. Icon sets live in RAM (built from resources), frame by value `0x400F927C`.
+- Class overrides: the DELAY/REVERB tab draws slots 5–6 as one HPF/LPF filter box (`0x40042CE0`); the AMP tab (`0x40041DA6`) draws ids 73–77 (and unknown ids) as part of the envelope graph, without their own graphic.
+
+## Keys
+
+- Key events: +12 code (trig keys 1–16 = 24–39, encoders A–H = 40–47), +16 flags (bit 0 down, bit 3 auto-repeat). All key events pass through `0x4000839E`, called at `0x4000B420`.
+- Page key handler `0x4003BC74` (encoder press: id under the encoder via +188). `KeyboardView::consumeKeyEvent` `0x4002E850`: keys 13–16 (retrig) branch at `0x4002EA92`, after the mode checks.
+
+## Hidden ids used by the mods
+
+| Id | Stock meaning | Mod use |
+|---|---|---|
+| 59, 91, 101, 115, 122, 127, 144 | gain, slews, delay routing, reverb mix alias, pan alias, amp delay time | master-comp (virtual, via [vparams](../mods/vparams)) |
+| 72 | amp "Delay Time", saved per track, unused | fx3 SND3 (native, per track) |
+| 113, 124 | delay mix alias, reverb routing | beat-repeat RPT1/RPT2 (virtual) |
+| 246–253 | Digitakt MIDI-track parameters (no MIDI tracks on Syntakt) | fx3 page (virtual) |
+
+Ids 1–5 and 11–18 are tied to MIDI CCs (bank select, data entry, all notes off…): not reusable.
 
 ## Per-parameter objects
 
