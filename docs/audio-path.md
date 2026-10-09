@@ -24,7 +24,33 @@ Per-block routine `0x400A3856` calls, in order: CV/gain function `0x400903CA` �
 
 Delay `0x40096890` and reverb `0x40096E3C` run on CPU #1 (same code as Digitakt mk1).
 
+### FX parameters as the DSP sees them
+
+Engine copy of the kit (or global) blocks, base `0x800021B0`, written by `0x400A1D18`:
+
+| Block | From kit L2 | Words |
+|---|---|---|
+| `0x80002896` delay | +34 | TIME · X · WID · FDBK · HPF · LPF · REV · VOL · routing |
+| `0x800028AA` reverb | +54 | PRE · DEC · FREQ · GAIN · HPF · LPF · VOL · routing |
+| `0x800028BA` external mixer | +70 | |
+| `0x800028CC` FX track filter | +88 | |
+| `0x800028E4` FX track amp | +112 | DRIVE at `0x800028F0` |
+
+- HPF / LPF (delay and reverb): one-pole filters, pole `p = table[i]` at `0x4029BFFC` (Q31, 512 entries, 5 Hz × e^(0.0177·i) up to ~1 kHz, then warped). HPF `i = HPF>>6`, LPF `i = (HPF+LPF)>>6`.
+- VOL (delay, reverb) and delay→reverb send: gain `(v/32768)²`.
+- Reverb pre-delay: `(PRE² >> 16) + 37` samples, max 16384.
+
 **The final mix is analog.** Digital buses go out through DACs (TDM, 8 slots, ring `0x80000000`) into the analog mixer; nothing digital sits after the master VCAs.
+
+## Track parameters, envelopes and filters
+
+- Engine copy per track: `0x800021B0 + 142·t` (t = 0–11), word offset = **28 + 2 × internal id** (filter FREQ +84, ENV +88, amp ATK +108 … VOL +124). CPU #1 sends CPU #2 the shared block at `0x80002000` (0x1B0 B per interrupt).
+- Track gain = velocity × (LEV × VOL)², VOL/LEV normalised to 127; sends (v/32768)²; pan constant-power (`0x400A171A`).
+- Digital tracks: filter cutoff computed on CPU #1 (`0x400956BC`: FREQ + key track − env × ENV), filter and amp run on CPU #2. Biquad pole frequency f0 = 4.918 Hz · e^(0.065542·FREQ). BASE/WDTH use the delay pole table.
+- Envelope tables (CPU #1 copies, 128 entries, index = value >> 8): filter env per block `0x401DEAC0` DEL (samples, max 3.0 s) / `0x401DEEC0` ATK / `0x401DECC0` DEC-REL; amp per sample `0x401DADDC` ATK (max 30 s) / `0x401DA9DC` HOLD (max 10 s) / `0x401DABDC` DEC-REL.
+- Analog voices and the FX track drive a **hardware envelope generator** with 20-bit rate codes (amp: `0x401DC3E0`, `0x401DBFE0`, `0x401DC1E0`; FX filter: `0x401DE254`, `0x401DE054`). Measured: amp times ≈ digital × 1.05–1.52.
+- Analog filter (tracks 9–12, FX track), measured from the resonance peak: f ≈ 14.645 Hz · e^(0.05741·FREQ).
+- Tempo: `0x402D7010` = BPM × 120. Delay TIME = (TIME + 256)/1024 × 48000 × 900 / tempo samples (128 = one bar).
 
 ## Analog mixer control voltages
 

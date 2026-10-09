@@ -13,7 +13,7 @@ Table at `0x4022D59C`, **505 records × 52 B, index = logical id**.
 | +36 | capability flags (e.g. `0xE00` → listed as modulation destination) |
 | +40 / +48 | long / short name pointers |
 
-Aliases share group + internal id. Ids 270–504 are machine parameters; hidden leftovers include 59, 72, 91, 101, 127, 144.
+Aliases share group + internal id. Ids 270–504 are machine parameters; hidden leftovers include 59, 72, 91, 101, 127, 144, 115 (on/off), 124 (on/off).
 
 ## Pages
 
@@ -32,11 +32,14 @@ Slots are read at draw time: changing them at runtime changes the page.
 
 | Offset | Role |
 |---|---|
-| +20 | value → text formatter, called as `invoker(fn, value 0..0x7F00, char *buf)` (numeric: `0x40077F86`) |
+| +20 | value → text formatter, called as `invoker(fn, value 0..0x7F00, char *buf)` (numeric: `0x40077F86`). Replaceable at runtime with our own `{data, data, manager, invoker}`; the manager must be non-null |
 | +36 | value graphic (knob / bar / bipolar). DRIVE has its own (`0x40071408`) |
 | +68 | graphic style: `0x41B9D5D0` bar, `0x41B9D670` knob, `0x41B9D660` bipolar ("hourglass") |
 
 The init code (`pea <prototype>`) decides the look of each id; patching that operand changes it.
+It copies with `0x401882BE(dst, src)`: plain `std::function` copy (manager called with *clone*). Formatter groups: `0x41B9DFD0` plain 0–127 (269 ids), `0x41B9DFB0` numeric (41), `0x41B9DF90` bipolar (40), `0x41B9DDB0` times with INF (18).
+
+**Active track** (0–11, 12 = FX track): `0x4001FF74(project + 48)`, project = `*0x444E13F4` (singleton `0x4016E804`). Track parameters 58–85 are shared by all tracks.
 
 ## Reading and writing values
 
