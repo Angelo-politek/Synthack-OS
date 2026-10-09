@@ -12,7 +12,7 @@
   "patches": [
     {
       "section": 3,
-      "addr": "0X40338D74",
+      "addr": "0X40338D80",
       "len": 138,
       "expect_sha256": "486a8212c0d6860840d883981ca52daaad3bf3b2ab5be56cdc47ed9b42daba22",
       "hex": "4fefffec48d70e0541f94034800043f94600000020100c8053484c5a663a2428000441e8000c2449d5c2b3ca642a700010186b0812d853806cfa60ee02800000007f548072001218e1891218264997c112db53806cfa60d245f94601000020090280000000036704421960f2b3ca6404429960f84cd70e054fef00144feffff048d700f04ef9400004ba",
@@ -23,7 +23,7 @@
       "addr": "0X400004B2",
       "len": 8,
       "expect_sha256": "02baba67a7ec7d7bdf683fa37f268620e3a694853b398205df521c64128da818",
-      "hex": "4ef940338d744e71",
+      "hex": "4ef940338d804e71",
       "what": "inizio dell'azzeramento del BSS: jmp modarea_reloc ; nop"
     }
   ]

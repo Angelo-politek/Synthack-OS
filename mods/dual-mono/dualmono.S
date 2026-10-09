@@ -47,17 +47,24 @@
 pre_hook:
         tst.b   dm_pass                         | seconda passata: niente da preparare
         bne.s   2f
-        tst.b   DUALMONO_FLAG
-        bne.s   1f
-        bsr.w   ui_mono                         | mono, passata 1
-        move.w  P_LEVEL(%a2),%d0                | salva IN LR e BAL
+        tst.b   DUALMONO_FLAG                   | d0.b = -1 in mono, 0 in stereo
+        seq     %d0
+        cmp.b   dm_mode,%d0                     | interfaccia aggiornata solo quando il modo cambia
+        beq.s   3f                              | (questo codice gira a ogni blocco audio)
+        move.b  %d0,dm_mode
+        tst.b   %d0
+        beq.s   4f
+        bsr.w   ui_mono
+        bra.s   3f
+4:      bsr.w   ui_stereo
+3:      tst.b   DUALMONO_FLAG
+        bne.s   2f
+        move.w  P_LEVEL(%a2),%d0                | mono, passata 1: salva IN LR e BAL
         move.w  %d0,dm_save_lr
         move.w  P_PAN(%a2),%d0
         move.w  %d0,dm_save_bal
         move.w  #PAN_CENTER,%d0                 | bilanciamento al centro per entrambe le passate
         move.w  %d0,P_PAN(%a2)
-        bra.s   2f
-1:      bsr.w   ui_stereo
 2:      move.w  P_LEVEL(%a2),%d2                | le due istruzioni spostate dal trampolino
         move.w  P_X(%a2),%d0
         rts
@@ -137,6 +144,7 @@ ui_stereo:
 
         .data
 dm_pass:  .byte 0
+dm_mode:  .byte 0x55                            | modo mostrato dall'interfaccia (0x55: ancora nessuno)
         .balign 2
 dm_save_lr:  .word 0
 dm_save_bal: .word 0

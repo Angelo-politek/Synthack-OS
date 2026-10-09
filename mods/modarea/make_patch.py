@@ -23,7 +23,7 @@ sys.path.insert(0, str(REPO / "tools" / "unpack"))
 import eft  # noqa: E402
 
 LOAD = 0x4000_0400
-CODE_BASE = 0x4033_8D74                 # spazio libero dell'immagine (dopo dual-mono)
+CODE_BASE = 0x4033_8D80                 # spazio libero dell'immagine (dopo dual-mono, con margine)
 FREE_END = 0x4033_9000
 HOOK = 0x4000_04B2
 HOOK_ORIG = "4feffff048d700f0"          # lea -16(sp),sp ; movem.l d4-d7,(sp)

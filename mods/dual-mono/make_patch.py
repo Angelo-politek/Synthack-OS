@@ -28,7 +28,7 @@ import eft  # noqa: E402
 
 LOAD = 0x4000_0400
 CODE_BASE = 0x4033_8BE0                 # dopo lo splash (0x40338740..0x40338BD8), stesso riempimento libero
-FREE_END = 0x4033_9000
+FREE_END = 0x4033_8D80                  # inizio del rilocatore di modarea
 BLOCK_START, BLOCK_END = 0x4009_0872, 0x4009_08FC
 ENTRY_ORIG = "342a070a302a0740"         # move.w 1802(a2),d2 ; move.w 1856(a2),d0
 EXIT_ORIG = "223c00007f7f"              # move.l #32639,d1
