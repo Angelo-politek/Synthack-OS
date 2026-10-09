@@ -9,7 +9,7 @@ Two **ColdFire MCF5441x** (V4, EMAC, no FPU, ~250 MHz). 64 KB internal SRAM at `
 | `0x40339000–0x40347B90` | initial SRAM content, copied at boot |
 | `0x40339000–0x45565490` | BSS, **zeroed at boot** |
 | `0x45565490–0x48000000` | unused by the OS (no code or data reference) |
-| `0x46000000–0x46008000` | **mod area** (ours) |
+| `0x46000000–0x46010000` | **mod area** (ours) |
 | `0x48000000` | boot stack top |
 | `0x4D570000…`, `0x4FC00000…` | delay / reverb lines |
 | `0x80000000–0x8000FFFF` | SRAM: audio buffers, DMA rings, engine parameter arrays |
@@ -24,7 +24,7 @@ Two **ColdFire MCF5441x** (V4, EMAC, no FPU, ~250 MHz). 64 KB internal SRAM at `
 
 ## Mod area
 
-Mods larger than the free fill are **appended to section 3** at `0x40348000` and linked at `0x46000000`. A 42-byte loader hooked at the start of `0x400004B2` copies 32 KB there before BSS is zeroed. See [mods/modarea](../mods/modarea).
+Mods larger than the free fill are **appended to section 3** at `0x40348000`, compressed (SHLZ), and linked at `0x46000000`. A loader hooked at the start of `0x400004B2` unpacks them into 64 KB of RAM before BSS is zeroed. See [mods/modarea](../mods/modarea).
 
 ## Screen
 

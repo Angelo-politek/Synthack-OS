@@ -33,7 +33,7 @@ The bootstrap (`0x80000210`, runs in SRAM) loads the **compressed** section 3 at
 
 - Rule: *decompressed − compressed* must stay below ~`0x1FFC00` at every point of the stream.
 - Margins: stock 1.41 +99 938 B · v0.5.0 +16 220 B · a build padded with zeros to `0x40350000`: −8 751 B → **did not boot** (tested twice).
-- Zero padding is the worst case (compresses to nothing). Already-compressed data *raises* the margin.
+- Zero padding is the worst case (compresses to nothing). Already-compressed data *raises* the margin: the mod area is stored compressed for this reason.
 - `tools/build/bootcheck.py` replays the unpacking; `build.py` refuses images below 4 KB of margin.
 - Repacking recompresses changed sections; compressed bytes differ, decompressed content is what we verify.
 - The Syntakt accepts rebuilt images (recompressed section 3, recomputed MAC) via USB and MIDI DIN.

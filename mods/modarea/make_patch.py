@@ -27,7 +27,7 @@ CODE_BASE = 0x4033_8D74                 # spazio libero dell'immagine (dopo dual
 FREE_END = 0x4033_9000
 HOOK = 0x4000_04B2
 HOOK_ORIG = "4feffff048d700f0"          # lea -16(sp),sp ; movem.l d4-d7,(sp)
-IMG, RAM, SIZE = 0x4034_8000, 0x4600_0000, 0x8000
+IMG, RAM, SIZE = 0x4034_8000, 0x4600_0000, 0x10000
 WSL_BINUTILS = "~/tools/m68k/root"
 
 
@@ -64,14 +64,14 @@ def main() -> None:
     jmp = struct.pack(">HIH", 0x4EF9, CODE_BASE, 0x4E71)      # jmp modarea_reloc.l ; nop
     spec = {
         "name": "modarea", "os": "1.41",
-        "description": f"Area mod: all'avvio copia {SIZE // 1024} KB accodati alla sezione 3 "
-                       f"({IMG:#x}) in RAM a {RAM:#x}, prima dell'azzeramento del BSS.",
+        "description": f"Area mod: all'avvio decomprime (SHLZ) le mod accodate alla sezione 3 ({IMG:#x}) "
+                       f"in RAM a {RAM:#x} ({SIZE // 1024} KB, resto azzerato), prima dell'azzeramento del BSS.",
         "generated_by": "mods/modarea/make_patch.py",
-        "layout": {"img": f"{IMG:#010x}", "ram": f"{RAM:#010x}", "size": f"{SIZE:#x}"},
+        "layout": {"img": f"{IMG:#010x}", "ram": f"{RAM:#010x}", "size": f"{SIZE:#x}", "compress": "shlz"},
         "patches": [
             {"section": 3, "addr": f"{CODE_BASE:#010X}", "len": len(blob),
              "expect_sha256": sha(sec3[CODE_BASE - LOAD:end - LOAD]), "hex": blob.hex(),
-             "what": "modarea_reloc: copia IMG -> RAM, istruzioni sostituite, jmp 0x400004BA"},
+             "what": "modarea_reloc: decomprime IMG -> RAM, azzera il resto, istruzioni sostituite, jmp 0x400004BA"},
             {"section": 3, "addr": f"{HOOK:#010X}", "len": 8,
              "expect_sha256": sha(sec3[HOOK - LOAD:HOOK - LOAD + 8]), "hex": jmp.hex(),
              "what": "inizio dell'azzeramento del BSS: jmp modarea_reloc ; nop"},

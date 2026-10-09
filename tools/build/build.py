@@ -22,6 +22,9 @@ Patch accodate ("append": true, solo "hex"): byte NUOVI oltre la fine della sezi
 mod, vedi mods/modarea); lo spazio tra la fine stock e "addr" viene riempito di zeri. Non hanno
 impronta (non sostituiscono byte Elektron). Una mod puo' dichiarare "requires": ["modarea"].
 
+Area mod compressa: se modarea dichiara "compress": "shlz", i byte accodati (da "img" in poi)
+vengono sostituiti dal loro flusso SHLZ (lz.py), che il rilocatore decomprime in RAM all'avvio.
+
 Controllo di avvio (bootcheck.py): il bootstrap decomprime la sezione 3 quasi sul posto; se il
 margine scende sotto bootcheck.MIN_MARGIN l'immagine non si avvierebbe e il build la scarta.
 """
@@ -42,6 +45,7 @@ import eft  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bootcheck  # noqa: E402
+import lz  # noqa: E402
 
 LOAD_ADDR = 0x4000_0400                 # sezioni 3 e 7 si caricano qui (vedi docs/)
 PATCHABLE = {3, 7}
@@ -100,6 +104,27 @@ def load_mod(moddir: Path, os_version: str) -> list[Patch]:
     return patches
 
 
+def mod_area(moddirs: list[Path]) -> dict | None:
+    """Disposizione dell'area mod compressa, se una delle mod (modarea) la dichiara."""
+    for d in moddirs:
+        lay = json.loads((Path(d) / "patch.json").read_text(encoding="utf-8")).get("layout", {})
+        if lay.get("compress") == "shlz":
+            return {"img": int(lay["img"], 16), "size": int(lay["size"], 16)}
+    return None
+
+
+def expected_area(patches: list[Patch], area: dict) -> bytes:
+    """Immagine dell'area mod ricostruita dalle sole patch accodate (zeri negli spazi)."""
+    img = bytearray()
+    for p in patches:
+        if p.append:
+            a = p.addr - area["img"]
+            if len(img) < a + len(p.data):
+                img.extend(bytes(a + len(p.data) - len(img)))
+            img[a:a + len(p.data)] = p.data
+    return bytes(img)
+
+
 def apply_patches(sections: dict[int, bytearray], patches: list[Patch]) -> None:
     """Applica le patch verificando impronte e sovrapposizioni. Modifica 'sections' sul posto."""
     taken: dict[int, list[Patch]] = {}
@@ -151,6 +176,16 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
         original = {s: files[s].read_bytes() for s in needed}
         sections = {s: bytearray(b) for s, b in original.items()}
         apply_patches(sections, patches)
+        area = mod_area(moddirs)
+        image = None
+        if area and 3 in sections and len(sections[3]) > area["img"] - LOAD_ADDR:
+            sec = sections[3]
+            off = area["img"] - LOAD_ADDR
+            image = bytes(sec[off:])                       # area mod come la vedra' la RAM
+            if len(image) > area["size"]:
+                raise BuildError(f"area mod: {len(image)} B, piu' dei {area['size']} B in RAM")
+            del sec[off:]
+            sec.extend(lz.compress(image))
         replaced = {}
         for s in needed:
             f = tmp / f"section_{s}.patched"
@@ -182,7 +217,13 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
             mine = [p for p in patches if p.section == sid]
             allowed = {i for p in mine for i in range(p.offset, p.end)}
             diff = [i for i in range(len(old)) if i >= len(new) or old[i] != new[i]]
-            tail = [i for i in range(len(old), len(new)) if new[i] and i not in allowed]
+            if image is not None and sid == 3:              # area compressa: confronto dopo la decompressione
+                off = area["img"] - LOAD_ADDR
+                if lz.decompress(bytes(new[off:])) != expected_area(mine, area):
+                    raise BuildError("area mod: il flusso compresso non riproduce le patch accodate")
+                tail = [i for i in range(len(old), off) if new[i]]
+            else:
+                tail = [i for i in range(len(old), len(new)) if new[i] and i not in allowed]
             if len(new) < len(old) or not set(diff) <= allowed or tail:
                 raise BuildError(f"sezione {sid}: modifiche fuori dalle patch dichiarate")
             if len(new) > len(old) and not any(p.append for p in mine):
