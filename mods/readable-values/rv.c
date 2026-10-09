@@ -449,7 +449,6 @@ void rv_invoke(const void *fn, s32 value, char *buf)
         hz(buf, lpf_hz100(pole_q30((clamp(REV[4]) + v) >> 6)));
         break;
     case 112:                           /* delay -> reverb */
-    case 113:                           /* delay mix (alias) */
     case 114:                           /* delay mix */
     case 122:                           /* reverb mix (alias) */
     case 123:                           /* reverb mix */

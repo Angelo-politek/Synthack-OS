@@ -52,7 +52,6 @@ PROTO_OPERANDS = {
     110: (0x4018_BF56, P_NUM),    # delay HPF (move.l)
     111: (0x4018_BFA8, P_NUM),    # delay LPF
     112: (0x4018_BFFA, P_NUM),    # delay -> reverb
-    113: (0x4018_C04C, P_NUM),    # delay mix (alias)
     114: (0x4018_C0A2, P_NUM),    # delay mix (move.l)
     116: (0x4018_C146, P_NUM),    # reverb pre-delay
     118: (0x4018_C1EE, P_NUM),    # reverb: FREQ dello shelving (move.l)

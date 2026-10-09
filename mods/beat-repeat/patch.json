@@ -1,0 +1,208 @@
+{
+  "name": "beat-repeat",
+  "os": "1.41",
+  "requires": [
+    "modarea",
+    "vparams"
+  ],
+  "description": "Beat repeat dal sequencer: RPT1 e RPT2 (1/16, 1/8, 3/16, 1/4, 1/2, 1BAR) sulla pagina TRIG della FX track; con la FX track attiva, tenendo premuti i tasti di retrig 13 e 14 si ripetono gli ultimi step di tutte le tracce, a tempo.",
+  "generated_by": "mods/beat-repeat/make_patch.py",
+  "symbols": {
+    "br_step": "0x4600417a",
+    "br_step_hook": "0x46004000",
+    "br_kbd": "0x4600435e",
+    "br_kbd_hook": "0x4600402a",
+    "br_ev": "0x460043e4",
+    "br_ev_hook": "0x4600405c",
+    "br_page_stub": "0x46004072",
+    "br_get": "0x46004440",
+    "br_set": "0x4600445a",
+    "br_invoke": "0x46004088",
+    "br_gfx": "0x460040d0",
+    "br_proto": "0x460044e8",
+    "br_gfx_proto": "0x460044d8",
+    "br_rate": "0x46004561",
+    "br_held": "0x46004560"
+  },
+  "patches": [
+    {
+      "section": 3,
+      "addr": "0X4034C000",
+      "len": 1379,
+      "append": true,
+      "hex": "4feffff048d703032f0b2f0a2f0c2f024eb94600417a4fef00104cd703034fef00105283528e528d4e752f002f002f022f0a4eb94600435e4fef000c4a806b08588f4ef94002e954201f7223b2806c064ef94002ea9a4ef94002eba62f2f00082f2f00084eb9460043e4508f4ef94000839e2f00707123c041b9f924707c23c041b9f928201f4e75222f0008068100000080e0817005b0816c1c72052001e588226f000c2040d1c1d1fc460044f8101812c066fa4e754a816ce242812001e588226f000c2040d1c1d1fc460044f860de202f0008068000000080e0807205b2806c4870052200e589d0810680460044f82f004879460044a84879460044ab42a748780001202f00285a802f00222f002850812f012f3c402a91c02f2f002c4eb9400f8c184fef00244e754a806cb642802200e589d0810680460044f82f004879460044a84879460044ab42a748780001202f00285a802f00222f002850812f012f3c402a91c02f2f002c4eb9400f8c184fef00244e7542804e7571b9460045604fefffe448d704fc222f0020538114394600455f206f00284a8067287782070066067001b182778243f946004561740571b13800b480650000d043f94600451671b10800227c000213794a309800670000c8206f002c756803c9760cb6816500009e4a826f000098206f00241a104a80670000e441f946004550163018007d857983bc84677845f94600451c1c32180043f9460045437f86b0876700008a4a0667141631180079832a045285b485630001002a0352854c4040061385180043f9460045361580180096861383180052861a0343f94600452916061386180079837b854c4040032003d085b0826d064c4208031003226f00241180180012804cd704fc4fef001c4e757001227c000213794a3098006600ff3c227c00021374757098006000ff361631180079835284b484635845f9460045295283183218001383180043f94600453652841a311800160415841800608841f94600451c4a301800671443f9460045431a31180011801800206f0024108541f946004550118518004cd704fc4fef001c4e75420345f946004529183218001383180043f94600453652841604158418001a3118006000ff304c404006420515801800968652861385180043f946004536138318001a0343f9460045291606138618006000ff024feffff4700148d7001c262f001824030682ffffffdcb0826516206f00102f2800a04eb94001ff74588f720cb280670c4cd7001c70ff4fef000c4e75206f001472017001e5a8c2a800101839460045604a816724808441f94600455d1183280013c24600455f13c04600456070014cd7001c4fef000c4e754680c08413c046004560700160e82f027201206f000cc2a800102028000c4a81661473b94600455db280672273b94600455eb2806704241f4e7510394600456072fd241fc08113c0460045604e7512394600456074fec28213c14600456073b94600455eb28066ce60d0727cb2af000857c041f9460045617100448071b00800e1884e752f02202f00100680000000802200e0812079444e13344a806d307005b0816d26747cb4af000c57c043f94600456171004480138108004a886706700111400060241f42804e75720560d6420160d2257300585858580042656174205265706561742032004265617420526570656174203100525054320052505431000000000000000000000046004176460040d000000000000000004600417646004088312f313600312f380000332f313600312f340000312f32000031424152000102030408100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffff00000001",
+      "ram": "0x46004000",
+      "what": "(area mod) br.c"
+    },
+    {
+      "section": 3,
+      "addr": "0X4008D152",
+      "len": 6,
+      "expect_sha256": "491b59d2e59a4758c49433d8e1ddce8eb0718b310f0555bccaf4d8be13c06ee7",
+      "hex": "4eb946004000",
+      "what": "avanzamento degli step: jsr br_step_hook"
+    },
+    {
+      "section": 3,
+      "addr": "0X4002EA92",
+      "len": 8,
+      "expect_sha256": "658707c783d5eb4c3e3fcb65eef1fb4e7c52116dc6736696f40face28028f6b8",
+      "hex": "4ef94600402a4e71",
+      "what": "tasti di retrig 13-16 (KeyboardView): jmp br_kbd_hook ; nop"
+    },
+    {
+      "section": 3,
+      "addr": "0X4000B420",
+      "len": 6,
+      "expect_sha256": "45bd3ff1d08b81ada459e14389fd5760a1213e1cd272f40e9ea441b16cf1c8dc",
+      "hex": "4eb94600405c",
+      "what": "dispatcher degli eventi: jsr br_ev_hook (rilascio)"
+    },
+    {
+      "section": 3,
+      "addr": "0X401950F0",
+      "len": 6,
+      "expect_sha256": "f8d6702380bcbb5e41ec311a1ed2c4ee9d8bfc636c759360b287dcb88dd166df",
+      "hex": "4eb946004072",
+      "what": "pagina TRIG della FX track, caselle 1-2 = RPT1, RPT2"
+    },
+    {
+      "section": 3,
+      "addr": "0X40350054",
+      "len": 12,
+      "append": true,
+      "hex": "00710000460044404600445a",
+      "ram": "0x46008054",
+      "what": "vparams[7]: id 113 -> beat-repeat RPT1"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C04C",
+      "len": 4,
+      "expect_sha256": "922a894f00265677fe21082f53c90750ec04d536b8fcb6f9fae973628b6c61d0",
+      "hex": "460044e8",
+      "what": "id 113 +20: 0x460044e8"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C05E",
+      "len": 4,
+      "expect_sha256": "0fae5c4ea6e8850e1d7b6fae0930f551125c5c398895195b1a34e5592ff6c6da",
+      "hex": "460044d8",
+      "what": "id 113 +36: 0x460044d8"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C07A",
+      "len": 4,
+      "expect_sha256": "e117e129397b8f6f1f9672a067eed448572087d6fb741cd9220c02b3951f90ed",
+      "hex": "41b9fa68",
+      "what": "id 113 +68: 0x41b9fa68"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C038",
+      "len": 2,
+      "expect_sha256": "ad69657fa5f7a9f4c954e7ae1292191b9767d30b44940e0b7233310460419328",
+      "hex": "2f03",
+      "what": "id 113 +4: prototipo discreto (come 93)"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C040",
+      "len": 2,
+      "expect_sha256": "f9c68083d925d4b38d0057ddaad189184a5d9e6a5d76e0123111789a82822b9f",
+      "hex": "7000",
+      "what": "id 113 +0: tipo 8 -> 0 (come 93)"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EC98",
+      "len": 12,
+      "expect_sha256": "25f506b170e6c68ac4fe05cc1e70e9bbf64a1351be67307fa46c69d19aadfdc2",
+      "hex": "000000000000050000000000",
+      "what": "id 113: min 0, max 0x500 (6 posizioni), default"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022ECB8",
+      "len": 4,
+      "expect_sha256": "9035ab446f20e81118e4e44c7312d4ed82994ee16f629284d16a6ca368c80615",
+      "hex": "460044be",
+      "what": "id 113: nome lungo 'Beat Repeat 1'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022ECC0",
+      "len": 4,
+      "expect_sha256": "0965d3f5d6fdaea1fae66d573778b608dfc32a71a639894a31cff1b2093f151e",
+      "hex": "460044d1",
+      "what": "id 113: nome breve 'RPT1'"
+    },
+    {
+      "section": 3,
+      "addr": "0X40350060",
+      "len": 12,
+      "append": true,
+      "hex": "007c0000460044404600445a",
+      "ram": "0x46008060",
+      "what": "vparams[8]: id 124 -> beat-repeat RPT2"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C3DE",
+      "len": 4,
+      "expect_sha256": "18d32aa587e7536191672be402711c6516cd39fe42381a96842b16d930ad3a3f",
+      "hex": "460044e8",
+      "what": "id 124 +20: 0x460044e8"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C3EC",
+      "len": 4,
+      "expect_sha256": "fd89bbe1b98d3ddf2a9180ce982f79a0aee657be29e01ab250bf73537e9be630",
+      "hex": "460044d8",
+      "what": "id 124 +36: 0x460044d8"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C40C",
+      "len": 4,
+      "expect_sha256": "130983f83892d42953c39b2aee3ddde1b791af269ff459a00c76baed1dd4895f",
+      "hex": "41b9fa68",
+      "what": "id 124 +68: 0x41b9fa68"
+    },
+    {
+      "section": 3,
+      "addr": "0X4018C3D2",
+      "len": 2,
+      "expect_sha256": "ad6f1d356e3929f0dc2d8cd232cd48ef58b22669c11c4265182df25834cc01a9",
+      "hex": "7200",
+      "what": "id 124 +0: tipo 12 -> 0 (come 93)"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EED4",
+      "len": 12,
+      "expect_sha256": "b57eecd0d1e5f21813f270ca86abc54ffed21d730c869a1758ceb585f09e8ec8",
+      "hex": "000000000000050000000100",
+      "what": "id 124: min 0, max 0x500 (6 posizioni), default"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EEF4",
+      "len": 4,
+      "expect_sha256": "442a03ad20c6e0be44b432a5516f545dfc07ac1d87f183d1cc4a1844a0896104",
+      "hex": "460044b0",
+      "what": "id 124: nome lungo 'Beat Repeat 2'"
+    },
+    {
+      "section": 3,
+      "addr": "0X4022EEFC",
+      "len": 4,
+      "expect_sha256": "2b5a122f52efa4cce332da000247774b7c1fb6f67a723a8d4a29e9e1aeb1de8f",
+      "hex": "460044cc",
+      "what": "id 124: nome breve 'RPT2'"
+    }
+  ]
+}
