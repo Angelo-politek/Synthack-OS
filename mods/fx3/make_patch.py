@@ -1,11 +1,11 @@
-"""Mod fx3: costruisce patch.json da fx3.c (terza mandata effetti, chorus).
+"""Mod fx3: costruisce patch.json da fx3.c (terza mandata effetti: chorus, flanger, phaser, crusher).
 
 - compila fx3.c per ColdFire e lo collega nell'area mod a 0x4600A000 (tabelle generate qui);
 - aggancia la funzione di mix a blocchi: ciclo per traccia (0x4008F3A0), delay (0x4008F828: mandata
   del chorus verso il delay), somme del master (0x4008FB04: bus 3, chorus a 24 kHz e ritorno);
 - SND3 = id 72 (nascosto, salvato per traccia) nella casella E della pagina AMP 2;
 - pagina FX3 = pagina 25 dell'OS ("OB8", inutilizzata) come seconda pagina del tab REVERB, con gli id
-  nascosti delle tracce MIDI 246..253 tramite vparams.
+  nascosti delle tracce MIDI 246..253 tramite vparams; valori salvati nel kit del pattern.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ AMP_FIX = (0x4004_1E84, "605c", "6058")
 # parametri della pagina: id, nomi, massimo, default; prototipi dell'oggetto {offset: (operando, atteso,
 # nuovo)}; correzioni ai campi +0/+4 per comportarsi come DEL (250): tipo 0, prototipo d3
 PARAMS = [
-    (246, "TYPE", "FX3 Type", 0, 0,
+    (246, "TYPE", "FX3 Type", 3, 0,
      {20: (0x4018_F252, 0x41B9_DF60, "fx3_proto_type"), 36: (0x4018_F260, 0x41B9_DCC0, "fx3_proto_type_gfx"),
       68: (0x4018_F27C, 0x41B9_D670, NO_STYLE)},
      [(0x4018_F234, "2f05", "2f03"), (0x4018_F23C, "7005", "7000")]),
@@ -96,25 +96,18 @@ def wsl(cmd: str) -> str:
     return r.stdout + r.stderr
 
 
-# ---- tabelle (curve scelte qui, nessun dato dell'OS)
-def spd_hz(v: int) -> float:
-    return 0.05 * 200 ** (v / 127)                     # 0.05 .. 10 Hz
-
-
-def del_ms(v: int) -> float:
-    return 1 + 29 * (v / 127) ** 1.5                   # 1 .. 30 ms
-
-
-def dep_ms(v: int) -> float:
-    return 8 * (v / 127) ** 2                          # 0 .. 8 ms
-
-
-def txt_hz(f: float) -> str:
-    return f"{f:.2f}Hz" if f < 10 else f"{f:.1f}"
-
-
-def txt_ms(m: float) -> str:
-    return f"{m:.2f}ms" if m < 1 else f"{m:.1f}ms" if m < 10 else f"{m:.0f}ms"
+# ---- tabelle (curve scelte qui, nessun dato dell'OS); i testi si compongono in fx3.c
+CURVES = {  # nome: (unita', funzione di v = 0..127)
+    "RATE_C": (1000, lambda v: 0.05 * 200 ** (v / 127)),       # chorus: 0.05 .. 10 Hz (mHz)
+    "RATE_F": (1000, lambda v: 0.02 * 250 ** (v / 127)),       # flanger, phaser: 0.02 .. 5 Hz
+    "DEP_C": (1000, lambda v: 8 * (v / 127) ** 2),             # chorus: 0 .. 8 ms (us)
+    "TIME_C": (1000, lambda v: 1 + 29 * (v / 127) ** 1.5),     # chorus: 1 .. 30 ms
+    "DEP_F": (1000, lambda v: 4 * (v / 127) ** 2),             # flanger: 0 .. 4 ms
+    "TIME_F": (1000, lambda v: 0.1 + 7.9 * (v / 127) ** 2),    # flanger: 0.1 .. 8 ms
+    "FREQ_P": (1, lambda v: 100 * 40 ** (v / 127)),            # phaser: 100 Hz .. 4 kHz
+    "DRV_G": (256, lambda v: 10 ** (24 * v / 127 / 20)),       # crusher: 0 .. 24 dB (Q8)
+}
+PH_LO, PH_N = 20, 292                   # coefficienti del phaser: 20 Hz * 2^(i/32), fino a ~11 kHz
 
 
 def txt_db(g: float) -> str:
@@ -122,27 +115,26 @@ def txt_db(g: float) -> str:
 
 
 def tables() -> str:
-    q8 = lambda ms: round(ms * FS / 1000 * 256)
     arr = lambda t, name, vals: f"static const {t} {name}[{len(vals)}] = {{{', '.join(str(v) for v in vals)}}};\n"
     txt = lambda name, vals: (f"static const char {name}[128][8] = {{" +
                               ", ".join(json.dumps(v) for v in vals) + "};\n")
     out = "/* generato da mods/fx3/make_patch.py */\n"
     out += arr("short", "SIN_T", [round(32767 * math.sin(2 * math.pi * i / 256)) for i in range(257)])
-    out += arr("u32", "SPD_INC", [round(spd_hz(v) / FS * 2 ** 32) for v in range(128)])
-    out += arr("u32", "DEL_Q8", [q8(del_ms(v)) for v in range(128)])
-    out += arr("u32", "DEP_Q8", [q8(dep_ms(v)) for v in range(128)])
-    out += arr("s32", "FB_Q15", [round(32767 * 0.9 * v / 127) for v in range(128)])
+    for name, (unit, f) in CURVES.items():
+        out += arr("u16", name, [round(unit * f(v)) for v in range(128)])
+    out += arr("u16", "FIDX_P", [round(32 * 256 * math.log2(CURVES["FREQ_P"][1](v) / PH_LO)) for v in range(128)])
+    t = [math.tan(math.pi * PH_LO * 2 ** (i / 32) / FS) for i in range(PH_N)]
+    out += f"#define PH_N {PH_N}\n" + arr("s16", "PH_A", [round(4096 * (x - 1) / (x + 1)) for x in t])
     out += arr("s32", "VOL_Q15", [round(32767 * (v / 127) ** 2) for v in range(128)])
-    out += txt("SPD_TXT", [txt_hz(spd_hz(v)) for v in range(128)])
-    out += txt("DEL_TXT", [txt_ms(del_ms(v)) for v in range(128)])
-    out += txt("DEP_TXT", [txt_ms(dep_ms(v)) for v in range(128)])
     out += txt("VOL_TXT", [txt_db((v / 127) ** 2) for v in range(128)])
     return out
 
 
 def names() -> str:
-    return "".join(f'const char fx3_n{i}_s[] = "{s}";\nconst char fx3_n{i}_l[] = "{ln}";\n'
-                   for i, (_, s, ln, *_r) in enumerate(PARAMS))
+    """Nomi in RAM (il tipo li riscrive): i descrittori puntano qui."""
+    out = "".join(f'char fx3_n{i}_s[6] DATA = "{s}";\nchar fx3_n{i}_l[20] DATA = "{ln}";\n'
+                  for i, (_, s, ln, *_r) in enumerate(PARAMS))
+    return out + 'char fx3_page_l[12] DATA = "Chorus";\n'
 
 
 def build_blob() -> tuple[bytes, dict[str, int], str]:
@@ -240,7 +232,7 @@ def main() -> None:
             "fx3_run", "fx3_dsnd", "fx3_ret", "fx3_get", "fx3_set", "fx3_p", "fx3_tgt", "fx3_cur", "fx3_moving",
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
-            "fx3_draw_hook")},
+            "fx3_draw_hook", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,
     }

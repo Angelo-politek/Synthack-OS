@@ -46,7 +46,7 @@ Slots are read at draw time: changing them at runtime changes the page.
 
 | Id | Stock meaning | Mod use |
 |---|---|---|
-| 59, 91, 101, 115, 122, 127, 144 | gain, slews, delay routing, reverb mix alias, pan alias, amp delay time | master-comp (virtual, via [vparams](../mods/vparams)) |
+| 59, 91, 101, 115, 122, 127, 144 | gain, slews, delay routing, reverb mix alias, pan alias, amp delay time | master-comp (virtual, via [vparams](../mods/vparams)); the kit word of 144 stores fx3 |
 | 72 | amp "Delay Time", saved per track, unused | fx3 SND3 (native, per track) |
 | 113, 124 | delay mix alias, reverb routing | beat-repeat RPT1/RPT2 (virtual) |
 | 246–253 | Digitakt MIDI-track parameters (no MIDI tracks on Syntakt) | fx3 page (virtual) |
@@ -83,6 +83,6 @@ Group handlers use jump tables by logical id (e.g. external mixer: get `0x4000C8
 ## Kit storage and "global FX"
 
 - UI kit struct (`obj->vfunc40`): internal mixer +2…+26, external +28…+45, DRIVE +46, FX filter +48…+71, FX amp +72…+99.
-- Pattern kit (`*0x800030BC`): external +70…+87, filter +88…+111, amp +112…+139, DRIVE +124.
+- Pattern kit (`*0x800030BC`, 142 B): the FX track's parameters, **one word per internal id** (offset = 2 × id, ids 0…0x46), copied whole to the engine (`0x80002874`). Blocks: LFO +2…+33, delay +34…+53, reverb +54…+69, external +70…+87, filter +88…+111, amp +112…+139 (DRIVE +124). Words the OS does not use: ids 0, 0x1A, 0x24, 0x27, 0x29, 0x2A, 0x37, 0x46 (+ 0x38 = hidden id 144).
 - Global flags `0x43BDE444`: bit 0 internal mixer, 1 external, **2 SYN (DRIVE)**, 3 filter, 4 amp. Enabled blocks are copied (memcpy) between kit and the global container `0x41B9D3B0`; the engine sync `0x400A1D18` copies whole blocks.
-- **Unused words** in the external block: UI +30, +36, +40, +42 (pattern kit +72, +78, +82, +84). Saved with the kit; used by the master compressor.
+- **Unused words**, saved with the kit: external block UI +30, +36, +40, +42 (pattern kit +72, +78, +82, +84) → master compressor; pattern kit +0, +52, +112, +140 (ids 0, 0x1A, 0x38, 0x46) → fx3.

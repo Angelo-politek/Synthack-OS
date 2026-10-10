@@ -1,4 +1,4 @@
-/* fx3: terza mandata effetti (Syntakt OS 1.41), primo effetto: chorus stereo.
+/* fx3: terza mandata effetti (Syntakt OS 1.41): chorus, flanger, phaser, crusher.
  *
  * Audio (funzione di mix a blocchi 0x4008F1CA, 32 campioni a 48 kHz):
  * - nel ciclo per traccia (0x4008F3A0) fx3_trk_hook prende i guadagni sinistro/destro della traccia
@@ -7,23 +7,32 @@
  *   DEL e REV, e segnala quando un bersaglio cambia (fx3_moving): a regime la rampa non gira;
  * - dopo le somme del master (0x4008FB04) fx3_run somma le tracce nel bus 3 a 24 kHz (coppie di campioni
  *   mediate, EMAC: un passaggio per traccia se mandano una o due tracce, se no uno solo per tutte), lo
- *   passa al chorus (a 24 kHz) e aggiunge il ritorno, scalato da VOL e riportato a 48 kHz per
+ *   passa all'effetto (a 24 kHz) e aggiunge il ritorno, scalato da VOL e riportato a 48 kHz per
  *   interpolazione lineare, al bus diretto (0x8000DAD0), con la convenzione di segno dell'OS;
- * - prima del delay del blocco seguente (0x4008F828) fx3_dsnd aggiunge l'uscita del chorus, scalata dalla
- *   mandata DEL, al bus d'ingresso del delay (0x8000DBD0): un blocco di ritardo (0,67 ms).
+ * - prima del delay del blocco seguente (0x4008F828) fx3_dsnd aggiunge l'uscita dell'effetto, scalata
+ *   dalla mandata DEL, al bus d'ingresso del delay (0x8000DBD0): un blocco di ritardo (0,67 ms).
  * Il carico conta: l'OS usa gia' quasi tutta la CPU e l'interfaccia vive del resto. Senza mandate, con
  * VOL e DEL a zero o con gli ingressi muti (sequencer fermo) e la coda esaurita resta solo la somma o
  * nemmeno quella; i cicli caldi sono in assembly. Istruzioni per blocco in tests/test_fx3.py.
  *
- * Interfaccia: pagina 2 del tab REVERB (pagina 25 dell'OS, "OB8", inutilizzata) con TYPE SPD DEP TIME
- * FDBK WID DEL VOL: id nascosti delle tracce MIDI (246..253) tramite mods/vparams, non salvati. La classe
- * dei tab DELAY/REVERB disegna le caselle 5-6 come filtro: per la pagina 25 si usa il disegno generico
- * a 8 caselle (fx3_draw_hook). SND3 e la mandata DEL usano la grafica della mandata del delay.
+ * Effetti (TYPE): CHOR e FLNG = una linea mono con due prese (L/R) modulate; PHSR = 4 celle allpass,
+ * uscita destra complementare (WID); CRSH = tenuta del campione, bit ridotti e drive (mono).
+ *
+ * Interfaccia: pagina 2 del tab REVERB (pagina 25 dell'OS, "OB8", inutilizzata) con TYPE e 7 controlli:
+ * id nascosti delle tracce MIDI (246..253) tramite mods/vparams. Nomi e testi cambiano col tipo. La
+ * classe dei tab DELAY/REVERB disegna le caselle 5-6 come filtro: per la pagina 25 si usa il disegno
+ * generico a 8 caselle (fx3_draw_hook). SND3 e la mandata DEL usano la grafica della mandata del delay.
+ *
+ * Salvataggio: nel kit del pattern (*0x800030BC = parametri della traccia FX, una parola per id interno),
+ * 4 parole che l'OS non usa: id interni 0, 0x1A (tra delay e riverbero), 0x38 (id 144, "Delay Time"
+ * dell'amp FX, nascosto) e 0x46 (dopo l'amp FX). Un byte per parametro, XOR il default: kit vecchi
+ * (parole a zero) = valori di default.
  */
 
 typedef unsigned int u32;
 typedef int s32;
 typedef short s16;
+typedef unsigned short u16;
 
 #include "fx3_tables.h"
 
@@ -31,19 +40,26 @@ typedef short s16;
 #define H         16                                       /* campioni per blocco a 24 kHz */
 #define DL        1024                                     /* linea a 24 kHz: 42 ms (TIME + DEP <= 38 ms) */
 #define DL_M      ((s16 *)0x4600E000u)                     /* linea mono + copia a +DL (area mod azzerata) */
+#define MAXD      (8 << 8)                                 /* variazione massima del ritardo per blocco (Q8) */
 #define SRC_D     0x80003D50u                              /* tracce digitali, 32 campioni a passo 128 B */
 #define SRC_A     0x80003950u                              /* tracce analogiche (canali 0..3) */
 #define OUT_A     ((s32 *)0x8000DAD0u)                     /* bus d'uscita, L/R alternati */
 #define DLY_IN    ((s32 *)0x8000DBD0u)                     /* bus d'ingresso del delay, L/R alternati */
+#define KIT       (*(char *const volatile *)0x800030BCu)   /* kit del pattern attivo */
 #define LOUD      (10 << 16)                               /* ingresso udibile: oltre 10/32768 (-70 dB) */
 #define UI_ROOT   (*(char *const volatile *)0x444E1334u)
 #define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...))                    0x400F8C18u)                            /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
 #define FONT      ((const void *)0x402A91C0u)              /* 4x6 */
 
 enum { P_TYPE, P_SPD, P_DEP, P_TIME, P_FDBK, P_WID, P_DSND, P_VOL, NP };
+enum { CHOR, FLNG, PHSR, CRSH, NT };
 static const unsigned short ids[NP] = {246, 247, 248, 250, 251, 252, 249, 253};
-static const unsigned char maxv[NP] = {0, 127, 127, 127, 127, 127, 127, 127};
+static const unsigned char maxv[NP] = {NT - 1, 127, 127, 127, 127, 127, 127, 127};
+static const unsigned char defv[NP] = {0, 60, 64, 64, 0, 64, 0, 100};
+static const unsigned char woff[4] = {0, 2 * 0x1A, 2 * 0x38, 2 * 0x46}; /* parole nel kit */
 unsigned char fx3_p[NP] DATA = {0, 60, 64, 64, 0, 64, 0, 100};
+static u16 fallback[0x47] DATA = {0};                     /* nessun kit (ancora): valori in RAM */
+static u32 seen[2] DATA = {1, 1};                         /* ultime parole lette, a coppie (1: rilettura) */
 
 s32 fx3_tgt[16] DATA = {0};                              /* bersagli mono (meta'): 0..7 digitali, 8..11 analogiche */
 s32 fx3_cur[16] DATA = {0};                              /* guadagni del blocco (levigati verso i bersagli) */
@@ -51,13 +67,87 @@ s32 fx3_moving DATA = 0;                                  /* != 0: un bersaglio 
 static u32 ramp DATA = 0;                                 /* != 0: un guadagno non ha ancora raggiunto il bersaglio */
 static u32 live DATA = 0;                                 /* tracce con guadagno (bit 0..11) */
 s32 fx3_bus[H] DATA = {0};                               /* bus 3 mono a 24 kHz */
-s32 fx3_wet[2 * H] DATA = {0};                           /* uscita del chorus (scala 16 bit), L/R alternati */
+s32 fx3_wet[2 * H] DATA = {0};                           /* uscita dell'effetto (scala 16 bit), L/R alternati */
 s32 fx3_idle DATA = 1;                                    /* 1 = niente da fare (e fx3_wet non valido) */
 static s32 ret_h[2] DATA = {0, 0}, dly_h[2] DATA = {0, 0}; /* ultimo mezzo campione L/R per l'interpolazione */
 static u32 quiet DATA = 0;                                /* blocchi consecutivi senza ingresso ne' coda */
 static u32 wpos DATA = 0, phase DATA = 0, dpos[2] DATA = {0, 0};
+static u32 dsp_type DATA = 0;                             /* tipo per cui e' preparato lo stato dell'effetto */
 
+/* ---- salvataggio nel kit */
+static char *kit(void)
+{
+    char *k = KIT;
+    return k ? k : (char *)fallback;
+}
 
+static u32 word(const char *k, u32 j)
+{
+    return *(const volatile u16 *)(k + woff[j]);
+}
+
+static u32 decode(u32 w, u32 i)                          /* byte del parametro i dalla sua parola */
+{
+    u32 v = ((i & 1 ? w : w >> 8) & 0xFF) ^ defv[i];
+    return v > maxv[i] ? maxv[i] : v;
+}
+
+/* nomi e testi della pagina secondo il tipo (stringhe in RAM: i descrittori puntano qui) */
+#include "fx3_names.h"
+static const char *const n_s[NT][5] = {{"SPD", "DEP", "TIME", "FDBK", "WID"},
+                                       {"SPD", "DEP", "TIME", "FDBK", "WID"},
+                                       {"SPD", "DEP", "FREQ", "FDBK", "WID"},
+                                       {"SRR", "BITS", "DRV", "-", "-"}};
+static const char *const n_l[NT][5] = {
+    {"Chorus Speed", "Chorus Depth", "Chorus Delay", "Chorus Feedback", "Chorus Width"},
+    {"Flanger Speed", "Flanger Depth", "Flanger Delay", "Flanger Feedback", "Flanger Width"},
+    {"Phaser Speed", "Phaser Depth", "Phaser Frequency", "Phaser Feedback", "Phaser Width"},
+    {"Crusher Rate", "Crusher Bits", "Crusher Drive", "-", "-"}};
+static const char *const t_s[NT] = {"CHOR", "FLNG", "PHSR", "CRSH"};
+static const char *const t_l[NT] = {"Chorus", "Flanger", "Phaser", "Crusher"};
+static char *const name_s[5] = {fx3_n1_s, fx3_n2_s, fx3_n3_s, fx3_n4_s, fx3_n5_s};
+static char *const name_l[5] = {fx3_n1_l, fx3_n2_l, fx3_n3_l, fx3_n4_l, fx3_n5_l};
+static u32 named DATA = 0;                                /* tipo dei nomi scritti */
+
+static void put(char *buf, const char *s)
+{
+    while ((*buf++ = *s++))
+        ;
+}
+
+static void retitle(u32 t)
+{
+    char *ui = UI_ROOT;
+    u32 i;
+
+    if (t == named)
+        return;
+    named = t;
+    for (i = 0; i < 5; i++) {
+        put(name_s[i], n_s[t][i]);
+        put(name_l[i], n_l[t][i]);
+    }
+    put(fx3_page_l, t_l[t]);
+    if (ui)
+        ui[96] = 1;
+}
+
+/* a ogni blocco: parametri dal kit (cambia col pattern), solo se le parole sono cambiate */
+static void sync(void)
+{
+    const char *k = kit();
+    u32 lo = word(k, 0) << 16 | word(k, 1), hi = word(k, 2) << 16 | word(k, 3), i;
+
+    if (lo == seen[0] && hi == seen[1])
+        return;
+    seen[0] = lo;
+    seen[1] = hi;
+    for (i = 0; i < NP; i++)
+        fx3_p[i] = (unsigned char)decode(word(k, i >> 1), i);
+    retitle(fx3_p[P_TYPE]);
+}
+
+/* ---- effetti */
 static s32 lfo(u32 ph)                                    /* seno unipolare 0..32767 */
 {
     u32 i = ph >> 24, f = (ph >> 8) & 0xFFFF;
@@ -65,13 +155,28 @@ static s32 lfo(u32 ph)                                    /* seno unipolare 0..3
     return (a + (((b - a) * (s32)(f >> 1)) >> 15) + 32768) >> 1;
 }
 
+static u32 inc(const u16 *rate)                           /* passo di fase per blocco da mHz */
+{
+    return ((u32)rate[fx3_p[P_SPD]] * 183252u >> 10) * H;  /* 2^32 / 24000 / 1000 = 178.96 */
+}
+
+static u32 q8(u32 us)                                     /* microsecondi -> campioni a 24 kHz, Q8 */
+{
+    return us * 6144u / 1000;                             /* 30 ms: 1.8e8, nessun traboccamento */
+}
+
+static s32 bip(u32 v, s32 max)                           /* 0..127, centro 64 -> -max..max */
+{
+    s32 x = ((s32)v - 64) * max / 63;
+    return x > max ? max : x < -max ? -max : x;
+}
 
 static const s32 zero[H] = {0};
 
-/* ciclo del chorus in assembly (fx3_cho, sotto): 16 campioni, due prese interpolate dalla linea doppia
- * (le posizioni partono sotto DL e in un blocco avanzano al massimo di ~20 campioni: le letture restano
- * nella copia, senza ritorno a capo), retroazione mono saturata a 16 bit; due varianti (con/senza
- * retroazione). La retroazione sta subito prima della linea (muls.l non accetta indirizzi assoluti). */
+/* CHOR / FLNG: ciclo in assembly (fx3_cho, sotto): 16 campioni, due prese interpolate dalla linea
+ * doppia, retroazione mono saturata a 16 bit; due varianti (con/senza retroazione). Le posizioni partono
+ * sotto DL e in un blocco avanzano di 16 +- MAXD campioni: le letture restano nella copia, senza ritorno
+ * a capo. La retroazione sta subito prima della linea (muls.l non accetta indirizzi assoluti). */
 struct cho { s16 *line; const s32 *in; s32 *wet; u32 pl, pr, il, ir, w; s32 yl, yr; };
 #define CHO_FB    (*(volatile s32 *)((char *)DL_M - 4))
 void fx3_cho(struct cho *c);
@@ -79,16 +184,23 @@ void fx3_sum(s32 *dst, const s32 *g, u32 which);         /* dst[n] = -sum g[k] (
 void fx3_sum1(s32 *dst, u32 src, s32 g, u32 add);         /* una traccia: dst[n] (+)= -g (x[2n] + x[2n+1]) */
 void fx3_ret(const s32 *wet, s32 gain, s32 *a, s32 *h);  /* a -= 2 * wet * gain a 48 kHz (saturato) */
 
-/* chorus: una linea mono, due prese (L/R) modulate da un LFO calcolato a inizio e fine blocco e
- * interpolato linearmente (le posizioni di lettura avanzano di 1 - pendenza a campione). Ritorna 1 se
- * la coda e' (quasi) muta. */
-static u32 chorus(const s32 *in)
+static u32 glide(u32 to, u32 from)                       /* TIME girato di colpo: scivola */
+{
+    s32 d = (s32)(to - from);
+    return d > MAXD ? from + MAXD : d < -MAXD ? from - MAXD : to;
+}
+
+/* una linea mono, due prese (L/R) modulate da un LFO calcolato a inizio e fine blocco e interpolato
+ * linearmente (le posizioni di lettura avanzano di 1 - pendenza a campione). Ritorna 1 se la coda e'
+ * (quasi) muta. */
+static u32 chorus(const s32 *in, u32 fl)
 {
     struct cho c;
-    u32 base = DEL_Q8[fx3_p[P_TIME]], dep = DEP_Q8[fx3_p[P_DEP]];
+    u32 base = q8((fl ? TIME_F : TIME_C)[fx3_p[P_TIME]]), dep = q8((fl ? DEP_F : DEP_C)[fx3_p[P_DEP]]);
     u32 off = (u32)fx3_p[P_WID] * 0x01020408u;             /* 0..180 gradi */
-    u32 end = phase + SPD_INC[fx3_p[P_SPD]] * H;
-    u32 el = base + ((dep * (u32)lfo(end)) >> 15), er = base + ((dep * (u32)lfo(end + off)) >> 15);
+    u32 end = phase + inc(fl ? RATE_F : RATE_C);
+    u32 el = glide(base + ((dep * (u32)lfo(end)) >> 15), dpos[0]);
+    u32 er = glide(base + ((dep * (u32)lfo(end + off)) >> 15), dpos[1]);
 
     c.line = DL_M;
     c.in = in;
@@ -98,7 +210,7 @@ static u32 chorus(const s32 *in)
     c.il = 256 - (u32)(((s32)(el - dpos[0])) >> 4);
     c.ir = 256 - (u32)(((s32)(er - dpos[1])) >> 4);
     c.w = wpos;
-    CHO_FB = FB_Q15[fx3_p[P_FDBK]];
+    CHO_FB = fl ? bip(fx3_p[P_FDBK], 31130) : 29490 * (s32)fx3_p[P_FDBK] / 127; /* 95 % / 90 % */
     fx3_cho(&c);
     wpos = c.w & (DL - 1);                                 /* multiplo di H: nel blocco non torna a capo */
     phase = end;
@@ -109,21 +221,87 @@ static u32 chorus(const s32 *in)
     return (u32)(c.yl + 10) <= 20 && (u32)(c.yr + 10) <= 20;
 }
 
+/* PHSR: 4 celle allpass del primo ordine in cascata (coefficiente per blocco, Q12, dalla frequenza
+ * spazzata dall'LFO in ottave), retroazione dall'uscita; sinistra = (x + y) / 2, destra = sinistra -
+ * WID * y (a WID massimo (x - y) / 2: notch e picchi scambiati). Ciclo in assembly (fx3_phs). */
+struct phs { const s32 *in; s32 *wet; s32 a, fb, w; s32 s[5]; };
+static struct phs ph DATA;
+void fx3_phs(struct phs *p);
+
+static u32 phaser(const s32 *in)
+{
+    u32 end = phase + inc(RATE_F);
+    u32 x = FIDX_P[fx3_p[P_TIME]] + (49152u * fx3_p[P_DEP] / 127 * (u32)lfo(end) >> 15);  /* 0..6 ottave */
+    u32 i, f;
+
+    if (x > (PH_N - 2) << 8)
+        x = (PH_N - 2) << 8;
+    i = x >> 8;
+    f = x & 0xFF;
+    ph.in = in;
+    ph.wet = fx3_wet;
+    ph.a = PH_A[i] + (((PH_A[i + 1] - PH_A[i]) * (s32)f) >> 8);
+    ph.fb = bip(fx3_p[P_FDBK], 29491);                     /* 90 % */
+    ph.w = 16384 * (s32)fx3_p[P_WID] / 127;                /* Q14 */
+    fx3_phs(&ph);
+    phase = end;
+    return (u32)(ph.s[4] + 10) <= 20 && (u32)(fx3_wet[2 * H - 2] + 10) <= 20 && (u32)(fx3_wet[2 * H - 1] + 10) <= 20;
+}
+
+/* CRSH: tenuta del campione (24 kHz / 1..32), bit 16..1, drive 0..24 dB con saturazione; mono */
+static u32 cr_cnt DATA = 0;
+static s32 cr_hold DATA = 0;
+
+static u32 crusher(const s32 *in)
+{
+    u32 n = 1 + (31 * fx3_p[P_SPD] + 63) / 127, k;
+    u32 sh = (15 * fx3_p[P_DEP] + 63) / 127;               /* bit tolti */
+    s32 g = DRV_G[fx3_p[P_TIME]], mask = -(1 << sh), *w = fx3_wet;
+
+    for (k = 0; k < H; k++) {
+        if (++cr_cnt >= n) {
+            s32 x = ((in[k] >> 16) * g) >> 8;
+            cr_cnt = 0;
+            x = x > 32767 ? 32767 : x < -32768 ? -32768 : x;
+            cr_hold = x & mask;
+        }
+        w[2 * k] = w[2 * k + 1] = cr_hold;
+    }
+    return (u32)(cr_hold + 10) <= 20;
+}
+
+/* nuovo tipo: niente coda del precedente */
+static void retype(u32 t)
+{
+    u32 *l = (u32 *)DL_M, k;
+
+    dsp_type = t;
+    for (k = 0; k < DL; k++)                               /* linea e copia: 2 x DL campioni */
+        l[k] = 0;
+    for (k = 0; k < 5; k++)
+        ph.s[k] = 0;
+    cr_hold = 0;
+    cr_cnt = 0;
+}
+
 static void rest(void)
 {
     fx3_idle = 1;
     ret_h[0] = ret_h[1] = dly_h[0] = dly_h[1] = 0;
 }
 
-/* dopo le somme del master (MACSR impostato dal trampolino): bus 3, chorus e ritorno sul bus diretto
+/* dopo le somme del master (MACSR impostato dal trampolino): bus 3, effetto e ritorno sul bus diretto
  * (come delay e riverbero con FX Routing spento; il bus 0x8000DFD0 passa dal blocco FX analogico).
  * I guadagni seguono i bersagli di 1/4 a blocco (~2.7 ms) e li raggiungono esatti quando sono vicini. */
 void fx3_run(void)
 {
     s32 *t = fx3_tgt, *c = fx3_cur;
-    s32 vol = VOL_Q15[fx3_p[P_VOL]];
+    s32 vol;
     u32 k, mask = 0, loud = 0, silent;
+    const s32 *in;
 
+    sync();
+    vol = VOL_Q15[fx3_p[P_VOL]];
     if (!(vol | fx3_p[P_DSND])) {                          /* nessuno ascolta l'uscita */
         rest();
         return;
@@ -173,7 +351,19 @@ void fx3_run(void)
         return;
     }
     fx3_idle = 0;
-    silent = chorus(mask ? fx3_bus : zero);
+    if (fx3_p[P_TYPE] != dsp_type)
+        retype(fx3_p[P_TYPE]);
+    in = mask ? fx3_bus : zero;
+    switch (dsp_type) {
+    case PHSR:
+        silent = phaser(in);
+        break;
+    case CRSH:
+        silent = crusher(in);
+        break;
+    default:
+        silent = chorus(in, dsp_type == FLNG);
+    }
     quiet = loud || !silent ? 0 : quiet + 1;
     if (vol)
         fx3_ret(fx3_wet, vol, OUT_A, ret_h);
@@ -181,7 +371,7 @@ void fx3_run(void)
         ret_h[0] = ret_h[1] = 0;
 }
 
-/* prima del delay: l'uscita del chorus del blocco precedente nel suo bus d'ingresso (che ha la
+/* prima del delay: l'uscita dell'effetto del blocco precedente nel suo bus d'ingresso (che ha la
  * convenzione del bus 3: si somma, quindi guadagno negativo) */
 void fx3_dsnd(void)
 {
@@ -193,7 +383,7 @@ void fx3_dsnd(void)
         dly_h[0] = dly_h[1] = 0;
 }
 
-/* parametri della pagina (vparams) */
+/* ---- parametri della pagina (vparams): letti e scritti nel kit */
 static s32 slot(s32 id)
 {
     s32 i;
@@ -205,62 +395,176 @@ static s32 slot(s32 id)
 
 s32 fx3_get(void *obj, s32 id)
 {
+    s32 i = slot(id);
     (void)obj;
-    return (s32)fx3_p[slot(id)] << 8;
+    return (s32)decode(word(kit(), (u32)i >> 1), (u32)i) << 8;
 }
 
 s32 fx3_set(void *obj, s32 id, s32 value)
 {
-    char *ui = UI_ROOT;
-    s32 i = slot(id);
+    char *ui = UI_ROOT, *k = kit();
+    u32 i = (u32)slot(id), v;
+    volatile u16 *w = (volatile u16 *)(k + woff[i >> 1]);
     (void)obj;
     value = (value + 0x80) >> 8;
-    fx3_p[i] = (unsigned char)(value < 0 ? 0 : value > maxv[i] ? maxv[i] : value);
+    v = (u32)(value < 0 ? 0 : value > maxv[i] ? maxv[i] : value);
+    v ^= defv[i];
+    *w = (u16)(i & 1 ? (*w & 0xFF00) | v : (*w & 0x00FF) | v << 8);
+    fx3_p[i] = (unsigned char)decode(*w, i);
+    if (i == P_TYPE)
+        retitle(fx3_p[P_TYPE]);
     if (ui)
         ui[96] = 1;
     return 0;
 }
 
-/* formattatori (std::function come in readable-values) */
-static void put(char *buf, const char *s)
-{
-    while ((*buf++ = *s++))
-        ;
-}
-
+/* ---- testi (std::function come in readable-values) */
 static u32 pos(s32 value)
 {
     value = (value + 0x80) >> 8;
     return (u32)(value < 0 ? 0 : value > 127 ? 127 : value);
 }
 
-void fx3_fmt_type(const void *fn, s32 value, char *buf) { (void)fn; (void)value; put(buf, "CHOR"); }
-void fx3_fmt_spd(const void *fn, s32 value, char *buf) { (void)fn; put(buf, SPD_TXT[pos(value)]); }
-void fx3_fmt_dep(const void *fn, s32 value, char *buf) { (void)fn; put(buf, DEP_TXT[pos(value)]); }
-void fx3_fmt_del(const void *fn, s32 value, char *buf) { (void)fn; put(buf, DEL_TXT[pos(value)]); }
-
-static void num(char *buf, u32 n, const char *unit)      /* intero 0..999 e unita' */
+static char *dec(char *buf, u32 n)                        /* intero senza segno */
 {
-    char t[4];
+    char t[10];
     u32 k = 0;
     do
         t[k++] = (char)('0' + n % 10);
-    while ((n /= 10) && k < 3);
+    while ((n /= 10) && k < 10);
     while (k)
         *buf++ = t[--k];
+    return buf;
+}
+
+static void fixed(char *buf, u32 n, u32 d, const char *unit) /* n / 10^d con d decimali (0..2) */
+{
+    u32 p = d == 2 ? 100 : d == 1 ? 10 : 1;
+    buf = dec(buf, n / p);
+    if (d) {
+        *buf++ = '.';
+        if (d == 2)
+            *buf++ = (char)('0' + n / 10 % 10);
+        *buf++ = (char)('0' + n % 10);
+    }
     put(buf, unit);
 }
 
-void fx3_fmt_fdbk(const void *fn, s32 value, char *buf) { (void)fn; num(buf, (90 * pos(value) + 63) / 127, "%"); }
-void fx3_fmt_wid(const void *fn, s32 value, char *buf) { (void)fn; num(buf, (180 * pos(value) + 63) / 127, "deg"); }
+static void hz_m(char *buf, u32 mhz)                      /* velocita': 0.05Hz .. 9.99Hz, 10.0 */
+{
+    if (mhz < 9995)
+        fixed(buf, (mhz + 5) / 10, 2, "Hz");
+    else
+        fixed(buf, (mhz + 50) / 100, 1, "");
+}
+
+static void ms_u(char *buf, u32 us)                       /* tempi: 0.00ms, 1.0ms, 30ms */
+{
+    if (us < 995)
+        fixed(buf, (us + 5) / 10, 2, "ms");
+    else if (us < 9950)
+        fixed(buf, (us + 50) / 100, 1, "ms");
+    else
+        fixed(buf, (us + 500) / 1000, 0, "ms");
+}
+
+static void hz(char *buf, u32 f)                          /* frequenze: 750Hz, 1.2kHz, 24kHz */
+{
+    if (f < 995)
+        fixed(buf, f, 0, "Hz");
+    else if (f < 9950)
+        fixed(buf, (f + 50) / 100, 1, "kHz");
+    else
+        fixed(buf, (f + 500) / 1000, 0, "kHz");
+}
+
+static void sgn(char *buf, s32 x, const char *unit)       /* -95% 0% +95% */
+{
+    if (x)
+        *buf++ = x < 0 ? '-' : '+';
+    fixed(buf, (u32)(x < 0 ? -x : x), 0, unit);
+}
+
+static u32 type(void)
+{
+    return fx3_p[P_TYPE];
+}
+
+void fx3_fmt_type(const void *fn, s32 value, char *buf)
+{
+    u32 t = pos(value);
+    (void)fn;
+    put(buf, t_s[t < NT ? t : 0]);
+}
+
+void fx3_fmt_spd(const void *fn, s32 value, char *buf)
+{
+    u32 v = pos(value), t = type();
+    (void)fn;
+    if (t == CRSH)
+        hz(buf, 24000 / (1 + (31 * v + 63) / 127));
+    else
+        hz_m(buf, (t == CHOR ? RATE_C : RATE_F)[v]);
+}
+
+void fx3_fmt_dep(const void *fn, s32 value, char *buf)
+{
+    u32 v = pos(value), t = type();
+    (void)fn;
+    if (t == CRSH)
+        put(dec(buf, 16 - (15 * v + 63) / 127), "bit");
+    else if (t == PHSR)
+        fixed(buf, (60 * v + 63) / 127, 1, "oct");
+    else
+        ms_u(buf, (t == CHOR ? DEP_C : DEP_F)[v]);
+}
+
+void fx3_fmt_del(const void *fn, s32 value, char *buf)
+{
+    u32 v = pos(value), t = type();
+    (void)fn;
+    if (t == CRSH)
+        fixed(buf, (240 * v + 63) / 127, 1, "dB");
+    else if (t == PHSR)
+        hz(buf, FREQ_P[v]);
+    else
+        ms_u(buf, (t == CHOR ? TIME_C : TIME_F)[v]);
+}
+
+void fx3_fmt_fdbk(const void *fn, s32 value, char *buf)
+{
+    u32 v = pos(value), t = type();
+    (void)fn;
+    if (t == CRSH)
+        put(buf, "-");
+    else if (t == CHOR)
+        fixed(buf, (90 * v + 63) / 127, 0, "%");
+    else {
+        s32 m = t == FLNG ? 95 : 90, x = ((s32)v - 64) * m, r = (x < 0 ? -x + 31 : x + 31) / 63;
+        sgn(buf, x < 0 ? -(r > m ? m : r) : r > m ? m : r, "%");
+    }
+}
+
+void fx3_fmt_wid(const void *fn, s32 value, char *buf)
+{
+    u32 v = pos(value), t = type();
+    (void)fn;
+    if (t == CRSH)
+        put(buf, "-");
+    else if (t == PHSR)
+        fixed(buf, (100 * v + 63) / 127, 0, "%");
+    else
+        fixed(buf, (180 * v + 63) / 127, 0, "deg");
+}
+
 void fx3_fmt_vol(const void *fn, s32 value, char *buf) { (void)fn; put(buf, VOL_TXT[pos(value)]); }
 
 /* grafica di TYPE (+36): il tipo come testo, centrato come le destinazioni degli LFO */
 void fx3_type_gfx(const void *fn, s32 value, void *ctx, s32 x, s32 y)
 {
+    u32 t = pos(value);
     (void)fn;
-    (void)value;
-    DRAW_TEXT(ctx, FONT, x + 8, y + 5, 1, 0, "XXXX", "%s", "CHOR");
+    DRAW_TEXT(ctx, FONT, x + 8, y + 5, 1, 0, "XXXX", "%s", t_s[t < NT ? t : 0]);
 }
 
 int fx3_mgr(void *dst, const void *src, int op)
@@ -284,10 +588,8 @@ PROTO(fx3_proto_type_gfx, fx3_type_gfx);
 
 const u32 fx3_reverb_pages[2] = {21, 25};                  /* tab REVERB: pagina dell'OS + la nostra */
 const char fx3_page_s[] = "FX3";
-const char fx3_page_l[] = "Chorus";
 const char fx3_snd_s[] = "FX3";
 const char fx3_snd_l[] = "FX3 Send";
-#include "fx3_names.h"
 
 /* cicli caldi in assembly */
 __asm__(
@@ -549,6 +851,151 @@ __asm__(
     "        move.l  %d3,4(%a1)\n"
     "        movem.l (%sp),%d2-%d7/%a2\n"
     "        lea     28(%sp),%sp\n"
+    "        rts\n");
+
+/* phaser */
+__asm__(
+    "        .globl  fx3_phs\n"
+    "fx3_phs:\n"                                /* (p): 16 campioni */
+    "        lea     -44(%sp),%sp\n"
+    "        movem.l %d2-%d7/%a2-%a6,(%sp)\n"
+    "        movea.l 48(%sp),%a2\n"
+    "        movea.l (%a2),%a0\n"               /* ingresso */
+    "        movea.l 4(%a2),%a1\n"              /* uscita */
+    "        lea     64(%a0),%a3\n"             /* fine dell'ingresso */
+    "        move.l  8(%a2),%d6\n"              /* coefficiente Q12 */
+    "        movem.l 20(%a2),%d1-%d5\n"         /* stato */
+    "        tst.l   12(%a2)\n"
+    "        bne.w   2f\n"
+    "1:      mvs.w   (%a0),%d0\n"               /* x (parola alta del bus) */
+    "        addq.l  #4,%a0\n"
+    "        move.l  %d0,%d7\n"                 /* y = a (x - s_k) + s_k-1, s0..s4 in d1..d5 */
+    "        sub.l   %d2,%d7\n"
+    "        muls.l  %d6,%d7\n"
+    "        asr.l   #8,%d7\n"
+    "        asr.l   #4,%d7\n"
+    "        add.l   %d1,%d7\n"
+    "        move.l  %d0,%d1\n"
+    "        move.l  %d7,%d0\n"
+    "        sub.l   %d3,%d0\n"
+    "        muls.l  %d6,%d0\n"
+    "        asr.l   #8,%d0\n"
+    "        asr.l   #4,%d0\n"
+    "        add.l   %d2,%d0\n"
+    "        move.l  %d7,%d2\n"
+    "        move.l  %d0,%d7\n"
+    "        sub.l   %d4,%d7\n"
+    "        muls.l  %d6,%d7\n"
+    "        asr.l   #8,%d7\n"
+    "        asr.l   #4,%d7\n"
+    "        add.l   %d3,%d7\n"
+    "        move.l  %d0,%d3\n"
+    "        move.l  %d7,%d0\n"
+    "        sub.l   %d5,%d0\n"
+    "        muls.l  %d6,%d0\n"
+    "        asr.l   #8,%d0\n"
+    "        asr.l   #4,%d0\n"
+    "        add.l   %d4,%d0\n"
+    "        move.l  %d7,%d4\n"
+    "        move.l  %d0,%d5\n"
+    "        move.l  %d0,%d7\n"                 /* sinistra (x + y) / 2 */
+    "        add.l   %d1,%d7\n"
+    "        asr.l   #1,%d7\n"
+    "        cmpi.l  #32767,%d7\n"
+    "        ble.s   3f\n"
+    "        move.l  #32767,%d7\n"
+    "3:      cmpi.l  #-32768,%d7\n"
+    "        bge.s   4f\n"
+    "        move.l  #-32768,%d7\n"
+    "4:\n"
+    "        move.l  %d7,(%a1)+\n"
+    "        muls.l  16(%a2),%d0\n"             /* destra: sinistra - WID * y */
+    "        asr.l   #8,%d0\n"
+    "        asr.l   #6,%d0\n"
+    "        sub.l   %d0,%d7\n"
+    "        cmpi.l  #32767,%d7\n"
+    "        ble.s   3f\n"
+    "        move.l  #32767,%d7\n"
+    "3:      cmpi.l  #-32768,%d7\n"
+    "        bge.s   4f\n"
+    "        move.l  #-32768,%d7\n"
+    "4:\n"
+    "        move.l  %d7,(%a1)+\n"
+    "        cmpa.l  %a3,%a0\n"
+    "        bne.w   1b\n"
+    "        bra.w   9f\n"
+    "2:\n"
+    "1:      mvs.w   (%a0),%d0\n"               /* x (parola alta del bus) */
+    "        addq.l  #4,%a0\n"
+    "        move.l  %d5,%d7\n"                 /* + retroazione dall'uscita, saturato a 16 bit */
+    "        muls.l  12(%a2),%d7\n"
+    "        asr.l   #8,%d7\n"
+    "        asr.l   #7,%d7\n"
+    "        add.l   %d7,%d0\n"
+    "        cmpi.l  #32767,%d0\n"
+    "        ble.s   3f\n"
+    "        move.l  #32767,%d0\n"
+    "3:      cmpi.l  #-32768,%d0\n"
+    "        bge.s   4f\n"
+    "        move.l  #-32768,%d0\n"
+    "4:\n"
+    "        move.l  %d0,%d7\n"                 /* y = a (x - s_k) + s_k-1, s0..s4 in d1..d5 */
+    "        sub.l   %d2,%d7\n"
+    "        muls.l  %d6,%d7\n"
+    "        asr.l   #8,%d7\n"
+    "        asr.l   #4,%d7\n"
+    "        add.l   %d1,%d7\n"
+    "        move.l  %d0,%d1\n"
+    "        move.l  %d7,%d0\n"
+    "        sub.l   %d3,%d0\n"
+    "        muls.l  %d6,%d0\n"
+    "        asr.l   #8,%d0\n"
+    "        asr.l   #4,%d0\n"
+    "        add.l   %d2,%d0\n"
+    "        move.l  %d7,%d2\n"
+    "        move.l  %d0,%d7\n"
+    "        sub.l   %d4,%d7\n"
+    "        muls.l  %d6,%d7\n"
+    "        asr.l   #8,%d7\n"
+    "        asr.l   #4,%d7\n"
+    "        add.l   %d3,%d7\n"
+    "        move.l  %d0,%d3\n"
+    "        move.l  %d7,%d0\n"
+    "        sub.l   %d5,%d0\n"
+    "        muls.l  %d6,%d0\n"
+    "        asr.l   #8,%d0\n"
+    "        asr.l   #4,%d0\n"
+    "        add.l   %d4,%d0\n"
+    "        move.l  %d7,%d4\n"
+    "        move.l  %d0,%d5\n"
+    "        move.l  %d0,%d7\n"                 /* sinistra (x + y) / 2 */
+    "        add.l   %d1,%d7\n"
+    "        asr.l   #1,%d7\n"
+    "        cmpi.l  #32767,%d7\n"
+    "        ble.s   3f\n"
+    "        move.l  #32767,%d7\n"
+    "3:      cmpi.l  #-32768,%d7\n"
+    "        bge.s   4f\n"
+    "        move.l  #-32768,%d7\n"
+    "4:\n"
+    "        move.l  %d7,(%a1)+\n"
+    "        muls.l  16(%a2),%d0\n"             /* destra: sinistra - WID * y */
+    "        asr.l   #8,%d0\n"
+    "        asr.l   #6,%d0\n"
+    "        sub.l   %d0,%d7\n"
+    "        cmpi.l  #32767,%d7\n"
+    "        ble.s   3f\n"
+    "        move.l  #32767,%d7\n"
+    "3:      cmpi.l  #-32768,%d7\n"
+    "        bge.s   4f\n"
+    "        move.l  #-32768,%d7\n"
+    "4:\n"
+    "        move.l  %d7,(%a1)+\n"
+    "        cmpa.l  %a3,%a0\n"
+    "        bne.w   1b\n"
+    "9:      movem.l %d1-%d5,20(%a2)\n"
+    "        movem.l (%sp),%d2-%d7/%a2-%a6\n"
+    "        lea     44(%sp),%sp\n"
     "        rts\n");
 
 /* trampolini */

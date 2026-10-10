@@ -276,8 +276,14 @@ def test_cost_per_block(m):
     assert rest < 120, rest                                     # nessuna mandata
     loud(m)
     gains(m, [0x4000_0000])                                    # una traccia, senza retroazione ne' DEL
+    run_block(m)                                               # a regime (il primo blocco fa la rampa)
     one = block_cost(m)
-    assert one < 1500, one                                     # era ~3100
+    assert one < 1400, one                                     # era ~3100
+    for t, most in ((1, 1600), (2, 1800), (3, 950)):           # FLNG e PHSR con retroazione (FDBK 0 = -95/-90 %)
+        m.param("TYPE", t)
+        run_block(m)
+        assert block_cost(m) < most, t
+    m.param("TYPE", 0)
     gains(m, [0x4000_0000] * 12)
     m.param("FDBK", 64)
     m.param("DSND", 64)
@@ -373,8 +379,10 @@ def test_parameters_through_vparams(m):
     assert m.call(GET, [0x5000_0000, IDS["VOL"]]) == 100 << 8
     m.param("SPD", 90)
     assert m.call(GET, [0x5000_0000, IDS["SPD"]]) == 90 << 8
-    m.param("TYPE", 3)                                          # un solo tipo per ora
-    assert m.call(GET, [0x5000_0000, IDS["TYPE"]]) == 0
+    m.param("TYPE", 3)                                          # CHOR FLNG PHSR CRSH
+    assert m.call(GET, [0x5000_0000, IDS["TYPE"]]) == 3 << 8
+    m.param("TYPE", 9)
+    assert m.call(GET, [0x5000_0000, IDS["TYPE"]]) == 3 << 8
     m.call(SET, [0x5000_0000, IDS["WID"], 0x9000, 1])
     assert m.call(GET, [0x5000_0000, IDS["WID"]]) == 127 << 8
 
@@ -565,3 +573,178 @@ def test_track_hook_cheap_when_snd3_is_off(m):
     m.put(m.sym["fx3_moving"], [0])
     assert track(m, 4, 0x6000_0000, 0x6000_0000, 0)[4] == 0  # spenta dopo essere stata accesa: azzerata
     assert m.longs(m.sym["fx3_moving"], 1) != [0]
+
+
+# ---- v0.8: salvataggio nel kit, tipi, nomi e testi per tipo
+
+KIT_PTR, KIT_A, KIT_B = 0x8000_30BC, 0x5000_A000, 0x5000_A100
+WOFF = (0, 52, 112, 140)                                        # id interni 0, 0x1A, 0x38, 0x46
+DEFV = (0, 60, 64, 64, 0, 64, 0, 100)
+
+
+def kit_words(m, base):
+    return [struct.unpack(">H", m.uc.mem_read(base + o, 2))[0] for o in WOFF]
+
+
+def put_kit(m, base, vals):
+    m.uc.mem_write(base, bytes(142))
+    for j, o in enumerate(WOFF):
+        w = (vals[2 * j] ^ DEFV[2 * j]) << 8 | (vals[2 * j + 1] ^ DEFV[2 * j + 1])
+        m.uc.mem_write(base + o, struct.pack(">H", w))
+
+
+def text(m, a, n=24):
+    return bytes(m.uc.mem_read(a, n)).split(b"\0")[0].decode()
+
+
+def test_params_saved_in_the_kit_words(m):
+    m.put(KIT_PTR, [KIT_A])
+    m.uc.mem_write(KIT_A, bytes(142))
+    assert m.call(GET, [0x5000_0000, IDS["VOL"]]) == 100 << 8     # parole a zero = default
+    m.param("SPD", 90)
+    m.param("TIME", 3)
+    m.param("VOL", 127)
+    m.param("TYPE", 2)
+    assert kit_words(m, KIT_A) == [2 << 8 | (90 ^ 60), 3 ^ 64, 0, 127 ^ 100]
+    raw = bytes(m.uc.mem_read(KIT_A, 142))
+    others = [i for i in range(0, 142, 2) if i not in WOFF and raw[i:i + 2] != b"\0\0"]
+    assert others == []                                          # il resto del kit non si tocca
+
+
+def test_pattern_change_follows_the_kit(m):
+    put_kit(m, KIT_A, [0, 10, 20, 30, 40, 50, 60, 70])
+    put_kit(m, KIT_B, [2, 11, 21, 31, 41, 51, 61, 71])
+    m.put(KIT_PTR, [KIT_A])
+    run_block(m)
+    assert list(m.uc.mem_read(m.sym["fx3_p"], 8)) == [0, 10, 20, 30, 40, 50, 60, 70]
+    m.put(KIT_PTR, [KIT_B])                                       # altro pattern
+    run_block(m)
+    assert list(m.uc.mem_read(m.sym["fx3_p"], 8)) == [2, 11, 21, 31, 41, 51, 61, 71]
+    assert m.call(GET, [0x5000_0000, IDS["DEP"]]) == 21 << 8
+    assert text(m, m.sym["fx3_n3_s"]) == "FREQ" and text(m, m.sym["fx3_page_l"]) == "Phaser"
+    m.uc.mem_write(KIT_B + 0, struct.pack(">H", 0xFF00))         # valori fuori scala: limitati
+    run_block(m)
+    assert m.uc.mem_read(m.sym["fx3_p"], 1)[0] == 3
+
+
+@pytest.mark.parametrize("t, n1, n3, n3l, page", [(0, "SPD", "TIME", "Chorus Delay", "Chorus"),
+                                                  (1, "SPD", "TIME", "Flanger Delay", "Flanger"),
+                                                  (2, "SPD", "FREQ", "Phaser Frequency", "Phaser"),
+                                                  (3, "SRR", "DRV", "Crusher Drive", "Crusher")])
+def test_names_follow_the_type(m, t, n1, n3, n3l, page):
+    m.param("TYPE", t)
+    assert (text(m, m.sym["fx3_n1_s"]), text(m, m.sym["fx3_n3_s"])) == (n1, n3)
+    assert (text(m, m.sym["fx3_n3_l"]), text(m, m.sym["fx3_page_l"])) == (n3l, page)
+
+
+@pytest.mark.parametrize("t, fn, v, want", [
+    (1, "fx3_fmt_fdbk", 64, "0%"), (1, "fx3_fmt_fdbk", 127, "+95%"), (1, "fx3_fmt_fdbk", 0, "-95%"),
+    (1, "fx3_fmt_del", 0, "0.10ms"), (1, "fx3_fmt_del", 127, "8.0ms"), (1, "fx3_fmt_spd", 127, "5.00Hz"),
+    (2, "fx3_fmt_del", 0, "100Hz"), (2, "fx3_fmt_del", 127, "4.0kHz"), (2, "fx3_fmt_dep", 127, "6.0oct"),
+    (2, "fx3_fmt_wid", 127, "100%"), (2, "fx3_fmt_fdbk", 127, "+90%"),
+    (3, "fx3_fmt_spd", 0, "24kHz"), (3, "fx3_fmt_spd", 127, "750Hz"), (3, "fx3_fmt_dep", 0, "16bit"),
+    (3, "fx3_fmt_dep", 127, "1bit"), (3, "fx3_fmt_del", 127, "24.0dB"), (3, "fx3_fmt_fdbk", 50, "-"),
+    (0, "fx3_fmt_type", 2, "PHSR"), (0, "fx3_fmt_type", 3, "CRSH")])
+def test_texts_per_type(m, t, fn, v, want):
+    m.param("TYPE", t)
+    buf = 0x5000_3000
+    m.call(m.sym[fn], [0, v << 8, buf])
+    assert text(m, buf, 12) == want
+
+
+def s16(v):
+    return max(-32768, min(32767, v))
+
+
+def ph_coef(tim):
+    import math
+    t = [math.tan(math.pi * 20 * 2 ** (i / 32) / 24000) for i in range(292)]
+    tab = [round(4096 * (x - 1) / (x + 1)) for x in t]
+    fidx = round(32 * 256 * math.log2(100 * 40 ** (tim / 127) / 20))
+    i, f = fidx >> 8, fidx & 0xFF
+    return tab[i] + (((tab[i + 1] - tab[i]) * f) >> 8)
+
+
+def phaser_ref(bus, st, a, fb, w):
+    """4 celle allpass: y = a (x - s_k) / 4096 + s_k-1; sinistra (x + y) / 2, destra sinistra - w y."""
+    out = []
+    for b in bus:
+        u = b >> 16
+        if fb:
+            u = s16(u + ((s32(st[4] * fb) >> 8) >> 7))
+        x = u
+        for k in range(1, 5):
+            y = (s32((x - st[k]) * a) >> 12) + st[k - 1]
+            st[k - 1] = x
+            x = y
+        st[4] = x
+        left = s16((x + st[0]) >> 1)
+        out += [left, s16(left - (s32(x * w) >> 14))]
+    return out
+
+
+@pytest.mark.parametrize("fdbk", [64, 127, 10])
+def test_phaser_matches_the_model(m, fdbk):
+    settle(m, TYPE=2, DEP=0, TIME=70, FDBK=fdbk, WID=90, VOL=127)
+    x = (fdbk - 64) * 29491
+    fb = max(-29491, min(29491, int(x / 63)))                     # come la divisione in C (verso zero)
+    w = 16384 * 90 // 127
+    st = [0] * 5
+    loud(m)
+    for _ in range(6):
+        run_block(m)
+        bus = m.longs(m.sym["fx3_bus"], 16)
+        assert m.longs(m.sym["fx3_wet"], 32) == phaser_ref(bus, st, ph_coef(70), fb, w)
+
+
+def test_crusher_matches_the_model(m):
+    spd, dep, tim = 40, 90, 60
+    settle(m, TYPE=3, SPD=spd, DEP=dep, TIME=tim, VOL=127)
+    n = 1 + (31 * spd + 63) // 127
+    sh = (15 * dep + 63) // 127
+    g = round(256 * 10 ** (24 * tim / 127 / 20))
+    cnt, hold, seen = 32 % n, 0, set()                          # i due blocchi muti di settle
+    loud(m)
+    for _ in range(4):
+        run_block(m)
+        want = []
+        for b in m.longs(m.sym["fx3_bus"], 16):
+            cnt += 1
+            if cnt >= n:
+                cnt = 0
+                hold = s16(((b >> 16) * g) >> 8) & -(1 << sh)
+            want += [hold, hold]
+        assert m.longs(m.sym["fx3_wet"], 32) == want
+        seen |= set(want)
+    assert len(seen) > 4
+
+
+def test_type_change_drops_the_old_tail(m):
+    settle(m, TYPE=0, FDBK=120, VOL=127)
+    loud(m)
+    for _ in range(10):
+        run_block(m)
+    m.put(SRC_DIG, [0] * 256)
+    m.put(SRC_ANA, [0] * 256)
+    m.param("TYPE", 1)
+    m.param("FDBK", 64)                                         # flanger senza retroazione
+    run_block(m)
+    run_block(m)
+    assert m.longs(m.sym["fx3_wet"], 32) == [0] * 32          # linea svuotata al cambio
+
+
+@pytest.mark.parametrize("t", [0, 1])
+def test_time_jumps_glide_and_reads_stay_in_the_line(m, t):
+    from unicorn import UC_HOOK_MEM_READ
+    settle(m, TYPE=t, DEP=127, SPD=127, TIME=0, FDBK=110, WID=127)
+    loud(m)
+    seen = []
+    h = m.uc.hook_add(UC_HOOK_MEM_READ, lambda uc, acc, a, size, v, _: seen.append(a),
+                      begin=0x4600_D000, end=0x4601_0000)
+    for k in range(300):                                        # TIME 0 <-> 127 di colpo, ripetutamente
+        if k % 40 == 0:
+            m.param("TIME", 127 if (k // 40) % 2 == 0 else 0)
+        run_block(m)
+    m.uc.hook_del(h)
+    line = [a for a in seen if a >= 0x4600_DC00 and not 0x4600_DFFC <= a < 0x4600_E000]  # tranne FDBK
+    assert line and min(line) >= 0x4600_E000 and max(line) < 0x4600_F000
