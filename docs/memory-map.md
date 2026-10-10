@@ -20,11 +20,11 @@ Two **ColdFire MCF5441x** (V4, EMAC, no FPU, ~250 MHz). 64 KB internal SRAM at `
 - `0x400004E8` entry. `0x4000045C` copies SRAM data, `0x400004B2` zeroes BSS (called once, from `0x40000542`). Caches are enabled after.
 - Intro animation task `0x40087E6A` (~28 fps). The rest of boot waits for it: **don't make it longer**.
 - Static constructors: loop `0x40082500`, count at `0x4033850C` (136), entries from `0x40338510`.
-- Mods initialise lazily (from their hooks), never at boot.
+- Mods never add boot time: they set up from their hooks, or from a stub inside the OS page initializer (`0x401885D2…`, one of the static constructors).
 
 ## Mod area
 
-Mods larger than the free fill are **appended to section 3** at `0x40348000`, compressed (SHLZ), and linked at `0x46000000`. A loader hooked at the start of `0x400004B2` unpacks them into 64 KB of RAM before BSS is zeroed. See [mods/modarea](../mods/modarea).
+Mods larger than the free fill are **appended to section 3** at `0x40348000`, compressed (SHLZ), and linked at `0x46000000`. A loader hooked at the start of `0x400004B2` unpacks them into 64 KB of RAM before BSS is zeroed. See [mods/modarea](../mods/modarea); offsets in use: [modding guide](modding-guide.md#1-workflow).
 
 ## Screen
 

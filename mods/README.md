@@ -12,5 +12,5 @@
 | [modarea](modarea) | Unpacks the (compressed) mod code into 64 KB of RAM at boot | — |
 | [mod-zero](mod-zero) | Example: renames a menu entry (smallest possible mod) | — |
 
-Each folder has `make_patch.py` (rebuilds `patch.json` from our sources) and a test in `tests/`.
+Each folder has `make_patch.py` (rebuilds `patch.json` from our sources) and a test in `tests/` (mod-zero: hand-written `patch.json`).
 `patch.json` = list of `{section, addr, len, expect_sha256, hex}`; `"append": true` for mod-area code.

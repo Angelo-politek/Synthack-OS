@@ -24,7 +24,7 @@ Static C++ initializer `0x401885D2–0x401968F4` builds page objects in BSS (44 
 | MIX3 External Mixer | `0x41B9F7E8` | `126 · – · – · – · 129 · 130 · 128 · 132` |
 | FX track SYN (FX Drive) | `0x41B9F948` | `– ×7 · 150 (DRIVE)` |
 
-Slots are read at draw time: changing them at runtime changes the page.
+Slots are read at draw time: changing them at runtime changes the page (0 = empty slot). AMP slots: page 1 `0x41B9F60C` / `0x41B9F638` (AHD / ADSR variant), page 2 `0x41B9F664` / `0x41B9F690`.
 
 - Page elements: array of 37 at `0x41B9F3C8` (44 B each), index → element `0x4007B9D0`. Page 25 ("OB8 / Outbox 8") is a Digitakt leftover, always empty: fx3 uses it.
 - **Tabs** are page widgets built from constant arrays of page indices + count (`0x4017DA3A`), e.g. DELAY `{20}` at `0x401C7FAC`, REVERB `{21}` at `0x401C7FA8` (built at `0x40035890`), generic class `0x40042B58`. A tab with N pages cycles them on its key; widget +124 = page vector, +144 = current position. The page's virtual +188 returns the id under an encoder.
@@ -63,7 +63,7 @@ Ids 1–5 and 11–18 are tied to MIDI CCs (bank select, data entry, all notes o
 | +36 | value graphic (knob / bar / bipolar). DRIVE has its own (`0x40071408`) |
 | +68 | graphic style: `0x41B9D5D0` bar, `0x41B9D670` knob, `0x41B9D660` bipolar ("hourglass") |
 
-The init code (`pea <prototype>`) decides the look of each id; patching that operand changes it.
+The init code (`pea <prototype>`) decides the look of each id; patching that operand changes it. At runtime, write `{0, 0, own manager, invoker}` from UI code only — details and a list of icons in the [modding guide](modding-guide.md#5-text-icons-and-styles).
 It copies with `0x401882BE(dst, src)`: plain `std::function` copy (manager called with *clone*). Formatter groups: `0x41B9DFD0` plain 0–127 (269 ids), `0x41B9DFB0` numeric (41), `0x41B9DF90` bipolar (40), `0x41B9DDB0` times with INF (18).
 
 **Active track** (0–11, 12 = FX track): `0x4001FF74(project + 48)`, project = `*0x444E13F4` (singleton `0x4016E804`). Track parameters 58–85 are shared by all tracks.
@@ -85,4 +85,4 @@ Group handlers use jump tables by logical id (e.g. external mixer: get `0x4000C8
 - UI kit struct (`obj->vfunc40`): internal mixer +2…+26, external +28…+45, DRIVE +46, FX filter +48…+71, FX amp +72…+99.
 - Pattern kit (`*0x800030BC`, 142 B): the FX track's parameters, **one word per internal id** (offset = 2 × id, ids 0…0x46), copied whole to the engine (`0x80002874`). Blocks: LFO +2…+33, delay +34…+53, reverb +54…+69, external +70…+87, filter +88…+111, amp +112…+139 (DRIVE +124). Words the OS does not use: ids 0, 0x1A, 0x24, 0x27, 0x29, 0x2A, 0x37, 0x46 (+ 0x38 = hidden id 144).
 - Global flags `0x43BDE444`: bit 0 internal mixer, 1 external, **2 SYN (DRIVE)**, 3 filter, 4 amp. Enabled blocks are copied (memcpy) between kit and the global container `0x41B9D3B0`; the engine sync `0x400A1D18` copies whole blocks.
-- **Unused words**, saved with the kit: external block UI +30, +36, +40, +42 (pattern kit +72, +78, +82, +84) → master compressor; pattern kit +0, +52, +112, +140 (ids 0, 0x1A, 0x38, 0x46) → fx3.
+- **Unused words**, saved with the kit: external block UI +30, +36, +40, +42 (pattern kit +72, +78, +82, +84) → master compressor; pattern kit +0, +52, +112, +140 (ids 0, 0x1A, 0x38, 0x46) → fx3; +110 (id 0x37) → beat-repeat.

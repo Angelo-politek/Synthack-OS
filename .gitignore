@@ -1,5 +1,5 @@
 # ---------------------------------------------------------------
-# MAI byte del firmware Elektron nel repo (vedi docs/legal.md).
+# MAI byte del firmware Elektron nel repo (vedi LEGAL.md).
 # Questa e' la prima linea di difesa; la seconda e' l'hook
 # tools/hooks/pre-commit (attivalo con: git config core.hooksPath tools/hooks).
 # ---------------------------------------------------------------
