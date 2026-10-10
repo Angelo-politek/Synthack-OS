@@ -6,7 +6,7 @@ Sequencer beat repeat for live use.
 - With the FX track selected, **hold retrig key 13** (RPT1) or **14** (RPT2) to repeat; release to resume **in time**, where the pattern would have been. Holding both: the last pressed wins.
 - Keys 15–16, and keys 13–16 on other tracks, keep the stock retrig.
 
-Every track loops the slice of that length (in its own steps, aligned to its grid) that contains the step just played. It repeats sequencer steps — notes and p-locks — so it works on **all tracks, analog ones included**. Rates are not saved (1/16 and 1/8 at power-on).
+Every track loops the slice of that length (in its own steps, aligned to its grid) that contains the step just played. It repeats sequencer steps — notes and p-locks — so it works on **all tracks, analog ones included**. Rates are saved with the kit (per pattern), in a word of the pattern kit the OS never uses (internal id 0x37); older projects load 1/16 and 1/8.
 
 ## How it works
 

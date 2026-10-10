@@ -12,6 +12,8 @@
  * - pressione: ramo dei tasti 13-16 di KeyboardView::consumeKeyEvent (0x4002EA92), dopo i controlli
  *   di modo dell'OS; sulle altre tracce e con i tasti 15-16 resta il retrig originale;
  * - rilascio: anche dal dispatcher degli eventi (0x4000B420), cosi' vale pure dopo un cambio di traccia.
+ * I rate si salvano col kit del pattern (*0x800030BC), nella parola dell'id interno 0x37 che l'OS non usa
+ * (byte basso RPT1, alto RPT2, XOR i default: kit vecchi = 1/16 e 1/8); senza kit, in RAM.
  */
 
 typedef unsigned int u32;
@@ -30,13 +32,15 @@ typedef int s32;
 #define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...)) \
                    0x400F8C18u)                             /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
 #define FONT      ((const void *)0x402A91C0u)               /* 4x6 */
+#define KIT       (*(unsigned char *const volatile *)0x800030BCu)   /* kit del pattern attivo */
+#define KIT_RPT   (2 * 0x37)                                /* parola libera (filtro FX, dopo FPAN) */
 
 #define DATA __attribute__((section(".data")))
 
 static const unsigned char rpt_steps[6] = {1, 2, 3, 4, 8, 16};
 static const char rpt_text[6][5] = {"1/16", "1/8", "3/16", "1/4", "1/2", "1BAR"};
 
-unsigned char br_rate[2] DATA = {0, 1};          /* RPT1, RPT2: posizione 0..5 (1/16, 1/8) */
+unsigned char br_rate[2] DATA = {0, 0};          /* senza kit: parola {RPT2 ^ 1, RPT1} */
 unsigned char br_held DATA = 0;                  /* bit r: tasto di RPTr tenuto */
 unsigned char br_last DATA = 0;                  /* ultimo premuto */
 static unsigned char key[2] DATA = {0xFF, 0xFF}; /* codice del tasto tenuto */
@@ -51,6 +55,18 @@ static s32 word(const unsigned char *p)          /* parola con segno, anche non 
     return (short)((p[0] << 8) | p[1]);
 }
 
+static volatile unsigned char *rpt_word(void)
+{
+    unsigned char *k = KIT;
+    return k ? k + KIT_RPT : br_rate;
+}
+
+static u32 rate(u32 r)                           /* posizione 0..5 di RPT1 (r = 0) o RPT2 (r = 1) */
+{
+    u32 v = rpt_word()[r ? 0 : 1] ^ r;
+    return v > 5 ? 5 : v;
+}
+
 static u32 cur_len(void)                         /* L in step, 0 = nessuna ripetizione */
 {
     u32 h = br_held, r = br_last;
@@ -59,7 +75,7 @@ static u32 cur_len(void)                         /* L in step, 0 = nessuna ripet
         return 0;
     if (!((h >> r) & 1))
         r ^= 1;
-    return rpt_steps[br_rate[r] < 6 ? br_rate[r] : 0];
+    return rpt_steps[rate(r)];
 }
 
 void br_step(u32 next_track, unsigned char *step, const unsigned char *pat, const unsigned char *trk)
@@ -134,7 +150,7 @@ void br_ev(void *root, const unsigned char *ev)  /* ogni evento di tasto: rilasc
 s32 br_get(void *obj, s32 id)
 {
     (void)obj;
-    return (s32)br_rate[id == ID_RPT2] << 8;
+    return (s32)rate(id == ID_RPT2) << 8;
 }
 
 s32 br_set(void *obj, s32 id, s32 value)
@@ -142,7 +158,8 @@ s32 br_set(void *obj, s32 id, s32 value)
     char *ui = UI_ROOT;
     (void)obj;
     value = (value + 0x80) >> 8;
-    br_rate[id == ID_RPT2] = (unsigned char)(value < 0 ? 0 : value > 5 ? 5 : value);
+    value = value < 0 ? 0 : value > 5 ? 5 : value;
+    rpt_word()[id == ID_RPT2 ? 0 : 1] = (unsigned char)(value ^ (id == ID_RPT2));
     if (ui)
         ui[96] = 1;                             /* ridisegno subito, come i setter originali */
     return 0;

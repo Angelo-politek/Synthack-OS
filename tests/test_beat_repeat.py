@@ -55,6 +55,7 @@ class Machine:
         uc.mem_map(0x444E_0000, 0x1_0000)
         uc.mem_map(0x4600_0000, 0x1_0000)
         uc.mem_map(0x5000_0000, 0x4_0000)
+        uc.mem_map(0x8000_0000, 0x1_0000)                         # SRAM: puntatore al kit (0 = nessuno)
         for f in MODS:
             for p in json.loads(f.read_text(encoding="utf-8"))["patches"]:
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
@@ -318,3 +319,22 @@ def test_patched_bytes(m):
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig
+
+
+def test_rates_saved_in_the_kit(m):
+    """RPT1/RPT2 nella parola dell'id interno 0x37 del kit del pattern, XOR i default (1/16, 1/8)."""
+    kit_a, kit_b = 0x5003_0000, 0x5003_0100
+    m.uc.mem_write(0x8000_30BC, struct.pack(">I", kit_a))
+    m.uc.mem_write(kit_a, bytes(142))
+    assert m.call(GET, [0x5000_0000, RPT1]) == 0 << 8 and m.call(GET, [0x5000_0000, RPT2]) == 1 << 8
+    m.rate(RPT1, 4)
+    m.rate(RPT2, 5)
+    assert struct.unpack(">H", m.uc.mem_read(kit_a + 110, 2))[0] == (5 ^ 1) << 8 | 4
+    raw = bytes(m.uc.mem_read(kit_a, 142))
+    assert raw[:110] == bytes(110) and raw[112:] == bytes(30)     # il resto del kit non si tocca
+    m.uc.mem_write(kit_b, bytes(142))
+    m.uc.mem_write(kit_b + 110, struct.pack(">H", (3 ^ 1) << 8 | 2))
+    m.uc.mem_write(0x8000_30BC, struct.pack(">I", kit_b))         # altro pattern
+    assert m.call(GET, [0x5000_0000, RPT1]) == 2 << 8 and m.call(GET, [0x5000_0000, RPT2]) == 3 << 8
+    m.uc.mem_write(kit_b + 110, bytes([0xFF, 0xFF]))            # valori fuori scala: limitati
+    assert m.call(GET, [0x5000_0000, RPT1]) == 5 << 8
