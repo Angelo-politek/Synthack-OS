@@ -19,7 +19,8 @@
  * uscita destra complementare (WID); CRSH = tenuta del campione, bit ridotti e drive (mono).
  *
  * Interfaccia: pagina 2 del tab REVERB (pagina 25 dell'OS, "OB8", inutilizzata) con TYPE e 7 controlli:
- * id nascosti delle tracce MIDI (246..253) tramite mods/vparams. Nomi e testi cambiano col tipo. La
+ * id nascosti delle tracce MIDI (246..253) tramite mods/vparams. Nomi, testi e icone (prese da parametri
+ * dell'OS simili) cambiano col tipo; il crusher lascia vuote le caselle che non usa. La
  * classe dei tab DELAY/REVERB disegna le caselle 5-6 come filtro: per la pagina 25 si usa il disegno
  * generico a 8 caselle (fx3_draw_hook). SND3 e la mandata DEL usano la grafica della mandata del delay.
  *
@@ -107,7 +108,25 @@ static const char *const t_s[NT] = {"CHOR", "FLNG", "PHSR", "CRSH"};
 static const char *const t_l[NT] = {"Chorus", "Flanger", "Phaser", "Crusher"};
 static char *const name_s[5] = {fx3_n1_s, fx3_n2_s, fx3_n3_s, fx3_n4_s, fx3_n5_s};
 static char *const name_l[5] = {fx3_n1_l, fx3_n2_l, fx3_n3_l, fx3_n4_l, fx3_n5_l};
-static u32 named DATA = 0;                                /* tipo dei nomi scritti */
+static u32 named DATA = 0xFF;                             /* tipo di nomi, icone e caselle (0xFF: da fare) */
+
+/* icone: per ogni casella la coppia (+36 grafica, +68 stile) di un parametro dell'OS dal significato
+ * simile. Dei prototipi (std::function costruite all'avvio) si prende solo l'invoker (+12): nessuno di
+ * quelli scelti usa i dati del functor; il gestore e' fx3_mgr (nessuna copia o distruzione sullo heap
+ * condiviso col prototipo). 0 = vuoto. */
+#define OBJ(id)   ((u32 *)(0x41B9FA24u + 84u * (id)))     /* oggetto del parametro */
+#define SLOTS     ((u32 *)0x41B9F81Cu)                     /* caselle della pagina 25 */
+enum {
+    G_DEF = 0x41B9DCD0, G_LFO = 0x41B9DC70, G_SPD = 0x41B9D6B0, G_MOD = 0x41B9D730, G_STIM = 0x41B9D7D0,
+    G_SDEP = 0x41B9D7E0, G_BAL = 0x41B9D740, G_TONE = 0x41B9D760, G_NCOL = 0x41B9D780, G_TICK = 0x41B9D830,
+    G_OVER = 0x41B9DCB0, S_KNOB = 0x41B9D670, S_660 = 0x41B9D660, S_FDBK = 0x41B9D5E0
+};
+static const u32 look[NT][5][2] = {
+    {{G_SPD, 0}, {G_MOD, 0}, {G_STIM, 0}, {G_DEF, S_FDBK}, {G_BAL, S_660}},     /* SPD 467, MOD 176, STIM 274, FDBK 109, BAL 216 */
+    {{G_SPD, 0}, {G_SDEP, 0}, {G_STIM, 0}, {G_LFO, S_660}, {G_BAL, S_660}},     /* SDEP 283, LFO DEP 94 (bipolare) */
+    {{G_SPD, 0}, {G_SDEP, 0}, {G_TONE, S_660}, {G_LFO, S_660}, {G_BAL, S_660}}, /* TONE 394 */
+    {{G_NCOL, S_660}, {G_TICK, 0}, {G_OVER, S_KNOB}, {0, 0}, {0, 0}}};          /* NCOL 385, TICK 277, OVER 164 */
+static const unsigned short knob_id[5] = {247, 248, 250, 251, 252};
 
 static void put(char *buf, const char *s)
 {
@@ -115,10 +134,22 @@ static void put(char *buf, const char *s)
         ;
 }
 
-static void retitle(u32 t)
+int fx3_mgr(void *dst, const void *src, int op);
+
+static void graphic(u32 *dst, u32 proto)
+{
+    dst[0] = dst[1] = 0;
+    dst[2] = proto ? (u32)fx3_mgr : 0;
+    dst[3] = proto ? ((const u32 *)proto)[3] : 0;
+}
+
+/* nomi, icone e caselle secondo il tipo. Solo nel contesto dell'interfaccia (formattatori, grafica,
+ * scrittura dei parametri): copiare una std::function mentre l'interfaccia la sta chiamando
+ * porterebbe a saltare a un indirizzo sbagliato; l'interrupt audio aggiorna soltanto fx3_p. */
+static void dress(void)
 {
     char *ui = UI_ROOT;
-    u32 i;
+    u32 t = fx3_p[P_TYPE], i;
 
     if (t == named)
         return;
@@ -126,7 +157,11 @@ static void retitle(u32 t)
     for (i = 0; i < 5; i++) {
         put(name_s[i], n_s[t][i]);
         put(name_l[i], n_l[t][i]);
+        graphic(OBJ(knob_id[i]) + 9, look[t][i][0]);
+        graphic(OBJ(knob_id[i]) + 17, look[t][i][1]);
     }
+    SLOTS[4] = t == CRSH ? 0 : 251;                        /* il crusher non usa FDBK e WID: */
+    SLOTS[5] = t == CRSH ? 0 : 252;                        /* caselle vuote */
     put(fx3_page_l, t_l[t]);
     if (ui)
         ui[96] = 1;
@@ -144,7 +179,6 @@ static void sync(void)
     seen[1] = hi;
     for (i = 0; i < NP; i++)
         fx3_p[i] = (unsigned char)decode(word(k, i >> 1), i);
-    retitle(fx3_p[P_TYPE]);
 }
 
 /* ---- effetti */
@@ -411,8 +445,7 @@ s32 fx3_set(void *obj, s32 id, s32 value)
     v ^= defv[i];
     *w = (u16)(i & 1 ? (*w & 0xFF00) | v : (*w & 0x00FF) | v << 8);
     fx3_p[i] = (unsigned char)decode(*w, i);
-    if (i == P_TYPE)
-        retitle(fx3_p[P_TYPE]);
+    dress();
     if (ui)
         ui[96] = 1;
     return 0;
@@ -501,6 +534,7 @@ void fx3_fmt_spd(const void *fn, s32 value, char *buf)
 {
     u32 v = pos(value), t = type();
     (void)fn;
+    dress();
     if (t == CRSH)
         hz(buf, 24000 / (1 + (31 * v + 63) / 127));
     else
@@ -511,6 +545,7 @@ void fx3_fmt_dep(const void *fn, s32 value, char *buf)
 {
     u32 v = pos(value), t = type();
     (void)fn;
+    dress();
     if (t == CRSH)
         put(dec(buf, 16 - (15 * v + 63) / 127), "bit");
     else if (t == PHSR)
@@ -523,6 +558,7 @@ void fx3_fmt_del(const void *fn, s32 value, char *buf)
 {
     u32 v = pos(value), t = type();
     (void)fn;
+    dress();
     if (t == CRSH)
         fixed(buf, (240 * v + 63) / 127, 1, "dB");
     else if (t == PHSR)
@@ -535,6 +571,7 @@ void fx3_fmt_fdbk(const void *fn, s32 value, char *buf)
 {
     u32 v = pos(value), t = type();
     (void)fn;
+    dress();
     if (t == CRSH)
         put(buf, "-");
     else if (t == CHOR)
@@ -549,6 +586,7 @@ void fx3_fmt_wid(const void *fn, s32 value, char *buf)
 {
     u32 v = pos(value), t = type();
     (void)fn;
+    dress();
     if (t == CRSH)
         put(buf, "-");
     else if (t == PHSR)
@@ -564,6 +602,7 @@ void fx3_type_gfx(const void *fn, s32 value, void *ctx, s32 x, s32 y)
 {
     u32 t = pos(value);
     (void)fn;
+    dress();
     DRAW_TEXT(ctx, FONT, x + 8, y + 5, 1, 0, "XXXX", "%s", t_s[t < NT ? t : 0]);
 }
 
@@ -1105,9 +1144,12 @@ __asm__(
     "        move.l  (%sp)+,%a0\n"
     "        rts\n"
     "        .globl  fx3_amp_stub\n"
-    "fx3_amp_stub:\n"                           /* al posto di clr.l 0x41B9F6A0: casella E di AMP 2 */
-    "        move.l  %d0,-(%sp)\n"
-    "        moveq   #72,%d0\n"
+    "fx3_amp_stub:\n"                           /* al posto di clr.l 0x41B9F6A0 (fine delle pagine AMP): */
+    "        move.l  %d0,-(%sp)\n"              /* SND3 (72) in G della pagina 1, accanto a DEL e REV, */
+    "        moveq   #72,%d0\n"                 /* PAN (80) in E della pagina 2; due varianti per pagina */
+    "        move.l  %d0,0x41B9F624\n"          /* (inviluppo AHD / ADSR) */
+    "        move.l  %d0,0x41B9F650\n"
+    "        moveq   #80,%d0\n"
     "        move.l  %d0,0x41B9F674\n"
     "        move.l  %d0,0x41B9F6A0\n"
     "        move.l  (%sp)+,%d0\n"

@@ -4,7 +4,7 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 
 ## Use
 
-- **SND3**: every audio track, **AMP page 2**, slot E (under DEL/REV of page 1). Saved per track with the kit, p-lockable, shown in dB like the other sends.
+- **SND3**: every audio track, **AMP page 1**, slot G, next to DEL and REV (PAN moves to page 2, slot E). Saved per track with the kit, p-lockable, shown in dB like the other sends, with the machines' MOD icon.
 - **FX3 page**: FX track → **REVERB** tab, press it again for page 2. TYPE picks the effect; the next five knobs change name and range with it:
 
 | TYPE | B | C | D | E | F |
@@ -15,7 +15,8 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 | CRSH | SRR 24 kHz … 750 Hz | BITS 16 … 1 | DRV 0 … 24 dB | – | – |
 
 - **DEL**: FX3 → delay send (the effect goes into the delay, and on to the reverb if the delay sends there). **VOL**: return level, independent of delay and reverb.
-- FLNG and PHSR feedback is bipolar: centre = none. PHSR is four allpass stages; WID turns the right side into the complementary response (notches where the left has peaks). CRSH is mono.
+- FLNG and PHSR feedback is bipolar: centre = none. PHSR is four allpass stages; WID turns the right side into the complementary response (notches where the left has peaks). CRSH is mono and hides the two knobs it doesn't use.
+- Each knob takes the icon of a similar OS parameter (machine SPD, MOD, sweep time/depth, TONE, BAL, OVER…), so every effect looks different.
 - The return goes to the direct bus (like delay and reverb with *FX Routing* off).
 - **Saved with the kit** (per pattern, like delay and reverb): in four words of the pattern kit the OS never uses (internal ids 0, 0x1A, 0x38 = hidden id 144, 0x46), one byte per knob. Older projects load with the default values.
 
@@ -26,7 +27,7 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 - **Chorus / flanger**: one modulated delay line with two interpolated taps (L/R). A sudden TIME change glides (at most 8 samples per block), so the taps never jump.
 - **DEL send:** the chorus output of the previous block goes into the delay bus right before the delay (`0x4008F828`), 0.67 ms later.
 - **Cost** (instructions per 32-sample block, emulator, one track sending): CHOR ~1 300, FLNG ~1 500, PHSR ~1 700, CRSH ~850; ~60 idle; ~2 300 worst case (12 tracks, feedback, DEL). Nothing runs without sends, with VOL and DEL at 0, or once the inputs are silent (sequencer stopped) and the tail has died out. The OS already uses ~89 % of the CPU at rest, so this matters: see [docs/audio-path.md](../../docs/audio-path.md#cpu-load).
-- **UI:** page 25 (unused "OB8" page) becomes REVERB page 2; the DELAY/REVERB tab is told to draw it as 8 plain slots. Controls are hidden ids 246–253 (Digitakt MIDI-track parameters) via [vparams](../vparams); their names are RAM strings rewritten when TYPE changes. The AMP tab is patched to give SND3 its own graphic (delay-send icon).
+- **UI:** page 25 (unused "OB8" page) becomes REVERB page 2; the DELAY/REVERB tab is told to draw it as 8 plain slots. Controls are hidden ids 246–253 (Digitakt MIDI-track parameters) via [vparams](../vparams); their names are RAM strings rewritten when TYPE changes, together with the icons and the page slots — from UI code only (see [modding guide](../../docs/modding-guide.md#5-text-icons-and-styles)). The AMP tab is patched to give SND3 its own graphic (delay-send icon).
 - Needs id 72 free: [master-comp](../master-comp) ATK moved to id 122.
 
 ## Build / test

@@ -3,7 +3,7 @@
 - compila fx3.c per ColdFire e lo collega nell'area mod a 0x4600A000 (tabelle generate qui);
 - aggancia la funzione di mix a blocchi: ciclo per traccia (0x4008F3A0), delay (0x4008F828: mandata
   del chorus verso il delay), somme del master (0x4008FB04: bus 3, chorus a 24 kHz e ritorno);
-- SND3 = id 72 (nascosto, salvato per traccia) nella casella E della pagina AMP 2;
+- SND3 = id 72 (nascosto, salvato per traccia) nella pagina AMP 1 accanto a DEL e REV (PAN in pagina 2);
 - pagina FX3 = pagina 25 dell'OS ("OB8", inutilizzata) come seconda pagina del tab REVERB, con gli id
   nascosti delle tracce MIDI 246..253 tramite vparams; valori salvati nel kit del pattern.
 """
@@ -47,7 +47,7 @@ HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
     (0x4008_FB04, "486efed848798000e0f0", "fx3_mix_hook",
      "somme del master: jsr fx3_mix_hook (bus 3, chorus, ritorno) ; nop ; nop"),
     (0x4019_4E2A, "42b941b9f83c", "fx3_page_stub", "pagina 25 (FX3): caselle all'avvio"),
-    (0x4019_4A50, "42b941b9f6a0", "fx3_amp_stub", "pagine AMP 2: casella E = SND3 (id 72)"),
+    (0x4019_4A50, "42b941b9f6a0", "fx3_amp_stub", "pagine AMP: SND3 (72) in G della pagina 1, PAN (80) in E della pagina 2"),
 ]
 # tab REVERB: vettore delle pagine {21} -> {21, 25}; nomi della pagina 25
 REVERB_COUNT, REVERB_ARRAY = 0x4003_588C, 0x4003_5892
@@ -82,7 +82,8 @@ PARAMS = [
      {20: (0x4018_F48A, 0x41B9_DF60, "fx3_proto_vol"), 36: (0x4018_F49C, 0x41B9_DCC0, G_KNOB)},
      [(0x4018_F476, "2f05", "2f03"), (0x4018_F47E, "7004", "7000")]),
 ]
-SND3 = {"id": 72, "g36": (0x4018_B37A, G_KNOB, G_SEND), "s68": (0x4018_B396, 0x41B9_D670, S_BAR)}
+G_MOD = 0x41B9_D730                     # icona MOD delle macchine (id 176)
+SND3 = {"id": 72, "g36": (0x4018_B37A, G_KNOB, G_MOD), "s68": (0x4018_B396, 0x41B9_D670, S_BAR)}
 
 
 def sha(b: bytes) -> str:
@@ -206,7 +207,7 @@ def main() -> None:
     resolve = lambda v: syms[v] if isinstance(v, str) else v
     # SND3: id 72, icona propria e barra, nomi
     r = DESC + 52 * SND3["id"]
-    for key, what in (("g36", "+36: grafica della mandata del delay"), ("s68", "+68: barra")):
+    for key, what in (("g36", "+36: icona MOD delle macchine"), ("s68", "+68: barra")):
         addr, orig, new = SND3[key]
         patches.append(fixed(addr, long(resolve(new)), f"id 72 (SND3) {what}", f"{orig:08x}"))
     patches += [fixed(r + 40, long(syms["fx3_snd_l"]), "id 72: nome lungo 'FX3 Send'"),
@@ -232,7 +233,7 @@ def main() -> None:
             "fx3_run", "fx3_dsnd", "fx3_ret", "fx3_get", "fx3_set", "fx3_p", "fx3_tgt", "fx3_cur", "fx3_moving",
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
-            "fx3_draw_hook", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l")},
+            "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,
     }

@@ -368,8 +368,9 @@ def test_mix_hook_replays_pushes(m):
 def test_page_slots_and_reverb_tab(m):
     m.call(m.sym["fx3_page_stub"])
     assert m.longs(0x41B9_F81C, 9) == [246, 247, 248, 250, 251, 252, 249, 253, 0]
-    m.call(m.sym["fx3_amp_stub"])
-    assert m.longs(0x41B9_F674, 1) == [72] and m.longs(0x41B9_F6A0, 1) == [72]
+    m.call(m.sym["fx3_amp_stub"])                               # AMP 1: ... DEL REV SND3 VOL; AMP 2: PAN in E
+    assert m.longs(0x41B9_F624, 1) == [72] and m.longs(0x41B9_F650, 1) == [72]
+    assert m.longs(0x41B9_F674, 1) == [80] and m.longs(0x41B9_F6A0, 1) == [80]
     assert m.longs(m.sym["fx3_reverb_pages"], 2) == [21, 25]
 
 
@@ -422,11 +423,11 @@ def stub_calls(m, addr, nargs, fn, args):
     return got
 
 
-def test_sends_use_the_delay_send_graphic():
+def test_send_graphics():
     spec = json.loads(MODS[1].read_text(encoding="utf-8"))
     fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
-    for g36, s68 in ((0x4018_B37A, 0x4018_B396), (0x4018_F356, 0x4018_F372)):   # SND3 (72), DEL (249)
-        assert fixes[g36] == "41b9dbd0" and fixes[s68] == "41b9d5d0"             # come la mandata DEL (78)
+    assert fixes[0x4018_F356] == "41b9dbd0" and fixes[0x4018_F372] == "41b9d5d0"   # DEL (249): come la mandata DEL
+    assert fixes[0x4018_B37A] == "41b9d730" and fixes[0x4018_B396] == "41b9d5d0"   # SND3 (72): icona MOD + barra
 
 
 def test_type_drawn_as_text(m):
@@ -621,6 +622,7 @@ def test_pattern_change_follows_the_kit(m):
     run_block(m)
     assert list(m.uc.mem_read(m.sym["fx3_p"], 8)) == [2, 11, 21, 31, 41, 51, 61, 71]
     assert m.call(GET, [0x5000_0000, IDS["DEP"]]) == 21 << 8
+    m.call(m.sym["fx3_fmt_dep"], [0, 21 << 8, 0x5000_3000])     # l'interfaccia ridisegna
     assert text(m, m.sym["fx3_n3_s"]) == "FREQ" and text(m, m.sym["fx3_page_l"]) == "Phaser"
     m.uc.mem_write(KIT_B + 0, struct.pack(">H", 0xFF00))         # valori fuori scala: limitati
     run_block(m)
@@ -748,3 +750,49 @@ def test_time_jumps_glide_and_reads_stay_in_the_line(m, t):
     m.uc.hook_del(h)
     line = [a for a in seen if a >= 0x4600_DC00 and not 0x4600_DFFC <= a < 0x4600_E000]  # tranne FDBK
     assert line and min(line) >= 0x4600_E000 and max(line) < 0x4600_F000
+
+
+LOOK = {0: [(0x41B9_D6B0, 0), (0x41B9_D730, 0), (0x41B9_D7D0, 0), (0x41B9_DCD0, 0x41B9_D5E0), (0x41B9_D740, 0x41B9_D660)],
+        1: [(0x41B9_D6B0, 0), (0x41B9_D7E0, 0), (0x41B9_D7D0, 0), (0x41B9_DC70, 0x41B9_D660), (0x41B9_D740, 0x41B9_D660)],
+        2: [(0x41B9_D6B0, 0), (0x41B9_D7E0, 0), (0x41B9_D760, 0x41B9_D660), (0x41B9_DC70, 0x41B9_D660),
+            (0x41B9_D740, 0x41B9_D660)],
+        3: [(0x41B9_D780, 0x41B9_D660), (0x41B9_D830, 0), (0x41B9_DCB0, 0x41B9_D670), (0, 0), (0, 0)]}
+
+
+def obj(i):
+    return 0x41B9_FA24 + 84 * i
+
+
+@pytest.mark.parametrize("t", [0, 1, 2, 3, 0])
+def test_icons_and_slots_follow_the_type(m, t):
+    protos = {a for row in LOOK.values() for pair in row for a in pair if a}
+    for a in protos:                                            # prototipi "costruiti all'avvio": firme
+        m.put(a, [a, a + 1, a + 2, a + 3])
+    m.call(m.sym["fx3_page_stub"])
+    if t == 0:
+        m.param("TYPE", 3)                                      # da un altro tipo
+    m.param("TYPE", t)
+    for i, pid in enumerate((247, 248, 250, 251, 252)):
+        g, st = LOOK[t][i]                                      # {0, 0, fx3_mgr, invoker del prototipo}
+        mgr = m.sym["fx3_mgr"]
+        assert m.longs(obj(pid) + 36, 4) == ([0, 0, mgr, g + 3] if g else [0] * 4), (pid, hex(g))
+        assert m.longs(obj(pid) + 68, 4) == ([0, 0, mgr, st + 3] if st else [0] * 4), pid
+    want = [246, 247, 248, 250, 0, 0, 249, 253] if t == 3 else [246, 247, 248, 250, 251, 252, 249, 253]
+    assert m.longs(0x41B9_F81C, 8) == want                      # il crusher lascia vuote FDBK e WID
+
+
+def test_audio_interrupt_never_rewrites_the_ui(m):
+    """Cambio di pattern a un kit con altro tipo: l'interrupt aggiorna i valori, nomi e icone li cambia
+    solo l'interfaccia (al primo disegno o lettura)."""
+    m.call(m.sym["fx3_fmt_spd"], [0, 0, 0x5000_3000])          # interfaccia: tipo 0 sistemato
+    m.put(obj(247) + 36, [0x1111] * 4)
+    put_kit(m, KIT_A, [3, 10, 20, 30, 40, 50, 60, 70])
+    m.put(KIT_PTR, [KIT_A])
+    gains(m, [0x4000_0000])
+    run_block(m)
+    assert m.uc.mem_read(m.sym["fx3_p"], 1)[0] == 3
+    assert m.longs(obj(247) + 36, 4) == [0x1111] * 4             # non toccata dall'interrupt
+    assert text(m, m.sym["fx3_n1_s"]) == "SPD"
+    m.call(m.sym["fx3_fmt_spd"], [0, 0, 0x5000_3000])
+    assert text(m, m.sym["fx3_n1_s"]) == "SRR"
+    assert m.longs(0x41B9_F81C + 16, 2) == [0, 0]
