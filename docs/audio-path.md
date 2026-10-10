@@ -53,8 +53,9 @@ Engine copy of the kit (or global) blocks, base `0x800021B0`, written by `0x400A
 ### CPU load
 
 - Everything above runs in the audio interrupt `0x400A3856` (`rte` at `0x400A54A8`), once per block. Free-running counter: DTIM0 `0xFC07000C`.
-- Measured with the fx3 test meter (`make_patch.py --meter`): **~89 % of the CPU at rest**, sequencer stopped. The UI only gets what is left: a few % more per block is enough to freeze it under load.
-- Reference costs per block (instructions, emulator): reverb ~8 200; our master compressor 100 off / ~2 000 on; fx3 ~300 idle, ~3 100 with 12 tracks sending, ~3 800 worst case.
+- Measured on the device (interrupt entry/exit with DTIM0): **~89 % of the CPU at rest**, sequencer stopped. The UI only gets what is left: a few % more per block is enough to make it lag.
+- The DSPI wait at the start of the interrupt (`0x40102066`) is not idle time to reuse: the CV transfer (~500 frames of 16 bits at ~15.6 MHz, ~0.55 ms) starts early in the previous interrupt and is over before the next one.
+- Reference costs per block (instructions, emulator): reverb ~8 200; our master compressor 100 off / ~2 000 on; fx3 ~40 idle, ~1 250 with one track sending, ~2 200 worst case.
 
 ## Track parameters, envelopes and filters
 

@@ -1,19 +1,15 @@
 """Mod fx3: costruisce patch.json da fx3.c (terza mandata effetti, chorus).
 
 - compila fx3.c per ColdFire e lo collega nell'area mod a 0x4600A000 (tabelle generate qui);
-- aggancia la funzione di mix a blocchi: ciclo per traccia (0x4008F3A0), delay (0x4008F828: bus 3,
-  chorus e mandata verso il delay), somme del master (0x4008FB04);
+- aggancia la funzione di mix a blocchi: ciclo per traccia (0x4008F3A0), delay (0x4008F828: mandata
+  del chorus verso il delay), somme del master (0x4008FB04: bus 3, chorus a 24 kHz e ritorno);
 - SND3 = id 72 (nascosto, salvato per traccia) nella casella E della pagina AMP 2;
 - pagina FX3 = pagina 25 dell'OS ("OB8", inutilizzata) come seconda pagina del tab REVERB, con gli id
   nascosti delle tracce MIDI 246..253 tramite vparams.
-
-    python mods/fx3/make_patch.py            # build normale
-    python mods/fx3/make_patch.py --meter    # prova: carico dell'interrupt audio nella casella TYPE
 """
 
 from __future__ import annotations
 
-import argparse
 import hashlib
 import importlib.util
 import json
@@ -37,18 +33,19 @@ _vp.loader.exec_module(vparams)
 
 LOAD = 0x4000_0400
 MODAREA_RAM, MODAREA_IMG = 0x4600_0000, 0x4034_8000
-CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # retroazione e mandata a +0xDFF8.., linea a +0xE000 (8 KB)
+CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # retroazione a +0xDFFC, linea a +0xE000 (4 KB)
 TOOLS = "~/tools/m68k/root"
 CFLAGS = "-mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
-FS = 48000
+FS = 24000                              # il chorus lavora a 24 kHz
 DESC = 0x4022_D59C
 P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_DFD0, 0x41B9_DCD0, 0x41B9_DBD0, 0x41B9_D5D0
 VP_SLOT = 9                             # posti 9..15 della tabella di vparams
 
 HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
     (0x4008_F3A0, "ae000900ae810900", "fx3_trk_hook", "ciclo per traccia: jsr fx3_trk_hook ; nop"),
-    (0x4008_F828, "4eb940096890", "fx3_del_hook", "delay: jsr fx3_del_hook (bus 3, chorus, mandata al delay)"),
-    (0x4008_FB04, "486efed848798000e0f0", "fx3_mix_hook", "somme del master: jsr fx3_mix_hook ; nop ; nop"),
+    (0x4008_F828, "4eb940096890", "fx3_del_hook", "delay: jsr fx3_del_hook (mandata del chorus al delay)"),
+    (0x4008_FB04, "486efed848798000e0f0", "fx3_mix_hook",
+     "somme del master: jsr fx3_mix_hook (bus 3, chorus, ritorno) ; nop ; nop"),
     (0x4019_4E2A, "42b941b9f83c", "fx3_page_stub", "pagina 25 (FX3): caselle all'avvio"),
     (0x4019_4A50, "42b941b9f6a0", "fx3_amp_stub", "pagine AMP 2: casella E = SND3 (id 72)"),
 ]
@@ -148,7 +145,7 @@ def names() -> str:
                    for i, (_, s, ln, *_r) in enumerate(PARAMS))
 
 
-def build_blob(meter: bool) -> tuple[bytes, dict[str, int], str]:
+def build_blob() -> tuple[bytes, dict[str, int], str]:
     with tempfile.TemporaryDirectory(prefix="fx3-") as tmp:
         tmp = Path(tmp)
         shutil.copy(HERE / "fx3.c", tmp / "fx3.c")
@@ -157,10 +154,10 @@ def build_blob(meter: bool) -> tuple[bytes, dict[str, int], str]:
         w = eft.to_wsl_path(tmp)
         env = f"R={TOOLS}; export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu; cd {w}; "
         gcc = "$R/usr/bin/m68k-linux-gnu-gcc-13 -B$R/usr/libexec/gcc/m68k-linux-gnu/13/ -B$R/usr/bin/m68k-linux-gnu-"
-        warn = wsl(env + f"{gcc} {CFLAGS} {'-DMETER' if meter else ''} -c fx3.c -o fx3.o")
+        warn = wsl(env + f"{gcc} {CFLAGS} -c fx3.c -o fx3.o")
         if "warning" in warn:
             raise SystemExit(warn)
-        wsl(env + f"$R/usr/bin/m68k-linux-gnu-ld -N -Ttext={CODE_BASE:#x} -e fx3_block -o fx3.elf fx3.o")
+        wsl(env + f"$R/usr/bin/m68k-linux-gnu-ld -N -Ttext={CODE_BASE:#x} -e fx3_run -o fx3.elf fx3.o")
         undef = wsl(env + "$R/usr/bin/m68k-linux-gnu-nm -u fx3.elf").strip()
         if undef:
             raise SystemExit(f"simboli esterni non permessi (libgcc?): {undef}")
@@ -179,26 +176,17 @@ def build_blob(meter: bool) -> tuple[bytes, dict[str, int], str]:
     return blob, syms, dis
 
 
-# misuratore (solo prova): ingresso e uscita dell'interrupt audio
-METER_HOOKS = [(0x400A_3856, "4e56ff5c48d73fff", "fx3_m_in", "interrupt audio, ingresso: jmp fx3_m_in ; nop"),
-               (0x400A_54A0, "4cee3fffff5c4e5e", "fx3_m_out",
-                "interrupt audio, uscita: jmp fx3_m_out ; nop")]
-
-
 def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--meter", action="store_true", help="build di prova col misuratore di carico")
-    a = ap.parse_args()
     stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
-    blob, syms, dis = build_blob(a.meter)
+    blob, syms, dis = build_blob()
     if CODE_BASE + len(blob) > CODE_END:
         raise SystemExit(f"non ci sta: {len(blob)} B")
     emac = [int(m[1], 16) for m in re.finditer(r"^\s*([0-9a-f]+):\s+(?:[0-9a-f]{4} ?)+\s+(\S+)\s*(.*)$", dis, re.M)
             if re.match(r"^(mac[lw]|msac[lw]|movclrl)$", m[2]) or re.search(r"%(acc|macsr|mask)", m[3])]
-    sums = [x for x in emac if syms["fx3_sum8"] <= x < syms["fx3_sum_end"]]     # somme del bus
+    sums = [x for x in emac if syms["fx3_sum"] <= x < syms["fx3_sum_end"]]      # somme del bus
     allowed = sorted([syms["fx3_trk_hook"], syms["fx3_trk_hook"] + 4, syms["fx3_macsr"]] + sums)
-    if emac != allowed or len(sums) != 14:
+    if emac != allowed or len(sums) != (16 + 1) + (8 + 1) + (24 + 1) + 7:
         raise SystemExit(f"EMAC fuori dai trampolini e dalle somme: {[hex(a) for a in emac]}")
 
     def fixed(addr: int, new: bytes, what: str, expect: str | None = None) -> dict:
@@ -215,9 +203,6 @@ def main() -> None:
         code = struct.pack(">HI", 0x4EB9, syms[sym])
         code += b"\x4e\x71" * ((len(orig) // 2 - len(code)) // 2)
         patches.append(fixed(addr, code, what, orig))
-    if a.meter:
-        for addr, orig, sym, what in METER_HOOKS:
-            patches.append(fixed(addr, struct.pack(">HI", 0x4EF9, syms[sym]) + bytes.fromhex("4e71"), what, orig))
     patches.append(fixed(REVERB_COUNT, bytes.fromhex("7202"), "tab REVERB: 2 pagine", "7201"))
     patches.append(fixed(REVERB_ARRAY, long(syms["fx3_reverb_pages"]), "tab REVERB: pagine {21, 25}", "401c7fa8"))
     for addr, orig, sym, what in PAGE_NAMES:
@@ -252,14 +237,11 @@ def main() -> None:
         "generated_by": "mods/fx3/make_patch.py",
         "symbols": {k: f"{syms[k]:#010x}" for k in (
             "fx3_trk_hook", "fx3_del_hook", "fx3_macsr", "fx3_mix_hook", "fx3_page_stub", "fx3_amp_stub",
-            "fx3_block", "fx3_out", "fx3_get", "fx3_set", "fx3_p", "fx3_tgt", "fx3_cur",
+            "fx3_run", "fx3_dsnd", "fx3_ret", "fx3_get", "fx3_set", "fx3_p", "fx3_tgt", "fx3_cur", "fx3_moving",
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
-        "meter_symbols": {k: f"{syms[k]:#010x}" for k in ("fx3_m_in", "fx3_m_out", "fx3_meter", "fx3_m_t0",
-                                                          "fx3_m_start", "fx3_m_avg", "fx3_m_max")} if a.meter else {},
-        "meter": a.meter,
         "patches": patches,
     }
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

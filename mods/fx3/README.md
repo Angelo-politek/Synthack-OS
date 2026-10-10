@@ -22,18 +22,17 @@ The return goes to the direct bus (like delay and reverb with *FX Routing* off).
 
 ## How it works
 
-- **Send gains:** a hook in the per-track loop of the mix function (`0x4008F3A0`) reads SND3 from the engine copy of the track (word +106) and the track's level/pan gain, like the OS does for DEL/REV, mute included.
-- **Bus 3 and chorus** run right before the delay (`0x4008F828`): mono sum of the 8 digital and 4 analog tracks (EMAC, gains smoothed per block), then one modulated delay line with two interpolated taps (L/R). The output can feed the delay bus in the same loop.
-- **Return** added to `0x8000DAD0` after the master sums (`0x4008FB04`).
-- **Cost** (instructions per 32-sample block, emulator): ~300 idle — nothing runs without sends or with VOL and DEL at 0 — ~3 100 with 12 tracks sending, ~3 800 worst case. Hot loops in assembly. The OS already uses ~89 % of the CPU at rest, so this matters: see [docs/audio-path.md](../../docs/audio-path.md#cpu-load).
+- **Send gains:** a hook in the per-track loop of the mix function (`0x4008F3A0`) reads SND3 from the engine copy of the track (word +106) and the track's level/pan gain, like the OS does for DEL/REV, mute included. With SND3 at 0 it returns after a few instructions.
+- **Bus 3, chorus and return** run after the master sums (`0x4008FB04`), at **24 kHz**: each pair of samples is averaged into the mono bus (EMAC, one pass over the sending tracks), the chorus is one modulated delay line with two interpolated taps (L/R), and the return is brought back to 48 kHz by linear interpolation while it is added to `0x8000DAD0`. The chorus band ends around 11 kHz, like a BBD chorus.
+- **DEL send:** the chorus output of the previous block goes into the delay bus right before the delay (`0x4008F828`), 0.67 ms later.
+- **Cost** (instructions per 32-sample block, emulator): ~40 idle; ~1 250 with one track sending; ~2 200 worst case (12 tracks, feedback, DEL). Nothing runs without sends, with VOL and DEL at 0, or once the inputs are silent (sequencer stopped) and the tail has died out. The OS already uses ~89 % of the CPU at rest, so this matters: see [docs/audio-path.md](../../docs/audio-path.md#cpu-load).
 - **UI:** page 25 (unused "OB8" page) becomes REVERB page 2; the DELAY/REVERB tab is told to draw it as 8 plain slots. Controls are hidden ids 246–253 (Digitakt MIDI-track parameters) via [vparams](../vparams). The AMP tab is patched to give SND3 its own graphic (delay-send icon).
 - Needs id 72 free: [master-comp](../master-comp) ATK moved to id 122.
 
 ## Build / test
 
 ```sh
-python mods/fx3/make_patch.py            # normal
-python mods/fx3/make_patch.py --meter    # test build: audio-interrupt load (avg/peak %) in the TYPE slot
+python mods/fx3/make_patch.py
 ```
 
-Test: `tests/test_fx3.py` (send gains like the OS, mute, bus sums, chorus as a pure delay, send to delay in every loop variant, return sign and saturation, idle after heavy use, cost per block, page and drawing hooks, texts).
+Test: `tests/test_fx3.py` (send gains like the OS, mute, bus sums, chorus as a pure delay, reads inside the line, return interpolation, sign and saturation, send to delay, idle after heavy use and with silent inputs, cost per block, page and drawing hooks, texts).

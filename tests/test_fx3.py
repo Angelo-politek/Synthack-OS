@@ -1,10 +1,13 @@
 """Mod fx3 (terza mandata, chorus), eseguita nell'emulatore con la routine delle mandate dell'OS.
 
 - trampolino del ciclo per traccia: bersagli della mandata come l'OS per DEL/REV ((v/32768)^2 per livello,
-  media dei lati), mute, istruzioni EMAC sostituite rieseguite, registri intatti;
-- fx3_block: bus 3 = routine delle mandate dell'OS sui buffer delle tracce; chorus come ritardo puro;
-  a riposo senza mandate; costo per blocco limitato (prove di regressione sul numero di istruzioni);
-- fx3_out: ritorno sul bus diretto con il segno dell'OS; pagina, parametri, testi.
+  media dei lati, a meta' per la somma delle coppie), mute, istruzioni EMAC sostituite rieseguite, registri
+  intatti;
+- fx3_run (somme del master): bus 3 a 24 kHz = media delle coppie di campioni pesata come le mandate
+  dell'OS; chorus come ritardo puro; ritorno sul bus diretto con il segno dell'OS, riportato a 48 kHz per
+  interpolazione lineare; a riposo senza mandate, senza ascoltatori o con ingressi muti; costo per blocco
+  limitato (prove di regressione sul numero di istruzioni);
+- fx3_dsnd (prima del delay): uscita del blocco precedente nel bus del delay; pagina, parametri, testi.
 """
 
 import json
@@ -31,9 +34,6 @@ pytestmark = pytest.mark.skipif(not (SY.exists() and all(p.exists() for p in MOD
 
 LOAD, STACK, RET, UI = 0x4000_0400, 0x5000_8000, 0x5000_F000, 0x5000_0C00
 FRAME, TRK = 0x5000_4000, 0x5000_5000
-SUM8_EMAC = [0x4008_F05E, 0x4008_F064, 0x4008_F06A, 0x4008_F070, 0x4008_F076, 0x4008_F07C, 0x4008_F082,
-             0x4008_F088, 0x4008_F0AA,                                  # 8 canali
-             0x4008_F15A, 0x4008_F160, 0x4008_F166, 0x4008_F16C, 0x4008_F17E]   # 4 canali
 SRC_DIG, SRC_ANA, OUT_A, OUT_B = 0x8000_3D50, 0x8000_3950, 0x8000_DAD0, 0x8000_DFD0
 GET, SET, KIT = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
 IDS = {"TYPE": 246, "SPD": 247, "DEP": 248, "TIME": 250, "FDBK": 251, "WID": 252, "DSND": 249, "VOL": 253}
@@ -68,7 +68,7 @@ class Machine:
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
         uc.mem_write(RET, b"\x4e\x75")
         uc.mem_write(0x444E_1334, struct.pack(">I", UI))
-        self.emac = UnicornEmac(uc, SUM8_EMAC + [int(a, 16) for a in self.spec["emac_sites"]])
+        self.emac = UnicornEmac(uc, [int(a, 16) for a in self.spec["emac_sites"]])
 
     def call(self, fn, args=(), regs=None):
         uc = self.uc
@@ -117,8 +117,9 @@ def test_track_targets_like_os_sends(m, t, v):
     gl, gr = 0x6000_0000, 0x2000_0000
     tgt = track(m, t, gl, gr, v)
     g = 2 * v * v if v > 0 else 0
-    assert tgt[t] == frac((gl >> 1) + (gr >> 1), g)
-    assert abs(tgt[t] / 2 ** 31 - (gl + gr) / 2 ** 32 * (max(v, 0) / 32768) ** 2) < 1e-3
+    assert tgt[t] == frac((gl >> 1) + (gr >> 1), g) >> 1
+    assert abs(tgt[t] / 2 ** 30 - (gl + gr) / 2 ** 32 * (max(v, 0) / 32768) ** 2) < 1e-3
+    assert (m.longs(m.sym["fx3_moving"], 1)[0] != 0) == (v > 0)  # bersaglio cambiato: rampa
 
 
 def test_muted_track_sends_nothing(m):
@@ -131,34 +132,62 @@ def test_fx_track_and_beyond_ignored(m):
 
 
 def run_block(m):
-    """Come l'OS: jsr fx3_del_hook al posto del delay (qui un rts), argomenti intatti."""
+    """Come l'OS: jsr fx3_del_hook al posto del delay (qui un rts), argomenti intatti; poi il trampolino
+    delle somme del master (ritorna con le due pea sostituite in pila)."""
     m.uc.mem_write(DELAY, b"\x4e\x75")
     m.call(m.sym["fx3_del_hook"], [0x1111, 0x2222, 0x3333])
     assert m.uc.reg_read(UC_M68K_REG_A7) == STACK - 16 + 4
+    m.uc.reg_write(UC_M68K_REG_A6, FRAME)
+    m.call(m.sym["fx3_mix_hook"])
+    assert m.uc.reg_read(UC_M68K_REG_A7) == STACK - 8
+    assert m.emac.state.acc[0] == 0                             # le somme dell'OS partono da acc0 = 0
+
+
+def sat(v):
+    return max(-2 ** 31, min(2 ** 31 - 1, v))
+
+
+def ret_ref(wet, gain, a, h):
+    """fx3_ret: a -= 2 * wet * guadagno a 48 kHz; dispari = campione del chorus, pari = media col precedente."""
+    a, h = list(a), list(h)
+    for n in range(16):
+        for c in (0, 1):
+            x = wet[2 * n + c] * gain
+            a[4 * n + c] = sat(a[4 * n + c] - (h[c] + x))
+            a[4 * n + 2 + c] = sat(a[4 * n + 2 + c] - 2 * x)
+            h[c] = x
+    return a, h
 
 
 def gains(m, g):
     m.put(m.sym["fx3_tgt"], g + [0] * (16 - len(g)))
     m.put(m.sym["fx3_cur"], g + [0] * (16 - len(g)))         # nessuna rampa
+    m.put(m.sym["fx3_moving"], [1])                            # come il ciclo per traccia
 
 
-@pytest.mark.parametrize("dig_on, ana_on", [(True, True), (True, False), (False, True)])
-def test_bus_is_the_os_send_sum(m, dig_on, ana_on):
+@pytest.mark.parametrize("on", [range(12), range(8), range(8, 12), [3], [10], [0, 11], [6, 7], [2, 5, 9]])
+def test_bus_is_the_os_send_sum(m, on):
+    """Tutte, digitali, analogiche (un passaggio con 12/8/4 canali) e una o due tracce (un passaggio ciascuna)."""
     dig = [((k * 7919 + n * 104729) % 65536 - 32768) << 12 for k in range(8) for n in range(32)]
-    ana = [((k * 31337 + n * 7) % 65536 - 32768) << 12 for k in range(8) for n in range(32)]
+    ana = [((k * 31337 + n * 7) % 65536 - 32768) << 12 for k in range(4) for n in range(32)]
     m.put(SRC_DIG, dig)
     m.put(SRC_ANA, ana)
-    g = [0x1000_0000 * (k + 1) // 2 if (k < 8 and dig_on) or (k >= 8 and ana_on) else 0 for k in range(12)]
+    m.put(SRC_ANA + 512, [0x7FFF_FFFF] * 8)                   # oltre i canali: non deve entrare
+    m.put(m.sym["fx3_bus"], [12345] * 16)
+    g = [0x0800_0000 * (k + 1) if k in on else 0 for k in range(12)]
     gains(m, g)
     run_block(m)
-    bus = m.longs(m.sym["fx3_bus"], 32)
-    for n in range(32):
-        want = -sum(g[k] * dig[32 * k + n] for k in range(8)) * 2 - sum(g[8 + k] * ana[32 * k + n] for k in range(4)) * 2
+    bus = m.longs(m.sym["fx3_bus"], 16)
+    pair = lambda x, k, n: x[32 * k + 2 * n] + x[32 * k + 2 * n + 1]
+    for n in range(16):
+        want = (-sum(g[k] * pair(dig, k, n) for k in range(8)) * 2
+                - sum(g[8 + k] * pair(ana, k, n) for k in range(4)) * 2)
         assert abs(bus[n] - want / 2 ** 32) < 64, n
 
 
 def test_gain_follows_target_smoothly_and_lands_exactly(m):
     m.put(m.sym["fx3_tgt"], [0x4000_0000] + [0] * 15)
+    m.put(m.sym["fx3_moving"], [1])
     seen = []
     for _ in range(80):                                          # ~58 blocchi (40 ms) per arrivare
         run_block(m)
@@ -172,7 +201,7 @@ def settle(m, **params):
     """Parametri e due blocchi muti con mandata attiva: LFO e posizioni di lettura a regime."""
     for k, v in params.items():
         m.param(k, v)
-    gains(m, [0x7FFF_FFFF])
+    gains(m, [0x4000_0000])                                    # guadagno 1 (meta')
     m.put(SRC_DIG, [0] * 256)
     run_block(m)
     run_block(m)
@@ -180,35 +209,43 @@ def settle(m, **params):
 
 def impulse(m):
     sig = [0] * 256
-    sig[5] = 0x1234 << 16
+    sig[10] = 0x1234 << 16                                      # coppia 5 a 24 kHz
     m.put(SRC_DIG, sig)
     run_block(m)
-    bus5 = m.longs(m.sym["fx3_bus"], 32)[5]
+    bus5 = m.longs(m.sym["fx3_bus"], 16)[5]
     m.put(SRC_DIG, [0] * 256)
     return bus5
 
 
 def test_chorus_without_depth_is_a_pure_delay(m):
-    settle(m, DEP=0, TIME=0, FDBK=0, VOL=127)                  # 1 ms = 48 campioni
+    settle(m, DEP=0, TIME=0, FDBK=0, VOL=127)                  # 1 ms = 24 campioni a 24 kHz
     bus5 = impulse(m)
+    m.put(OUT_A, [0] * 64)
     run_block(m)
-    wet = m.longs(m.sym["fx3_wet"], 64)
+    wet = m.longs(m.sym["fx3_wet"], 32)
     y = bus5 >> 16
-    assert wet[2 * (5 + 48 - 32)] == y != 0
-    assert wet[2 * (5 + 48 - 32) + 1] == wet[2 * (5 + 48 - 32)]
+    k = 5 + 24 - 16
+    assert wet[2 * k] == y != 0
+    assert wet[2 * k + 1] == wet[2 * k]
     assert sum(1 for v in wet if v) == 2
+    x = y * 32767                                               # ritorno a 48 kHz, interpolato
+    out = m.longs(OUT_A, 64)
+    assert out[4 * k:4 * k + 8] == [-x, -x, -2 * x, -2 * x, -x, -x, 0, 0]
+    assert sum(1 for v in out if v) == 6
 
 
 def test_idle_without_sends_and_after_tail(m):
     settle(m, DEP=0, TIME=0, FDBK=0)
     assert m.longs(m.sym["fx3_idle"], 1) == [0]
     gains(m, [0])
-    for _ in range(4096 // 32 + 2):
+    for _ in range(1024 // 16 + 2):
         run_block(m)
     assert m.longs(m.sym["fx3_idle"], 1) == [1]
     m.put(OUT_A, [5] * 64)
-    m.call(m.sym["fx3_out"])
+    m.put(DLY_IN, [5] * 64)
+    run_block(m)
     assert m.longs(OUT_A, 64) == [5] * 64                       # a riposo non tocca le uscite
+    assert m.longs(DLY_IN, 64) == [5] * 64
 
 
 def count(m, fn):
@@ -220,34 +257,84 @@ def count(m, fn):
     return n[0]
 
 
+def loud(m):
+    m.put(SRC_DIG, [((n * 7919) % 65536 - 32768) << 14 for n in range(256)])
+    m.put(SRC_ANA, [((n * 7907) % 65536 - 32768) << 14 for n in range(256)])
+
+
+def block_cost(m):
+    """Istruzioni di un blocco nei due trampolini (le chiamate dei test hanno un rts in piu' ciascuna)."""
+    return count(m, lambda: run_block(m)) - 3
+
+
 def test_cost_per_block(m):
-    """Regressione sul carico: istruzioni per blocco (32 campioni, 1500 blocchi al secondo)."""
-    for _ in range(4096 // 32 + 2):
+    """Regressione sul carico: istruzioni per blocco (32 campioni, 1500 blocchi al secondo). L'OS usa gia'
+    quasi tutta la CPU: ogni istruzione qui toglie tempo all'interfaccia."""
+    for _ in range(1024 // 16 + 2):
         run_block(m)
-    assert count(m, lambda: run_block(m)) < 250                 # a riposo
-    assert count(m, lambda: m.call(m.sym["fx3_out"])) < 20
+    rest = block_cost(m)
+    assert rest < 120, rest                                     # nessuna mandata
+    loud(m)
+    gains(m, [0x4000_0000])                                    # una traccia, senza retroazione ne' DEL
+    one = block_cost(m)
+    assert one < 1500, one                                     # era ~3100
     gains(m, [0x4000_0000] * 12)
+    m.param("FDBK", 64)
     m.param("DSND", 64)
-    active = count(m, lambda: run_block(m)) + count(m, lambda: m.call(m.sym["fx3_out"]))
-    assert active < 5000, active                               # 4600 nel caso peggiore (era 13 000)
+    run_block(m)
+    worst = block_cost(m)
+    assert worst < 2400, worst                                 # era ~3800
+
+
+def test_sends_on_but_inputs_silent(m):
+    """Sequencer fermo con SND3 alzato: dopo la coda resta solo la somma del bus."""
+    settle(m, FDBK=0)
+    gains(m, [0x4000_0000] * 8)
+    loud(m)
+    run_block(m)
+    m.put(SRC_DIG, [1 << 16] * 256)                             # fondo sotto la soglia
+    m.put(SRC_ANA, [0] * 256)
+    for _ in range(1024 // 16 + 40):                           # coda (TIME + DEP) e linea da svuotare
+        run_block(m)
+    assert m.longs(m.sym["fx3_idle"], 1) == [1]
+    m.put(OUT_A, [5] * 64)
+    idle = block_cost(m)
+    assert idle < 600, idle
+    assert m.longs(OUT_A, 64) == [5] * 64
+    loud(m)                                                     # riparte subito
+    run_block(m)
+    assert m.longs(m.sym["fx3_idle"], 1) == [0]
 
 
 def test_return_added_with_os_sign(m):
-    wet = [(n - 32) * 1000 for n in range(64)]                  # scala 16 bit
-    m.put(m.sym["fx3_wet"], wet)
-    m.put(m.sym["fx3_idle"], [0])
-    m.param("VOL", 127)
-    m.put(OUT_A, [1000] * 64)
-    m.put(OUT_B, [-1000] * 64)
-    m.call(m.sym["fx3_out"])
-    assert m.longs(OUT_A, 64) == [1000 - 2 * w * 32767 for w in wet]
-    assert m.longs(OUT_B, 64) == [-1000] * 64                  # bus del blocco FX analogico: non toccato
+    wet = [(n - 16) * 2000 for n in range(32)]                  # scala 16 bit, 24 kHz
+    h0 = [123456, -654321]
+    st = 0x5000_3800
+    for gain in (32767, -20000, 1):
+        m.put(m.sym["fx3_wet"], wet)
+        m.put(st, h0)
+        m.put(OUT_A, [1000] * 64)
+        m.call(m.sym["fx3_ret"], [m.sym["fx3_wet"], gain, OUT_A, st])
+        want, h = ret_ref(wet, gain, [1000] * 64, h0)
+        assert m.longs(OUT_A, 64) == want
+        assert m.longs(st, 2) == h
+    m.put(st, [0, 0])
     m.put(OUT_A, [0x7FFF_0000] * 64)
-    m.call(m.sym["fx3_out"])
-    assert m.longs(OUT_A, 64)[0] == 0x7FFF_FFFF                   # saturazione come l'OS
+    m.call(m.sym["fx3_ret"], [m.sym["fx3_wet"], 32767, OUT_A, st])
+    assert m.longs(OUT_A, 64)[2] == 0x7FFF_FFFF                   # saturazione come l'OS
+
+
+def test_return_only_on_the_direct_bus(m):
+    settle(m, DEP=0, TIME=0, FDBK=0, VOL=127)
+    m.put(OUT_B, [-1000] * 64)
+    impulse(m)
+    for _ in range(3):
+        run_block(m)
+    assert m.longs(OUT_B, 64) == [-1000] * 64                  # bus del blocco FX analogico: non toccato
     m.param("VOL", 0)
+    m.param("DSND", 10)
     m.put(OUT_A, [1000] * 64)
-    m.call(m.sym["fx3_out"])
+    run_block(m)
     assert m.longs(OUT_A, 64) == [1000] * 64
 
 
@@ -327,12 +414,6 @@ def stub_calls(m, addr, nargs, fn, args):
     return got
 
 
-def image(m, a):
-    w, h, stride, data, mask = struct.unpack(">5I", m.uc.mem_read(a + 4, 20))
-    rows = struct.unpack(f">{h}I", m.uc.mem_read(data, 4 * h))
-    return w, h, stride, rows, mask
-
-
 def test_sends_use_the_delay_send_graphic():
     spec = json.loads(MODS[1].read_text(encoding="utf-8"))
     fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
@@ -396,15 +477,32 @@ def test_object_fields_like_del():
 def test_send_to_delay_adds_scaled_chorus(m):
     settle(m, DEP=0, TIME=0, FDBK=0, VOL=127, DSND=127)
     impulse(m)
-    m.put(DLY_IN, [7] * 64)
     run_block(m)
-    wet = m.longs(m.sym["fx3_wet"], 64)                        # DEL = 127: guadagno 32767
+    wet = m.longs(m.sym["fx3_wet"], 32)                        # DEL = 127: guadagno 32767
     assert any(wet)
-    assert m.longs(DLY_IN, 64) == [7 + 2 * w * 32767 for w in wet]
+    m.put(DLY_IN, [7] * 64)
+    run_block(m)                                                # nel delay al blocco dopo
+    assert m.longs(DLY_IN, 64) == ret_ref(wet, -32767, [7] * 64, [0, 0])[0]
     m.param("DSND", 0)
     m.put(DLY_IN, [7] * 64)
     run_block(m)
     assert m.longs(DLY_IN, 64) == [7] * 64
+
+
+@pytest.mark.parametrize("fb", [0, 90])
+def test_send_to_delay_with_and_without_feedback(m, fb):
+    settle(m, DEP=40, TIME=20, FDBK=fb, VOL=0, DSND=100)       # VOL 0: la mandata al delay basta
+    impulse(m)
+    ds = round(32767 * (100 / 127) ** 2)
+    prev, h, seen = m.longs(m.sym["fx3_wet"], 32), [0, 0], False
+    for _ in range(12):                                         # TIME 20: ~68 campioni a 24 kHz
+        m.put(DLY_IN, [5] * 64)
+        run_block(m)
+        want, h = ret_ref(prev, -ds, [5] * 64, h)
+        assert m.longs(DLY_IN, 64) == want
+        prev = m.longs(m.sym["fx3_wet"], 32)
+        seen |= any(prev)
+    assert seen
 
 
 @pytest.mark.parametrize("start", [20, -12, 63, -63])
@@ -412,6 +510,7 @@ def test_ramp_does_not_stick_near_zero(m, start):
     """(t - c) >> 5 si fermava a pochi punti da zero: FX3 restava attivo (e pesante) fino al riavvio."""
     m.put(m.sym["fx3_tgt"], [0] * 16)
     m.put(m.sym["fx3_cur"], [start] + [0] * 15)
+    m.put(m.sym["fx3_moving"], [1])
     run_block(m)
     assert m.longs(m.sym["fx3_cur"], 1) == [0]
 
@@ -420,10 +519,11 @@ def test_back_to_idle_after_heavy_use(m):
     settle(m, FDBK=127, DEP=127, TIME=127)
     sig = [((n * 7919) % 65536 - 32768) << 15 for n in range(256)]
     m.put(SRC_DIG, sig)
-    gains(m, [0x7FFF_FFFF] * 8)
+    gains(m, [0x4000_0000] * 8)
     for _ in range(50):
         run_block(m)
     m.put(m.sym["fx3_tgt"], [0] * 16)                           # SND3 a zero, tracce ancora in play
+    m.put(m.sym["fx3_moving"], [1])
     blocks = 0
     while m.longs(m.sym["fx3_idle"], 1) != [1]:
         run_block(m)
@@ -432,25 +532,36 @@ def test_back_to_idle_after_heavy_use(m):
     assert m.longs(m.sym["fx3_cur"], 16) == [0] * 16
 
 
-@pytest.mark.parametrize("fb", [0, 90])
-def test_send_to_delay_in_every_loop_variant(m, fb):
-    settle(m, DEP=40, TIME=20, FDBK=fb, VOL=0, DSND=100)       # VOL 0: la mandata al delay basta
-    impulse(m)
-    seen = False
-    for _ in range(8):                                          # TIME 20: ~136 campioni
-        m.put(DLY_IN, [5] * 64)
-        run_block(m)
-        wet = m.longs(m.sym["fx3_wet"], 64)
-        ds = round(32767 * (100 / 127) ** 2)
-        assert m.longs(DLY_IN, 64) == [5 + 2 * w * ds for w in wet]
-        seen |= any(wet)
-    assert seen
-
-
 def test_nothing_runs_when_nobody_listens(m):
     settle(m, VOL=0, DSND=0)
     m.put(DLY_IN, [5] * 64)
     run_block(m)
     assert m.longs(m.sym["fx3_idle"], 1) == [1]
     assert m.longs(DLY_IN, 64) == [5] * 64
-    assert count(m, lambda: run_block(m)) < 250
+    assert block_cost(m) < 120
+
+
+@pytest.mark.parametrize("dep, spd, time", [(127, 127, 127), (127, 127, 0), (60, 90, 30)])
+def test_chorus_reads_stay_in_the_line(m, dep, spd, time):
+    """Senza maschera per campione le prese devono restare nella linea doppia (4 KB a 0x4600E000)."""
+    from unicorn import UC_HOOK_MEM_READ
+    settle(m, DEP=dep, SPD=spd, TIME=time, FDBK=100, WID=127)
+    loud(m)
+    seen = []
+    h = m.uc.hook_add(UC_HOOK_MEM_READ, lambda uc, acc, a, size, v, _: seen.append(a),
+                      begin=0x4600_D000, end=0x4601_0000)
+    for _ in range(400):                                        # piu' di un periodo dell'LFO a 10 Hz
+        run_block(m)
+    m.uc.hook_del(h)
+    line = [a for a in seen if a >= 0x4600_E000]
+    assert line and min(line) >= 0x4600_E000 and max(line) < 0x4600_F000
+
+
+def test_track_hook_cheap_when_snd3_is_off(m):
+    """Il trampolino gira per ogni traccia a ogni blocco, anche senza FX3: con SND3 a zero esce subito."""
+    n = count(m, lambda: track(m, 4, 0x6000_0000, 0x6000_0000, 0))
+    assert n <= 11, n
+    assert track(m, 4, 0x6000_0000, 0x6000_0000, 0x7F00)[4] != 0
+    m.put(m.sym["fx3_moving"], [0])
+    assert track(m, 4, 0x6000_0000, 0x6000_0000, 0)[4] == 0  # spenta dopo essere stata accesa: azzerata
+    assert m.longs(m.sym["fx3_moving"], 1) != [0]
