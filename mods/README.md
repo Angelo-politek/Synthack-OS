@@ -5,7 +5,7 @@
 | [master-comp](master-comp) | VCA bus compressor on the analog master, UI on the FX track SYN page | modarea, vparams |
 | [readable-values](readable-values) | Real units (Hz, dB, ms, %) instead of 0–127 | modarea |
 | [beat-repeat](beat-repeat) | Sequencer stutter (FX track: retrig keys 13/14, rates on the TRIG page) | modarea, vparams |
-| [fx3](fx3) | Third send effect (chorus): SND3 per track, page 2 of the REVERB tab | modarea, vparams |
+| [fx3](fx3) | Third send effect (chorus, flanger, phaser, crusher): SND3 per track, page 2 of the REVERB tab | modarea, vparams |
 | [vparams](vparams) | Virtual parameters shared by mods (kit-parameter hooks + registration table) | modarea |
 | [dual-mono](dual-mono) | Independent IN L / IN R levels when EXTERNAL IN is mono | — |
 | [splash](splash) | "SyntHack" logo and version after the official intro | — |
