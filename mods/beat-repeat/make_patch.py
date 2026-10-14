@@ -3,7 +3,7 @@
 - compila br.c per ColdFire e lo collega nell'area mod a 0x46004000;
 - aggancia l'avanzamento degli step del sequencer (0x4008D152), i tasti di retrig 13-16 di KeyboardView
   (0x4002EA92) e il dispatcher degli eventi (0x4000B420);
-- RPT1 e RPT2 = id nascosti 113 e 124 nelle prime due caselle della pagina TRIG della FX track:
+- RPT1 e RPT2 = id 269 ("CC8 Select" dei track MIDI della Digitakt, mai mostrato) e 124 nelle prime due caselle della pagina TRIG della FX track:
   descrittori, formattatore, grafica a testo, valore discreto senza stile e registrazione in vparams.
 
     python mods/beat-repeat/make_patch.py
@@ -46,9 +46,8 @@ PAGE_HOOK, PAGE_ORIG = 0x4019_50F0, "42b941b9f928"      # clr.l 0x41B9F928 (pagi
 # (id, nome, default, operandi dei prototipi dell'oggetto: +20 formattatore, +36 grafica, +68 stile
 #  con i valori originali, poi le correzioni per farli comportare come LFO MODE (93): valore discreto)
 RPTS = [
-    (113, "1", 0x000, {20: (0x4018_C04C, "41b9dfb0"), 36: (0x4018_C05E, "41b9dc00"), 68: (0x4018_C07A, "41b9d5d0")},
-     [(0x4018_C038, "2f02", "2f03", "id 113 +4: prototipo discreto (come 93)"),
-      (0x4018_C040, "7008", "7000", "id 113 +0: tipo 8 -> 0 (come 93)")]),
+    (269, "1", 0x000, {20: (0x4018_F9AA, "41b9dfd0"), 36: (0x4018_F9BC, "41b9d8b0"), 68: (0x4018_F9D8, "41b9d670")},
+     [(0x4018_F99E, "7201", "7200", "id 269 +0: tipo 1 -> 0 (come 93); +4 e' gia' il prototipo discreto (d5)")]),
     (124, "2", 0x100, {20: (0x4018_C3DE, "41b9de90"), 36: (0x4018_C3EC, "41b9d9f0"), 68: (0x4018_C40C, "41b9d680")},
      [(0x4018_C3D2, "720c", "7200", "id 124 +0: tipo 12 -> 0 (come 93)")]),
 ]

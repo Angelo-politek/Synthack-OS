@@ -6,7 +6,7 @@
  * di L step allineato alla griglia e si tiene la posizione "reale", ripresa al rilascio.
  * Si ripetono gli step (note e p-lock), quindi anche le tracce analogiche.
  *
- * Interfaccia: i rate RPT1 e RPT2 (id nascosti 113 e 124, mods/vparams) stanno nelle prime due caselle
+ * Interfaccia: i rate RPT1 e RPT2 (id 269 e 124, mods/vparams; 113 era un alias del mix del delay) stanno nelle prime due caselle
  * della pagina TRIG della FX track, scritti come testo ("1/16"). Con la FX track attiva si ripete tenendo
  * premuti i tasti di retrig 13 (RPT1) e 14 (RPT2):
  * - pressione: ramo dei tasti 13-16 di KeyboardView::consumeKeyEvent (0x4002EA92), dopo i controlli
@@ -249,7 +249,7 @@ __asm__(
     "        .globl  br_page_stub\n"
     "br_page_stub:\n"                           /* al posto di clr.l 0x41B9F928: caselle 1 e 2 */
     "        move.l  %d0,-(%sp)\n"
-    "        moveq   #113,%d0\n"
+    "        move.l  #269,%d0\n"
     "        move.l  %d0,0x41B9F924\n"
     "        moveq   #124,%d0\n"
     "        move.l  %d0,0x41B9F928\n"
