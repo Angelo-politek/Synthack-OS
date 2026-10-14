@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 
 pytest.importorskip("unicorn")
-from unicorn import UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, Uc  # noqa: E402
+from unicorn import UC_ARCH_M68K, UC_HOOK_CODE, UC_MODE_BIG_ENDIAN, Uc  # noqa: E402
 from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A3, UC_M68K_REG_A7,  # noqa: E402
                                 UC_M68K_REG_D0, UC_M68K_REG_D1, UC_M68K_REG_D2, UC_M68K_REG_D3,
                                 UC_M68K_REG_SR)
@@ -530,3 +530,32 @@ def test_init_sets_the_encoder_type_of_the_new_ids(setup):
     want = {"THR": 0, "ATK": 8, "REL": 0, "MUP": 0, "RAT": 8, "GR": 0, "COMP": 12}
     for k, v in want.items():
         assert struct.unpack(">I", m.uc.mem_read(OBJS + 84 * IDS[k], 4))[0] == v
+
+
+# ----------------------------------------------------------------------------- costo per blocco (v0.8.1)
+def block_cost(m, left, right):
+    n = [0]
+    m.uc.ctl_flush_tb()                                        # i blocchi gia' tradotti non vedrebbero il gancio
+    h = m.uc.hook_add(UC_HOOK_CODE, lambda *a: n.__setitem__(0, n[0] + 1))
+    m.block(left, right, 40000, 40000)
+    m.uc.hook_del(h)
+    return n[0]
+
+
+def test_cost_per_block(setup):
+    """Regressione sul carico (issue #2): il rilevatore per blocco costa una frazione di quello per campione
+    (~2 000 istruzioni fino alla v0.8.0). L'OS usa gia' ~89 % della CPU: ogni istruzione qui la toglie
+    all'interfaccia."""
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    rnd = random.Random(3)
+    sig = list(signal(rnd, 4))
+    m.block(*sig[0], 40000, 40000)                             # costanti gia' calcolate
+    off = block_cost(m, *sig[1])
+    m.set("RAT", 4 * RAT_STEP)
+    m.block(*sig[1], 40000, 40000)                             # ricalcolo delle costanti (una volta)
+    on = max(block_cost(m, *s) for s in sig[2:])
+    noisy = [rnd.randrange(-2**31, 2**31) for _ in range(32)]  # ogni campione un nuovo picco o minimo
+    worst = block_cost(m, noisy, noisy)
+    assert off < 150, off
+    assert on < 650 and worst < 650, (on, worst)                # v0.8.0: ~2 000

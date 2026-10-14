@@ -72,30 +72,45 @@ comp_hook:
         bsr.w   meter
         move.l  #4096,%d1
         bra.w   apply
-8:      lea     ADC_L,%a0
+8:      | ---- rilevatore per blocco (v0.8.1): picco del blocco su L e R, come la DT |x| = x ^ (x >> 31)
+        lea     ADC_L,%a0
         lea     ADC_R,%a1
-        lea     k_state,%a2
-        lea     k_logt,%a4
-        lea     k_const,%a5
-        move.l  (%a2),%d5                       | st: tenuta con rilascio
-        move.l  4(%a2),%d6                      | at: attacco
+        move.l  (%a0),%d3                       | massimo
+        move.l  %d3,%d4                         | minimo
         moveq   #32,%d7
-1:      move.l  (%a0)+,%d0                      | |L| (come la DT: x ^ (x >> 31))
+1:      move.l  (%a0)+,%d0
+        cmp.l   %d0,%d3
+        bge.s   2f
+        move.l  %d0,%d3
+2:      cmp.l   %d0,%d4
+        ble.s   3f
         move.l  %d0,%d4
+3:      move.l  (%a1)+,%d0
+        cmp.l   %d0,%d3
+        bge.s   4f
+        move.l  %d0,%d3
+4:      cmp.l   %d0,%d4
+        ble.s   5f
+        move.l  %d0,%d4
+5:      subq.l  #1,%d7
+        bne.s   1b
         moveq   #31,%d1
-        asr.l   %d1,%d4
-        eor.l   %d4,%d0
-        move.l  (%a1)+,%d2                      | |R|
-        move.l  %d2,%d4
-        asr.l   %d1,%d4
-        eor.l   %d4,%d2
-        cmp.l   %d0,%d2
-        ble.s   2f
-        move.l  %d2,%d0
-2:      cmpi.l  #256,%d0                        | pavimento come la DT
-        bge.s   3f
+        move.l  %d3,%d0
+        asr.l   %d1,%d0
+        eor.l   %d0,%d3
+        move.l  %d4,%d0
+        asr.l   %d1,%d0
+        eor.l   %d0,%d4
+        move.l  %d3,%d0
+        cmp.l   %d4,%d0
+        bge.s   6f
+        move.l  %d4,%d0
+6:      cmpi.l  #256,%d0                        | pavimento come la DT
+        bge.s   7f
         move.l  #256,%d0
-3:      | ---- log: L = T[i] + interp - lz*C_OCT
+7:      lea     k_logt,%a4
+        lea     k_const,%a5
+        | ---- log: L = T[i] + interp - lz*C_OCT
         move.l  %d0,%d4
         ff1     %d4                             | lz
         move.l  %d4,%d2
@@ -120,30 +135,31 @@ comp_hook:
         moveq   #0,%d0
         move.l  %d1,%d2
         sub.l   4(%a5),%d2
-        blt.s   4f
+        blt.s   1f
         move.l  8(%a5),%d3
         mac.l   %d3,%d2,%acc0
         movclr.l %acc0,%d0
         add.l   4(%a5),%d0
         sub.l   %d1,%d0
-4:      | ---- tenuta con rilascio: st = min(gr, (1-r)*gr + r*st)
-        move.l  12(%a5),%d3
-        mac.l   %d3,%d0,%acc0
-        move.l  16(%a5),%d3
-        mac.l   %d3,%d5,%acc0
-        movclr.l %acc0,%d2
-        move.l  %d0,%d5
-        cmp.l   %d2,%d0
-        blt.s   5f
-        move.l  %d2,%d5
-5:      | ---- attacco: at = (1-a)*st + a*at
-        move.l  20(%a5),%d3
-        mac.l   %d3,%d5,%acc0
-        move.l  24(%a5),%d3
+1:      | ---- tenuta con rilascio e attacco su 32 campioni a ingresso costante, d = min(st - gr, 0):
+        |      st = gr + r^32 * d, at = gr + a^32 * (at - gr) + K * d
+        lea     k_state,%a2
+        move.l  (%a2),%d2
+        sub.l   %d0,%d2
+        ble.s   2f
+        moveq   #0,%d2
+2:      move.l  4(%a2),%d6
+        sub.l   %d0,%d6
+        move.l  32(%a5),%d3                     | a^32
         mac.l   %d3,%d6,%acc0
+        move.l  40(%a5),%d3                     | K
+        mac.l   %d3,%d2,%acc0
         movclr.l %acc0,%d6
-        subq.l  #1,%d7
-        bne.w   1b
+        add.l   %d0,%d6                         | at
+        move.l  36(%a5),%d3                     | r^32
+        mac.l   %d3,%d2,%acc0
+        movclr.l %acc0,%d5
+        add.l   %d0,%d5                         | st
         move.l  %d5,(%a2)
         move.l  %d6,4(%a2)
         bsr.w   meter
@@ -245,6 +261,32 @@ convert:
         move.l  (%a1,%d0.l*4),%d1
         lea     k_const,%a5
         move.l  %d1,8(%a5)
+        | rilevatore per blocco: a^32, r^32 (5 quadrati) e K = (1-a) * sum r^n a^(32-n), n = 1..32
+        move.l  24(%a5),%d0
+        move.l  16(%a5),%d1
+        moveq   #4,%d2
+2:      mac.l   %d0,%d0,%acc0
+        movclr.l %acc0,%d0
+        mac.l   %d1,%d1,%acc0
+        movclr.l %acc0,%d1
+        subq.l  #1,%d2
+        bge.s   2b
+        move.l  %d0,32(%a5)
+        move.l  %d1,36(%a5)
+        move.l  24(%a5),%d0                     | a
+        move.l  20(%a5),%d1                     | 1 - a
+        move.l  16(%a5),%d3                     | r
+        move.l  %d3,%d4                         | r^n
+        moveq   #0,%d5                          | K
+        moveq   #31,%d2
+3:      mac.l   %d0,%d5,%acc0
+        mac.l   %d1,%d4,%acc0
+        movclr.l %acc0,%d5
+        mac.l   %d4,%d3,%acc0
+        movclr.l %acc0,%d4
+        subq.l  #1,%d2
+        bge.s   3b
+        move.l  %d5,40(%a5)
         rts
 
 | ---- misuratore GR con balistica: sale subito, scende a ~20 dB/s; chiede un ridisegno dello
@@ -687,6 +729,7 @@ scale:  cmpi.l  #CV_MAX,%d0
         .balign 4
 k_const:
         .long   C_OCT, 0, 0, 0, 0, 0, 0, 0      | C_OCT, THR, SLOPE, REL1, REL, ATT1, ATT, MK
+        .long   0, 0, 0                         | ATT^32, REL^32, K (rilevatore per blocco)
 k_fallback:
         .space  16                              | blocco esterno di ripiego se non c'e' ancora un kit
 k_ids:

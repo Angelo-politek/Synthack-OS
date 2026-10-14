@@ -60,10 +60,26 @@ class Preset:
         self.rel = RELEASE[rel >> 8]
         self.att = ATTACK[atk >> 8]
         self.mk = frac(MUP_K, s32(mup << 16)) - MUP_K
+        # rilevatore per blocco (v0.8.1): i due filtri per campione risolti su 32 campioni
+        self.a32 = self.att
+        self.r32 = self.rel
+        for _ in range(5):
+            self.a32 = frac(self.a32, self.a32)
+            self.r32 = frac(self.r32, self.r32)
+        k, rn = 0, self.rel                      # K = (1-a) * sum r^n a^(32-n), n = 1..32
+        for _ in range(32):
+            k = frac2(self.att, k, (1 << 31) - 1 - self.att, rn)
+            rn = frac(rn, self.rel)
+        self.k = k
 
 
 class Compact:
-    """Same steps and truncations as comp.S: 32 ADC samples in, VCA gain G (Q12, 65536 = x16) out."""
+    """Same steps and truncations as comp.S: 32 ADC samples in, VCA gain G (Q12, 65536 = x16) out.
+
+    Detector per block (v0.8.1): the block peak (as the Digitakt, |x| = x ^ (x >> 31), floor 256) drives
+    the per-sample hold/release and attack filters solved over 32 samples with a constant input:
+    st = gr + r^32 * min(st - gr, 0), at = gr + a^32 * (at - gr) + K * min(st - gr, 0).
+    The gain was already applied once per block (VCA control voltages)."""
 
     def __init__(self, pr: Preset):
         self.pr = pr
@@ -81,14 +97,14 @@ class Compact:
     def block(self, left: list[int], right: list[int]) -> int:
         pr = self.pr
         st, at = self.rel_state, self.att_state
-        for l, r in zip(left, right):
-            x = max(l ^ (l >> 31), r ^ (r >> 31), 256)
-            lg = self.log(x)
-            y = lg if pr.thr > lg else frac(pr.slope, lg - pr.thr) + pr.thr
-            gr = y - lg
-            sm = frac2((1 << 31) - 1 - pr.rel, gr, pr.rel, st)
-            st = gr if gr < sm else sm
-            at = frac2((1 << 31) - 1 - pr.att, st, pr.att, at)
+        hi, lo = max(left + right), min(left + right)
+        x = max(s32(hi ^ (hi >> 31)), s32(lo ^ (lo >> 31)), 256)
+        lg = self.log(x)
+        y = lg if pr.thr > lg else frac(pr.slope, lg - pr.thr) + pr.thr
+        gr = y - lg
+        d = min(st - gr, 0)
+        at = gr + frac2(pr.a32, at - gr, pr.k, d)
+        st = gr + frac(pr.r32, d)
         self.rel_state, self.att_state = st, at
         v = frac(EXP_K, pr.mk + at)
         sh, i, f = v >> 23, (v >> 19) & 15, (v & 0x7_FFFF) << 12
