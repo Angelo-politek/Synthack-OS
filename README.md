@@ -27,6 +27,10 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 | New machines: RISER / DOWNFILTER, SY SWARM+ | ⬜ planned | Requires custom audio-engine code (CPU #2). |
 | Web builder | ⬜ planned | Pick mods in the browser, build your `.syx` locally. |
 
+## Known issues
+
+- **Projects with samples (SP TWINSHOT) can crash at boot** ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)): something overwrites the mod code in RAM while samples load. Until it's fixed, don't use SyntHack with sample projects. Recovery: flash stock 1.41; your projects and samples are not affected.
+
 ## Roadmap
 
 ```mermaid
