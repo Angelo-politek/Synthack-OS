@@ -18,7 +18,7 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 - FLNG and PHSR feedback is bipolar: centre = none. PHSR is four allpass stages; WID turns the right side into the complementary response (notches where the left has peaks). CRSH is mono and hides the two knobs it doesn't use.
 - Each knob takes the icon of a similar OS parameter (machine SPD, MOD, sweep time/depth, TONE, BAL, OVER…), so every effect looks different.
 - The return goes to the direct bus (like delay and reverb with *FX Routing* off).
-- **Saved with the kit** (per pattern, like delay and reverb): in four words of the pattern kit the OS never uses (internal ids 0, 0x1A, 0x38 = hidden id 144, 0x46), one byte per knob. Older projects load with the default values.
+- **Saved with the kit** (per pattern, like delay and reverb): in four words of the pattern kit the OS never uses (internal ids 0, 0x1A, 0x38 = hidden id 144, 0x46), one byte per knob. Older projects load with the default values. The OS kit file format drops words 0x1A and 0x46 and reads word 0 back from 0x1A (FUNC+YES/NO, project save): hooks on the FX block writer/reader (`0x400A6D96` / `0x400A6D2E`) keep the three words in 8 bytes of the block the OS zeroes and never reads (marker `SH`). Files without the marker load the defaults.
 
 ## How it works
 
@@ -36,4 +36,4 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 python mods/fx3/make_patch.py
 ```
 
-Test: `tests/test_fx3.py` (send gains like the OS, mute, bus sums, chorus as a pure delay, reads inside the line with sudden TIME changes, phaser and crusher against bit-exact models, return interpolation, sign and saturation, send to delay, idle after heavy use and with silent inputs, cost per block and per type, kit storage and pattern change, names and texts per type, page and drawing hooks).
+Test: `tests/test_fx3.py` (send gains like the OS, mute, bus sums, chorus as a pure delay, reads inside the line with sudden TIME changes, phaser and crusher against bit-exact models, return interpolation, sign and saturation, send to delay, idle after heavy use and with silent inputs, cost per block and per type, kit storage and pattern change, kit file round trip through the OS writer/reader, names and texts per type, page and drawing hooks).

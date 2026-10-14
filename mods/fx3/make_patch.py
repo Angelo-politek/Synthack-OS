@@ -55,6 +55,9 @@ PAGE_NAMES = [(0x4019_4D96, "4024e947", "fx3_page_s", "pagina 25: nome breve"),
               (0x4019_4DDC, "40251b03", "fx3_page_l", "pagina 25: nome lungo")]
 NO_STYLE = 0x41B9_FA68                 # +68 dell'id 0: std::function vuota (nessuno stile, come LFO MODE)
 DRAW_HOOK, DRAW_ORIG = 0x4004_2CE0, "4fefffa048d77cfc"  # disegno dei tab DELAY/REVERB (caselle 5-6 = filtro)
+# blocco della FX track del kit nel file: scrittura e lettura (le parole 0, 0x1A e 0x46 si perdevano)
+KIT_HOOKS = [(0x400A_6D96, "2f0b2f0a246f000c", "fx3_kser_hook", "kit -> file (FX track): jmp fx3_kser_hook ; nop"),
+             (0x400A_6D2E, "4feffff448d71c00", "fx3_kdes_hook", "file -> kit (FX track): jmp fx3_kdes_hook ; nop")]
 # classe del tab AMP: gli id sotto 73 (diversi da 73-74) erano trattati come parti dell'inviluppo, senza
 # grafica propria; con bra -> "casella normale" SND3 (72) disegna la sua icona
 AMP_FIX = (0x4004_1E84, "605c", "6058")
@@ -200,6 +203,8 @@ def main() -> None:
     patches.append(fixed(REVERB_ARRAY, long(syms["fx3_reverb_pages"]), "tab REVERB: pagine {21, 25}", "401c7fa8"))
     for addr, orig, sym, what in PAGE_NAMES:
         patches.append(fixed(addr, long(syms[sym]), what, orig))
+    for addr, orig, sym, what in KIT_HOOKS:
+        patches.append(fixed(addr, struct.pack(">HI", 0x4EF9, syms[sym]) + bytes.fromhex("4e71"), what, orig))
     patches.append(fixed(DRAW_HOOK, struct.pack(">HI", 0x4EF9, syms["fx3_draw_hook"]) + bytes.fromhex("4e71"),
                          "tab DELAY/REVERB: pagina 25 col disegno generico a 8 caselle", DRAW_ORIG))
     patches.append(fixed(AMP_FIX[0], bytes.fromhex(AMP_FIX[2]), "tab AMP: SND3 (72) come casella normale",
@@ -233,7 +238,8 @@ def main() -> None:
             "fx3_run", "fx3_dsnd", "fx3_ret", "fx3_get", "fx3_set", "fx3_p", "fx3_tgt", "fx3_cur", "fx3_moving",
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
-            "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l")},
+            "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
+            "fx3_kser_hook", "fx3_kdes_hook")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,
     }

@@ -1118,6 +1118,54 @@ __asm__(
     "1:      lea     -96(%sp),%sp\n"            /* istruzioni sostituite */
     "        movem.l %d2-%d7/%a2-%a6,(%sp)\n"
     "        jmp     0x40042CE8\n"
+    /* Kit nel file (salvataggio, FUNC+YES/NO, progetto): il blocco della FX track passa da 0x400A6D96
+     * (scrittura) e 0x400A6D2E (lettura) con una tabella di posizioni che perde le parole degli id
+     * interni 0x1A e 0x46 e rilegge nella 0 il valore della 0x1A. Le tre parole di fx3 vanno nei byte
+     * +148..+155 del blocco nel file, che l'OS azzera e non legge: marcatore "SH" e le tre parole. */
+    "        .globl  fx3_kser_hook\n"
+    "fx3_kser_hook:\n"                         /* al posto di 0x400A6D96 (file, kit) */
+    "        move.l  8(%sp),-(%sp)\n"
+    "        move.l  8(%sp),-(%sp)\n"
+    "        bsr.s   1f\n"
+    "        addq.l  #8,%sp\n"
+    "        tst.b   %d0\n"
+    "        beq.s   2f\n"
+    "        movea.l 4(%sp),%a0\n"              /* blocco nel file */
+    "        movea.l 8(%sp),%a1\n"              /* blocco nel kit: una parola per id interno */
+    "        move.w  #0x5348,%d1\n"
+    "        move.w  %d1,148(%a0)\n"
+    "        move.w  (%a1),150(%a0)\n"
+    "        move.w  52(%a1),152(%a0)\n"
+    "        move.w  140(%a1),154(%a0)\n"
+    "2:      rts\n"
+    "1:      move.l  %a3,-(%sp)\n"             /* istruzioni sostituite */
+    "        move.l  %a2,-(%sp)\n"
+    "        movea.l 12(%sp),%a2\n"
+    "        jmp     0x400A6D9E\n"
+    "        .globl  fx3_kdes_hook\n"
+    "fx3_kdes_hook:\n"                         /* al posto di 0x400A6D2E (kit, file) */
+    "        move.l  8(%sp),-(%sp)\n"
+    "        move.l  8(%sp),-(%sp)\n"
+    "        bsr.s   1f\n"
+    "        addq.l  #8,%sp\n"
+    "        tst.b   %d0\n"
+    "        beq.s   3f\n"
+    "        movea.l 4(%sp),%a0\n"              /* blocco nel kit */
+    "        movea.l 8(%sp),%a1\n"              /* blocco nel file */
+    "        move.w  148(%a1),%d1\n"
+    "        cmpi.w  #0x5348,%d1\n"
+    "        bne.s   2f\n"
+    "        move.w  150(%a1),(%a0)\n"
+    "        move.w  152(%a1),52(%a0)\n"
+    "        move.w  154(%a1),140(%a0)\n"
+    "        rts\n"
+    "2:      clr.w   (%a0)\n"                  /* file senza marcatore: valori di default */
+    "        clr.w   52(%a0)\n"
+    "        clr.w   140(%a0)\n"
+    "3:      rts\n"
+    "1:      lea     -12(%sp),%sp\n"           /* istruzioni sostituite */
+    "        movem.l %a2-%a4,(%sp)\n"
+    "        jmp     0x400A6D36\n"
     "        .globl  fx3_page_stub\n"
     "fx3_page_stub:\n"                          /* al posto di clr.l 0x41B9F83C: caselle della pagina 25 */
     "        move.l  %a0,-(%sp)\n"

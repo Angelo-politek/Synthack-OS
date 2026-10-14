@@ -11,6 +11,7 @@
 """
 
 import json
+import random
 import struct
 import sys
 from pathlib import Path
@@ -796,3 +797,69 @@ def test_audio_interrupt_never_rewrites_the_ui(m):
     m.call(m.sym["fx3_fmt_spd"], [0, 0, 0x5000_3000])
     assert text(m, m.sym["fx3_n1_s"]) == "SRR"
     assert m.longs(0x41B9_F81C + 16, 2) == [0, 0]
+
+
+# ----------------------------------------------------------------------------- kit nel file (FUNC+YES/NO)
+KSER, KDES = 0x400A_6D96, 0x400A_6D2E          # blocco della FX track: kit -> file, file -> kit
+FILE, KBLK, KIT2 = 0x5000_6000, 0x5000_6100, 0x5000_6200
+FX3_WORDS = (0, 0x1A, 0x38, 0x46)               # parole del kit usate da fx3
+LFO_DEST = (4, 12)                              # destinazioni degli LFO: indice convertito con la tabella
+
+
+def valid(words):
+    """Parole del kit con destinazioni LFO valide (0 = nessuna), come le scrive l'OS."""
+    return [0 if i in LFO_DEST else w for i, w in enumerate(words)]
+
+
+def round_trip(m, words, file_fill=0x00):
+    """Blocco del kit (71 parole) -> file -> nuovo kit, con le funzioni dell'OS. -> parole rilette."""
+    m.uc.mem_write(KBLK, struct.pack(">71H", *words))
+    m.uc.mem_write(FILE, bytes([file_fill]) * 160)
+    assert m.call(KSER, [FILE, KBLK]) & 0xFF == 1
+    m.uc.mem_write(KIT2, b"\xee" * 142)
+    assert m.call(KDES, [KIT2, FILE]) & 0xFF == 1
+    return list(struct.unpack(">71H", m.uc.mem_read(KIT2, 142)))
+
+
+def test_stock_kit_file_loses_fx3_words():
+    """Senza gli agganci (OS stock): la tabella delle posizioni perde 0x1A e 0x46 e rilegge nella 0 il
+    valore della 0x1A. Era FUNC+NO che portava fx3 dal chorus al crusher (issue #4)."""
+    m = Machine()
+    for addr, orig in ((KSER, "2f0b2f0a246f000c"), (KDES, "4feffff448d71c00")):
+        m.uc.mem_write(addr, bytes.fromhex(orig))
+    words = valid([0x1000 + i for i in range(71)])
+    back = round_trip(m, words)
+    assert back[0] == words[0x1A] and back[0x1A] == 0xEEEE and back[0x46] == 0xEEEE
+    assert [i for i in range(71) if back[i] != words[i]] == [0, 0x1A, 0x46]
+
+
+def test_kit_file_keeps_every_word():
+    m = Machine()
+    rnd = random.Random(4)
+    for _ in range(20):
+        words = valid([rnd.randrange(0x10000) for _ in range(71)])
+        assert round_trip(m, words, file_fill=rnd.randrange(256)) == words
+    raw = m.uc.mem_read(FILE + 148, 8)
+    assert struct.unpack(">4H", raw) == (0x5348, words[0], words[0x1A], words[0x46])
+
+
+def test_kit_file_without_marker_gives_fx3_defaults():
+    """File scritto dall'OS stock (o da v0.8.0): niente marcatore -> parole di fx3 a zero (= default),
+    non il valore spostato dalla 0x1A."""
+    m = Machine()
+    words = valid([0x2000 + i for i in range(71)])
+    m.uc.mem_write(KBLK, struct.pack(">71H", *words))
+    m.call(KSER, [FILE, KBLK])
+    m.uc.mem_write(FILE + 148, bytes(8))                    # come l'OS stock: byte azzerati
+    m.uc.mem_write(KIT2, b"\xee" * 142)
+    m.call(KDES, [KIT2, FILE])
+    back = struct.unpack(">71H", m.uc.mem_read(KIT2, 142))
+    assert back[0] == back[0x1A] == back[0x46] == 0
+    assert all(back[i] == words[i] for i in range(71) if i not in (0, 0x1A, 0x46))
+
+
+def test_kit_hooks_keep_failure_paths():
+    m = Machine()
+    assert m.call(KSER, [0, KBLK]) & 0xFF == 0
+    m.uc.mem_write(FILE, struct.pack(">I", 7))              # tipo di blocco sbagliato: l'OS rifiuta
+    assert m.call(KDES, [KIT2, FILE]) & 0xFF == 0
