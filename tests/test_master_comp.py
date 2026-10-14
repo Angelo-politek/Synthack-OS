@@ -38,7 +38,8 @@ KIT_PTR, KIT, KIT_BLK = 0x8000_30BC, 0x5000_4000, 70
 GLOB_BLK, GLOBAL_FLAGS = 0x41B9_D3B0, 0x43BD_E444
 WOFF = {"THR": 12, "ATK": 14, "REL": 2, "MUP": 8}      # parole nel blocco esterno
 UI_ROOT, UI = 0x444E_1334, 0x5000_A000
-IDS = {"THR": 144, "ATK": 122, "REL": 91, "MUP": 101, "RAT": 127, "GR": 59, "COMP": 115}
+IDS = {"THR": 262, "ATK": 263, "REL": 264, "MUP": 265, "RAT": 266, "GR": 267, "COMP": 268}
+OLD_IDS = (144, 122, 91, 101, 127, 59, 115)               # alias dell'OS usati fino alla v0.8
 RAT_STEP = 0xFE0
 OBJS = 0x41B9_FA24
 GET, SET, KIT_FN = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
@@ -65,9 +66,9 @@ class Machine:
             uc.mem_write(dst, bytes.fromhex(p["hex"]))
         uc.mem_map(0x8000_0000, 0x1_0000)
         uc.mem_map(0x5000_0000, 0x2_0000)
-        uc.mem_map(0x41B9_D000, 0x7000)                        # globale, pagine, oggetti (BSS)
-        uc.mem_map(0x43BD_E000, 0x1000)                        # bit global
-        uc.mem_map(0x444E_1000, 0x1000)                        # puntatore all'interfaccia
+        uc.mem_map(0x41B9_D000, 0xA000)                     # globale, pagine, oggetti (BSS, fino a id 268)
+        uc.mem_map(0x43BD_E000, 0x1000)                     # bit global
+        uc.mem_map(0x444E_1000, 0x1000)                     # puntatore all'interfaccia
         uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
         uc.mem_write(KIT_PTR, struct.pack(">I", KIT if kit else 0))
         uc.mem_write(RET, b"\x4e\x75")
@@ -294,7 +295,7 @@ def test_page_stub_sets_the_knobs_at_boot(setup):
     m.uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
     m.uc.reg_write(UC_M68K_REG_D0, 0x1234)
     m.call(int(spec["symbols"]["comp_page_stub"], 16), [])
-    assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == [144, 122, 91, 101, 127, 59, 115, 150]
+    assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == [*IDS.values(), 150]
     assert m.uc.reg_read(UC_M68K_REG_D0) == 0x1234
     sec = {int(p["addr"], 16): p for p in spec["patches"] if not p.get("append")}
     assert 0x4019_5156 in sec                                   # al posto dell'ultimo clr.l delle caselle
@@ -370,9 +371,9 @@ def test_init_copies_drive_knob_graphics(setup):
     drive = OBJS + 84 * 150 + 36
     m.uc.mem_write(drive, bytes(range(0xA0, 0xB0)))
     comp_init(m, spec)
-    for i in (144, 122, 91, 101):
-        assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(range(0xA0, 0xB0))
-    for i in (127, 59):                              # RAT e GR restano barre
+    for k in ("THR", "ATK", "REL", "MUP"):
+        assert bytes(m.uc.mem_read(OBJS + 84 * IDS[k] + 36, 16)) == bytes(range(0xA0, 0xB0))
+    for i in (IDS["RAT"], IDS["GR"]):                # RAT e GR restano barre
         assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(16)
 
 
@@ -502,4 +503,30 @@ def test_on_off_text_and_page_slot(setup):
     assert call_fmt(m, 0x100, "COMP") == "ON" and call_fmt(m, 0, "COMP") == "OFF"
     m.set("COMP", 0)
     m.block([0] * 32, [0] * 32, 1000, 1000)          # la casella resta nostra anche da spento
-    assert struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))[6] == 115
+    assert struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))[6] == IDS["COMP"]
+
+
+# ----------------------------------------------------------------------------- v0.8.1: id liberi
+def test_old_alias_ids_are_left_to_the_os(setup):
+    """59 (GAIN dei filtri EQ), 122 (REV del MIXER), 91/101 (SLEW), 127 (PAN): l'OS li usa come alias
+    sulle pagine; la mod non li registra e non tocca i loro descrittori."""
+    spec, sec3, _ = setup
+    table = [p for p in spec["patches"] if p.get("append") and "vparams[" in p.get("what", "")]
+    ids = {struct.unpack(">H", bytes.fromhex(p["hex"])[:2])[0] for p in table}
+    assert ids == set(IDS.values())
+    desc = 0x4022_D59C
+    for i in OLD_IDS:
+        lo, hi = desc + 52 * i, desc + 52 * i + 52
+        assert not any(lo < int(p["addr"], 16) + p["len"] and int(p["addr"], 16) < hi
+                       for p in spec["patches"] if not p.get("append")), i
+
+
+def test_init_sets_the_encoder_type_of_the_new_ids(setup):
+    spec, sec3, _ = setup
+    m = Machine(spec, sec3)
+    for i in IDS.values():
+        m.uc.mem_write(OBJS + 84 * i, struct.pack(">I", 1))         # MIDI-track type
+    comp_init(m, spec)
+    want = {"THR": 0, "ATK": 8, "REL": 0, "MUP": 0, "RAT": 8, "GR": 0, "COMP": 12}
+    for k, v in want.items():
+        assert struct.unpack(">I", m.uc.mem_read(OBJS + 84 * IDS[k], 4))[0] == v

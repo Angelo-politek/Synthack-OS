@@ -14,8 +14,8 @@
 | Scrive hw+70/hw+72; preserva tutti i registri (d1/d3 non servono dopo), MACSR e ACC puliti.
 |
 | Interfaccia (v0.3): 5 parametri "virtuali" THR ATK REL MUP RAT sulla pagina SYN della FX
-| track (FX Drive), con gli id logici nascosti 144, 122, 91, 101, 127 (descrittori riscritti da
-| make_patch.py) + misuratore GR (59, sola lettura). Tre agganci intercettano per questi id le
+| track (FX Drive), con gli id logici liberi 262..266 (descrittori riscritti da make_patch.py)
+| + misuratore GR (267, sola lettura) e interruttore COMP (268). Tre agganci intercettano per questi id le
 | funzioni centrali dei parametri di kit: "e' di kit?" 0x4000D870, lettura 0x4000D94A,
 | scrittura 0x4000DA32. RAT 0 = compressore spento, 1..8 = 1.5,2,3,4,6,8,16,20:1.
 | Valori (v0.4.2) in 4 parole libere del blocco "mixer esterno" del kit del pattern (o del
@@ -638,7 +638,16 @@ comp_init:
         move.l  DRIVE_GFX+12,(%a0)+
         subq.l  #1,%d2
         bge.s   1b
-3:      lea     k_fmts,%a2                      | {id, formattatore} x 7
+3:      lea     k_types,%a2                     | {id, tipo} x 7: passo dell'encoder (+0 dell'oggetto)
+        moveq   #6,%d2
+5:      move.l  (%a2)+,%d0
+        mulu.w  #84,%d0
+        addi.l  #OBJS,%d0
+        movea.l %d0,%a0
+        move.l  (%a2)+,(%a0)
+        subq.l  #1,%d2
+        bge.s   5b
+        lea     k_fmts,%a2                      | {id, formattatore} x 7
         moveq   #6,%d2
 4:      move.l  (%a2)+,%d0
         mulu.w  #84,%d0
@@ -714,6 +723,8 @@ k_logt:
 k_expt:
         .long   EXP_T0, EXP_T1, EXP_T2, EXP_T3, EXP_T4, EXP_T5, EXP_T6, EXP_T7, EXP_T8
         .long   EXP_T9, EXP_T10, EXP_T11, EXP_T12, EXP_T13, EXP_T14, EXP_T15, EXP_T16
+k_types:
+        .long   ID_THR, TY_THR, ID_ATK, TY_ATK, ID_REL, TY_REL, ID_MUP, TY_MUP, ID_RAT, TY_RAT, ID_GR, TY_GR, ID_COMP, TY_COMP
 k_fmts:
         .long   ID_THR, fmt_thr, ID_ATK, fmt_atk, ID_REL, fmt_rel, ID_MUP, fmt_mup, ID_RAT, fmt_rat, ID_GR, fmt_gr, ID_COMP, fmt_on
         .include "fmt_tables.inc"

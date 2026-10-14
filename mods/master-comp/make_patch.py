@@ -74,28 +74,47 @@ FREE_END = MODAREA_RAM + MODAREA_SIZE
 HOOK, HOOK_END = 0x4009_053E, 0x4009_0562
 HOOK_ORIG = "0c810000ffff6f06223c0000ffff374100460c830000ffff6f06263c0000ffff37430048"
 
-# ---- interfaccia: id logici nascosti riusati (vedi comp.S e docs/)
+# ---- interfaccia: id logici liberi (vedi comp.S e docs/)
+# Gli id "nascosti" usati fino alla v0.8 (144, 122, 91, 101, 127, 59, 115) sono quasi tutti ALIAS che
+# l'OS mette sulle pagine in certi modi: 59 = GAIN al posto di RESO nei filtri EQ dei track, 122 = REV
+# sulla pagina 2 del MIXER, 91/101 = SLEW al posto di SPH degli LFO, 127 = PAN al posto di BAL. Con le
+# nostre funzioni al loro posto quelle manopole mostravano il compressore e non funzionavano.
+# Ora: 262..268 = "CC1..CC7 Select" dei track MIDI della Digitakt (nessun track MIDI sulla Syntakt,
+# pagina "CC Select" mai mostrata, nessun CC MIDI, nessun alias): gli id vecchi tornano come nell'OS.
 DESC = 0x4022_D59C                      # descrittori: 52 B, indice = id logico
 PARAMS = [  # (nome breve, nome lungo, id, massimo)
-    ("THR", "Comp Threshold", 144, 0x7F00),
-    ("ATK", "Comp Attack", 122, 0x7F00),     # alias nascosto del mix del reverb
-    ("REL", "Comp Release", 91, 0x7F00),
-    ("MUP", "Comp Makeup", 101, 0x7F00),
-    ("RAT", "Comp Ratio", 127, 0x7F00),        # 9 posizioni: 0 = OFF, 1..8 = 1.5..20:1
-    ("GR", "Gain Reduction", 59, 0x7F00),      # misuratore, sola lettura
-    ("COMP", "Compressor On/Off", 115, 0x100),  # interruttore (era "Delay FX Routing", nascosto)
+    ("THR", "Comp Threshold", 262, 0x7F00),
+    ("ATK", "Comp Attack", 263, 0x7F00),
+    ("REL", "Comp Release", 264, 0x7F00),
+    ("MUP", "Comp Makeup", 265, 0x7F00),
+    ("RAT", "Comp Ratio", 266, 0x7F00),        # 9 posizioni: 0 = OFF, 1..8 = 1.5..20:1
+    ("GR", "Gain Reduction", 267, 0x7F00),     # misuratore, sola lettura
+    ("COMP", "Compressor On/Off", 268, 0x100),  # interruttore
 ]
 # agganci alle funzioni centrali dei parametri di kit: (indirizzo, byte originali, simbolo)
 VP_SLOT0 = 0                            # posti nella tabella di vparams: 0..6
-# inizializzatore degli oggetti per-parametro: grafico a barra per 91, 101 e 127 (127 = come 125)
-INIT_FIX = [(0x4018_B986, "41b9d660", "41b9d670", "id 91 +68: renderer clessidra -> barra (come 144)"),
-            (0x4018_BCA4, "41b9d660", "41b9d670", "id 101 +68: renderer clessidra -> barra"),
-            (0x4018_C4B0, "2f04", "2f02", "id 127 +4: prototipo bipolare -> come 125/126"),
-            (0x4018_C4C4, "41b9df10", "41b9dfb0", "id 127 +20: formattatore pan -> numerico"),
-            (0x4018_C4D6, "41b9db80", "41b9dc00", "id 127 +36: come 125/126"),
-            (0x4018_C4E4, "41b9d660", "41b9d5d0", "id 127 +68: renderer clessidra -> barra"),
-            (0x4018_AEE6, "41b9dcd0", "41b9dc00", "id 59 (GR) +36: come IN LR"),
-            (0x4018_AF06, "41b9d5b0", "41b9d5d0", "id 59 (GR) +68: manopola -> barra (come IN LR)")]
+# inizializzatore degli oggetti per-parametro (indirizzi 1.41): ai nuovi id lo stesso aspetto che
+# avevano gli id vecchi con le correzioni della v0.8. +4 prototipo del valore: qui d3 = 0x401D6B44
+# (come 144/91/101), d4 = 0x401D6B34 (come 122/127/59), d5 = 0x401D6B74 (come 115). Il tipo (+0, passo
+# dell'encoder: 0, 8 come 122/127, 12 interruttore) lo scrive comp_init.
+INIT_FIX = [(0x4018_F750, "2f05", "2f03", "id 262 (THR) +4: prototipo come 144"),
+            (0x4018_F776, "41b9d8b0", "41b9dcd0", "id 262 (THR) +36: manopola come 144"),
+            (0x4018_F7AA, "2f05", "2f04", "id 263 (ATK) +4: prototipo come 122"),
+            (0x4018_F7CA, "41b9d8b0", "41b9dc00", "id 263 (ATK) +36: come 122"),
+            (0x4018_F7EA, "41b9d670", "41b9d5d0", "id 263 (ATK) +68: barra come 122"),
+            (0x4018_F7FA, "2f05", "2f03", "id 264 (REL) +4: prototipo come 91"),
+            (0x4018_F81A, "41b9d8b0", "41b9dcd0", "id 264 (REL) +36: manopola come 91"),
+            (0x4018_F84A, "2f05", "2f03", "id 265 (MUP) +4: prototipo come 101"),
+            (0x4018_F86E, "41b9d8b0", "41b9dcd0", "id 265 (MUP) +36: manopola come 101"),
+            (0x4018_F89A, "2f05", "2f04", "id 266 (RAT) +4: prototipo come 125/126"),
+            (0x4018_F8BE, "41b9d8b0", "41b9dc00", "id 266 (RAT) +36: come 125/126"),
+            (0x4018_F8DA, "41b9d670", "41b9d5d0", "id 266 (RAT) +68: barra"),
+            (0x4018_F8EE, "2f05", "2f04", "id 267 (GR) +4: prototipo come 59"),
+            (0x4018_F914, "41b9d8b0", "41b9dc00", "id 267 (GR) +36: come IN LR"),
+            (0x4018_F934, "41b9d670", "41b9d5d0", "id 267 (GR) +68: barra come IN LR"),
+            (0x4018_F966, "41b9d8b0", "41b9d9f0", "id 268 (COMP) +36: come 115"),
+            (0x4018_F986, "41b9d670", "41b9d680", "id 268 (COMP) +68: come 115")]
+TYPES = {"THR": 0, "ATK": 8, "REL": 0, "MUP": 0, "RAT": 8, "GR": 0, "COMP": 12}   # +0 degli oggetti
 RAT_STEP = 0xFE0
 PAGE_HOOK, PAGE_ORIG = 0x4019_5156, "42b941b9f968"      # clr.l 0x41B9F968 (ultima casella vuota, all'avvio)
 WSL_BINUTILS = "~/tools/m68k/root"
@@ -152,6 +171,7 @@ def main() -> None:
     defs = {"C_OCT": C_OCT, "D_THR": a.thr, "D_ATK": a.atk, "D_REL": a.rel, "D_MUP": a.mup,
             "GFX_ON": 0 if a.no_drive_knob else 1}
     defs.update({f"ID_{n}": i for n, _, i, _ in PARAMS})
+    defs.update({f"TY_{n}": TYPES[n] for n, _, _, _ in PARAMS})
     nl = "\n"
     tables = "".join(f"        .long   {', '.join(str(v) for v in tab[k:k + 8])}{nl}"
                      for tab in (ATTACK, RELEASE, RATIO) for k in range(0, len(tab), 8))

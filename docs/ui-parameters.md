@@ -46,12 +46,15 @@ Slots are read at draw time: changing them at runtime changes the page (0 = empt
 
 | Id | Stock meaning | Mod use |
 |---|---|---|
-| 59, 91, 101, 115, 122, 127, 144 | gain, slews, delay routing, reverb mix alias, pan alias, amp delay time | master-comp (virtual, via [vparams](../mods/vparams)); the kit word of 144 stores fx3 |
+| 262–268 | Digitakt MIDI-track "CC1–CC7 Select" (page never shown, no MIDI CC) | master-comp (virtual, via [vparams](../mods/vparams)) |
+| 144 | amp delay time | the kit word of 144 stores fx3 |
 | 72 | amp "Delay Time", saved per track, unused | fx3 SND3 (native, per track) |
 | 113, 124 | delay mix alias, reverb routing | beat-repeat RPT1/RPT2 (virtual) |
 | 246–253 | Digitakt MIDI-track parameters (no MIDI tracks on Syntakt) | fx3 page (virtual) |
 
 Ids 1–5 and 11–18 are tied to MIDI CCs (bank select, data entry, all notes off…): not reusable.
+
+**Hidden is not free.** Ids without a page or MIDI CC are often *aliases* the OS swaps onto a page: 59 GAIN replaces 60 RESO for track filter types 2–6 (`0x40042140` in 1.42), 122 REV shows on MIXER page 2, 91/101 SLEW replace SPH, 125 IN and 127 PAN replace IN LR and BAL. Same group + internal id as the visible parameter = alias: do not reuse.
 
 ## Per-parameter objects
 
