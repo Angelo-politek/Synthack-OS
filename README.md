@@ -29,7 +29,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 
 ## Known issues
 
-- **Projects with samples (SP TWINSHOT) can crash at boot** ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)): something overwrites the mod code in RAM while samples load. Until it's fixed, don't use SyntHack with sample projects. Recovery: flash stock 1.41; your projects and samples are not affected.
+- **v0.8.0 and earlier: projects with samples (SP TWINSHOT) can crash at boot** ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)). The mod code lived in RAM that the OS uses when it loads samples. Fixed in v0.8.1: the mod code now lives in a block of the OS heap. Recovery for the old versions: flash stock 1.41; projects and samples are not affected.
 
 ## Roadmap
 
