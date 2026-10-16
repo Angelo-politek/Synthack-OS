@@ -15,7 +15,7 @@ Mod area (first 64 KB block of the OS heap, from `modarea_layout.RAM`; unpacked 
 |---|---|
 | `+0x0000` | master-comp |
 | `+0x2000` | readable-values |
-| `+0x4000` | beat-repeat |
+| `+0x4000` | perf-fx |
 | `+0x7E00` | vparams code; `+0x8000` vparams table (32 × 12 B) |
 | `+0xA000` | fx3 code and data; `+0xE000` fx3 delay line (4 KB) |
 
@@ -49,7 +49,7 @@ Logical id → descriptor (`0x4022D59C + 52·id`: group, internal id, min/max/de
 **Saving.** Two kinds of spare storage, both saved by the OS without knowing:
 
 - **Per track**: engine word +106 (internal id 39, hidden id 72 "amp delay time") is saved per track and p-lockable. fx3 uses it for SND3 (a real OS parameter: only its descriptor and page slot change).
-- **Per kit (pattern)**: `*0x800030BC` is the pattern kit = the FX track's parameters, one word per internal id (offset = 2 × id, 142 B). Words with no use: ids 0, 0x1A, 0x24, 0x27, 0x29, 0x2A, 0x37, 0x46 and 0x38 (hidden id 144). master-comp uses 0x24/0x27/0x29/0x2A, fx3 0/0x1A/0x38/0x46, beat-repeat 0x37: **all taken**. Store values **XOR their default**, so old projects (zero words) load with defaults. Read the word on every use (pattern changes swap the kit); fall back to RAM while the pointer is 0. With *global* FX blocks the OS uses a container at `0x41B9D3B0` instead (master-comp follows the SYN flag).
+- **Per kit (pattern)**: `*0x800030BC` is the pattern kit = the FX track's parameters, one word per internal id (offset = 2 × id, 142 B). Words with no use: ids 0, 0x1A, 0x24, 0x27, 0x29, 0x2A, 0x37, 0x46 and 0x38 (hidden id 144). master-comp uses 0x24/0x27/0x29/0x2A, fx3 0/0x1A/0x38/0x46; 0x37 is free again since v0.9 (perf-fx stores its settings in the native Mod A values). Store values **XOR their default**, so old projects (zero words) load with defaults. Read the word on every use (pattern changes swap the kit); fall back to RAM while the pointer is 0. With *global* FX blocks the OS uses a container at `0x41B9D3B0` instead (master-comp follows the SYN flag).
 - **Kit on storage** (FUNC+YES/NO, project save): the FX block goes through a position table that drops words 0x1A and 0x46 and reads word 0 back from 0x1A. fx3 keeps those three words in 8 reserved bytes of the stored block (hooks at `0x400A6D96` / `0x400A6D2E`). Any new kit word must survive the round trip tested in `tests/test_fx3.py`.
 
 ## 4. Pages and tabs

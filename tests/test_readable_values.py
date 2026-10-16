@@ -206,7 +206,7 @@ def test_mix_levels_match_original_gain(m):
         m.uc.emu_start(0x4008_F96A, 0x4008_F996, count=100)
         g_dly = -struct.unpack(">i", struct.pack(">I", m.uc.reg_read(UC_M68K_REG_D1) & 0xFFFFFFFF))[0] / 2**31
         g_rev = -struct.unpack(">i", struct.pack(">I", m.uc.reg_read(UC_M68K_REG_D0) & 0xFFFFFFFF))[0] / 2**31
-        for pid, g in ((114, g_dly), (123, g_rev)):     # 113 e 122: RPT1 (beat-repeat) e ATK (master-comp)
+        for pid, g in ((114, g_dly), (123, g_rev)):     # 113 e 122 sono alias di questi
             t = m.fmt(pid, v)
             if g == 0:
                 assert t == "-inf"

@@ -49,7 +49,7 @@ Slots are read at draw time: changing them at runtime changes the page (0 = empt
 | 262–268 | Digitakt MIDI-track "CC1–CC7 Select" (page never shown, no MIDI CC) | master-comp (virtual, via [vparams](../mods/vparams)) |
 | 144 | amp delay time | the kit word of 144 stores fx3 |
 | 72 | amp "Delay Time", saved per track, unused | fx3 SND3 (native, per track) |
-| 269, 124 | Digitakt MIDI-track "CC8 Select", reverb routing | beat-repeat RPT1/RPT2 (virtual) |
+| 48–51 | Trig modifier Mod A, M1–M4 | perf-fx: effect of keys 13–16 (native storage in the kit, text formatter) |
 | 246–253 | Digitakt MIDI-track parameters (no MIDI tracks on Syntakt) | fx3 page (virtual) |
 
 Ids 1–5 and 11–18 are tied to MIDI CCs (bank select, data entry, all notes off…): not reusable.
@@ -88,5 +88,5 @@ Group handlers use jump tables by logical id (e.g. external mixer: get `0x4000C8
 - UI kit struct (`obj->vfunc40`): internal mixer +2…+26, external +28…+45, DRIVE +46, FX filter +48…+71, FX amp +72…+99.
 - Pattern kit (`*0x800030BC`, 142 B): the FX track's parameters, **one word per internal id** (offset = 2 × id, ids 0…0x46), copied whole to the engine (`0x80002874`). Blocks: LFO +2…+33, delay +34…+53, reverb +54…+69, external +70…+87, filter +88…+111, amp +112…+139 (DRIVE +124). Words the OS does not use: ids 0, 0x1A, 0x24, 0x27, 0x29, 0x2A, 0x37, 0x46 (+ 0x38 = hidden id 144).
 - Global flags `0x43BDE444`: bit 0 internal mixer, 1 external, **2 SYN (DRIVE)**, 3 filter, 4 amp. Enabled blocks are copied (memcpy) between kit and the global container `0x41B9D3B0`; the engine sync `0x400A1D18` copies whole blocks.
-- **Unused words**, saved with the kit: external block UI +30, +36, +40, +42 (pattern kit +72, +78, +82, +84) → master compressor; pattern kit +0, +52, +112, +140 (ids 0, 0x1A, 0x38, 0x46) → fx3; +110 (id 0x37) → beat-repeat.
+- **Unused words**, saved with the kit: external block UI +30, +36, +40, +42 (pattern kit +72, +78, +82, +84) → master compressor; pattern kit +0, +52, +112, +140 (ids 0, 0x1A, 0x38, 0x46) → fx3; +110 (id 0x37) free.
 - **Kit file format** (FUNC+YES/NO, project save): the FX block is written by `0x400A6D96` and read by `0x400A6D2E` through a position table (`0x40233E78` / `0x40233F90`) that **drops words 0x1A and 0x46 and reads word 0 back from 0x1A**; LFO destinations (words 4, 12) go through the same table. Bytes +148…+155 of the 156-byte file block are zeroed and never read: fx3 keeps its three words there. A new kit word must survive this round trip (`tests/test_fx3.py`).

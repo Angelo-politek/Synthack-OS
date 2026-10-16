@@ -53,10 +53,10 @@ def virtual_ids():
 
 
 def test_some_mods_register_virtual_ids():
-    assert {"master-comp", "beat-repeat", "fx3"} <= set(virtual_ids())
+    assert {"master-comp", "fx3"} <= set(virtual_ids())
 
 
-@pytest.mark.parametrize("mod", ["master-comp", "beat-repeat", "fx3"])
+@pytest.mark.parametrize("mod", ["master-comp", "fx3"])
 def test_ids_are_not_aliases_and_have_no_midi(desc, mod):
     keys = defaultdict(list)
     for i, (g, iid, _, _) in enumerate(desc):
