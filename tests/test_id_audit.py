@@ -74,3 +74,49 @@ def test_mods_do_not_share_ids():
         for i in ids | NATIVE.get(mod, set()):
             assert i not in seen, f"id {i}: {seen[i]} e {mod}"
             seen[i] = mod
+
+
+MOD_DEST = 0xE00                                # descrittore +36: destinazione di modulazione (LFO)
+INTENDED_DEST = {72}                            # SND3 di fx3: modulabile come le mandate DEL/REV
+# L'elenco delle destinazioni (0x4001471C) prende gli id del modello della traccia: i gruppi delle tracce
+# MIDI della Digitakt (56..58) non ci sono sulla Syntakt, quindi i loro id non compaiono mai.
+UNREACHABLE_GROUPS = {56, 57, 58}
+
+
+def renamed_ids():
+    """{id: mod} dei descrittori a cui una mod cambia il nome (+40 o +48)."""
+    out = {}
+    for f in sorted((ROOT / "mods").glob("*/patch.json")):
+        spec = json.loads(f.read_text(encoding="utf-8"))
+        for p in spec["patches"]:
+            if p.get("append"):
+                continue
+            off = int(p["addr"], 16) - DESC
+            if 0 <= off < 52 * N and off % 52 in (40, 48):
+                out[off // 52] = spec["name"]
+    return out
+
+
+def built_desc():
+    """Descrittori dopo le patch di tutte le mod: {id: flag +36}."""
+    sec3 = bytearray(eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes())
+    for f in sorted((ROOT / "mods").glob("*/patch.json")):
+        for p in json.loads(f.read_text(encoding="utf-8"))["patches"]:
+            if not p.get("append") and p["section"] == 3:
+                a = int(p["addr"], 16) - LOAD
+                data = bytes.fromhex(p["hex"]) if "hex" in p else p["ascii"].encode("latin1")
+                sec3[a:a + len(data)] = data
+    return {i: struct.unpack(">iI", sec3[DESC - LOAD + 52 * i:DESC - LOAD + 52 * i + 4]
+                             + sec3[DESC - LOAD + 52 * i + 36:DESC - LOAD + 52 * i + 40]) for i in range(N)}
+
+
+def test_renamed_parameters_are_modulation_targets_only_on_purpose():
+    """Un parametro rinominato da una mod che resta destinazione degli LFO apparirebbe con il nuovo nome ma
+    modulerebbe il parametro originale dell'OS (era il caso di RPT2 = Reverb FX Routing fino alla v0.8)."""
+    desc = built_desc()
+    for i, mod in renamed_ids().items():
+        group, cap = desc[i]
+        if i in INTENDED_DEST:
+            assert cap & MOD_DEST == MOD_DEST, (mod, i)
+        elif group not in UNREACHABLE_GROUPS:
+            assert cap & MOD_DEST == 0, f"{mod}: id {i} rinominato ma ancora destinazione LFO"

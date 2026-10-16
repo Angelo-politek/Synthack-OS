@@ -256,6 +256,14 @@
     },
     {
       "section": 3,
+      "addr": "0X4022E460",
+      "len": 4,
+      "expect_sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119",
+      "hex": "00000e00",
+      "what": "id 72: destinazione di modulazione (LFO), come la mandata DEL (78)"
+    },
+    {
+      "section": 3,
       "addr": "0X4035006C",
       "len": 12,
       "append": true,

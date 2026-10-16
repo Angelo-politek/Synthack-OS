@@ -217,7 +217,9 @@ def main() -> None:
         addr, orig, new = SND3[key]
         patches.append(fixed(addr, long(resolve(new)), f"id 72 (SND3) {what}", f"{orig:08x}"))
     patches += [fixed(r + 40, long(syms["fx3_snd_l"]), "id 72: nome lungo 'FX3 Send'"),
-                fixed(r + 48, long(syms["fx3_snd_s"]), "id 72: nome breve 'FX3'")]
+                fixed(r + 48, long(syms["fx3_snd_s"]), "id 72: nome breve 'FX3'"),
+                fixed(r + 36, long(0xE00), "id 72: destinazione di modulazione (LFO), come la mandata DEL (78)",
+                      "00000000")]
     # pagina FX3
     for n, (pid, short, ln, mx, df, protos, extra) in enumerate(PARAMS):
         r = DESC + 52 * pid

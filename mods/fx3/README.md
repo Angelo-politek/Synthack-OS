@@ -4,7 +4,7 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 
 ## Use
 
-- **SND3**: every audio track, **AMP page 1**, slot G, next to DEL and REV (PAN moves to page 2, slot E). Saved per track with the kit, p-lockable, shown in dB like the other sends, with the machines' MOD icon.
+- **SND3**: every audio track, **AMP page 1**, slot G, next to DEL and REV (PAN moves to page 2, slot E). Saved per track with the kit, p-lockable, shown in dB like the other sends, with the machines' MOD icon. Since v0.9 it is also an LFO destination, like DEL and REV (same descriptor flags).
 - **FX3 page**: FX track → **REVERB** tab, press it again for page 2. TYPE picks the effect; the next five knobs change name and range with it:
 
 | TYPE | B | C | D | E | F |
