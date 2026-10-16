@@ -165,17 +165,22 @@ void pf_ev(void *root, const unsigned char *ev)  /* ogni evento di tasto: rilasc
             pf_held &= (unsigned char)~(1u << k);
 }
 
-static const char *text(s32 value)
+/* testo del valore; fuori scala (kit da versioni precedenti) il default del tasto, come suona.
+ * fn = std::function dentro l'oggetto del parametro (84 B, 0x41B9FA24 + 84 * id) */
+static const char *text(const void *fn, u32 off, s32 value)
 {
+    u32 k = ((u32)fn - (0x41B9FA24u + 84u * 48u + off)) / 84u;
+
     value = (value + 0x80) >> 8;
-    return fx_text[value < 0 ? 0 : value >= NFX ? NFX - 1 : value];
+    if (value < 0 || value >= NFX)
+        return fx_text[k < 4 ? fx_def[k] : 0];
+    return fx_text[value];
 }
 
 /* formattatore del testo (+20, std::function come in readable-values) */
 void pf_invoke(const void *fn, s32 value, char *buf)
 {
-    const char *s = text(value);
-    (void)fn;
+    const char *s = text(fn, 20, value);
     while ((*buf++ = *s++))
         ;
 }
@@ -183,8 +188,7 @@ void pf_invoke(const void *fn, s32 value, char *buf)
 /* grafica della casella (+36): l'effetto come testo, centrato come le destinazioni degli LFO */
 void pf_gfx(const void *fn, s32 value, void *ctx, s32 x, s32 y)
 {
-    (void)fn;
-    DRAW_TEXT(ctx, FONT, x + 8, y + 5, 1, 0, "XXXX", "%s", text(value));
+    DRAW_TEXT(ctx, FONT, x + 8, y + 5, 1, 0, "XXXX", "%s", text(fn, 36, value));
 }
 
 int pf_mgr(void *dst, const void *src, int op)

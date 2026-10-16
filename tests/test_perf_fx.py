@@ -44,6 +44,7 @@ KIT_PTR, KIT_MODA = 0x8000_30B8, 0x15B6
 FX = {"--": 0, "1/16": 1, "1/8": 2, "3/16": 3, "1/4": 4, "1/2": 5, "1BAR": 6,
       "R1/8": 7, "R1/4": 8, "R1/2": 9, "RBAR": 10, "HALF": 11}
 MOD_A, RETRIG = 2, 0
+OBJ = lambda pid: 0x41B9_FA24 + 84 * pid                  # oggetto del parametro
 
 
 @pytest.fixture()
@@ -323,7 +324,7 @@ def test_slot_graphic_draws_the_effect(m):
         got.append((args[0], args[1], args[2], args[3], args[4], args[5],
                     cstr(args[6]), cstr(args[7]), cstr(args[8])))
     h = m.uc.hook_add(UC_HOOK_CODE, at, begin=DRAW, end=DRAW)
-    m.call(m.sym["pf_gfx"], [0, 0x800, 0x5000_5000, 30, 40])
+    m.call(m.sym["pf_gfx"], [OBJ(49) + 36, 0x800, 0x5000_5000, 30, 40])
     m.uc.hook_del(h)
     assert got == [(0x5000_5000, 0x402A_91C0, 38, 45, 1, 0, "XXXX", "%s", "R1/4")]
 
@@ -332,10 +333,14 @@ def test_texts(m):
     buf = 0x5000_3000
     out = []
     for pos in range(12):
-        m.call(m.sym["pf_invoke"], [0, pos << 8, buf])
+        m.call(m.sym["pf_invoke"], [OBJ(48) + 20, pos << 8, buf])
         raw = bytes(m.uc.mem_read(buf, 8))
         out.append(raw[:raw.index(0)].decode())
     assert out == list(FX)
+    for n, want in enumerate(("1/16", "1/8", "R1/4", "HALF")):     # fuori scala: il default del tasto
+        m.call(m.sym["pf_invoke"], [OBJ(48 + n) + 20, 127 << 8, buf])
+        raw = bytes(m.uc.mem_read(buf, 8))
+        assert raw[:raw.index(0)].decode() == want
 
 
 def test_mod_a_page_and_objects_at_boot(m):
