@@ -7,7 +7,6 @@
 | mod con lo stesso stack; per gli altri id si riprende il codice originale.
 | VP_TABLE: 32 voci da 12 byte {id.w, 0.w, lettura, scrittura}, scritte da ogni mod nel suo posto.
 
-        .equ    VP_TABLE,       0x46008000
         .equ    VP_N,           32
 
         .text

@@ -40,7 +40,7 @@ typedef unsigned short u16;
 #define DATA __attribute__((section(".data")))
 #define H         16                                       /* campioni per blocco a 24 kHz */
 #define DL        1024                                     /* linea a 24 kHz: 42 ms (TIME + DEP <= 38 ms) */
-#define DL_M      ((s16 *)0x4600E000u)                     /* linea mono + copia a +DL (area mod azzerata) */
+#define DL_M      ((s16 *)(MODAREA_RAM + 0xE000u))         /* linea mono + copia a +DL (area mod azzerata) */
 #define MAXD      (8 << 8)                                 /* variazione massima del ritardo per blocco (Q8) */
 #define SRC_D     0x80003D50u                              /* tracce digitali, 32 campioni a passo 128 B */
 #define SRC_A     0x80003950u                              /* tracce analogiche (canali 0..3) */

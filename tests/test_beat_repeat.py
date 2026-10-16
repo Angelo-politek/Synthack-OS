@@ -22,8 +22,13 @@ from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A0, UC_M68K_REG_A1,
                                 UC_M68K_REG_D3, UC_M68K_REG_SR)
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "tools" / "unpack")]
+sys.path[:0] = [str(ROOT / "tools" / "build"), str(ROOT / "tools" / "unpack")]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
+
+MA = modarea_layout.RAM                                    # area mod (mods/modarea)
+MA_PAGE, MA_MAP = 0x444E_0000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E1334)
+assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
 SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
 MODS = [ROOT / "mods" / m / "patch.json" for m in ("vparams", "beat-repeat")]
@@ -52,8 +57,7 @@ class Machine:
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
         uc.mem_map(0x41B9_0000, 0x2_0000)
-        uc.mem_map(0x444E_0000, 0x1_0000)
-        uc.mem_map(0x4600_0000, 0x1_0000)
+        uc.mem_map(MA_PAGE, MA_MAP)
         uc.mem_map(0x5000_0000, 0x4_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)                         # SRAM: puntatore al kit (0 = nessuno)
         for f in MODS:

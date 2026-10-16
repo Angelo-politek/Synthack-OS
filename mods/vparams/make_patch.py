@@ -18,11 +18,12 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path.insert(0, str(REPO / "tools" / "unpack"))
+sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
 
 LOAD = 0x4000_0400
-IMG, RAM = 0x4034_8000, 0x4600_0000     # area mod (mods/modarea)
+IMG, RAM = modarea_layout.IMG, modarea_layout.RAM     # area mod (mods/modarea)
 CODE = RAM + 0x7E00                     # codice di vparams
 VP_TABLE, VP_N = RAM + 0x8000, 32
 HOOKS = [(0x4000_D870, "2f02747c222f0008", "vp_kit"),
@@ -60,7 +61,7 @@ def main() -> None:
         shutil.copy(HERE / "vparams.S", tmp / "vparams.S")
         w = eft.to_wsl_path(tmp)
         bu = f"R={WSL_BINUTILS}; export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu; cd {w}; "
-        wsl(bu + "$R/usr/bin/m68k-linux-gnu-as -mcpu=54418 vparams.S -o v.o")
+        wsl(bu + f"$R/usr/bin/m68k-linux-gnu-as -mcpu=54418 --defsym VP_TABLE={VP_TABLE} vparams.S -o v.o")
         wsl(bu + f"$R/usr/bin/m68k-linux-gnu-ld -N -Ttext={CODE:#x} -o v.elf v.o")
         wsl(bu + "$R/usr/bin/m68k-linux-gnu-objcopy -O binary v.elf v.bin")
         syms = {p[2]: int(p[0], 16) for p in (l.split() for l in wsl(bu + "$R/usr/bin/m68k-linux-gnu-nm v.elf").splitlines()) if len(p) == 3}

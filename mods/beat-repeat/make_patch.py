@@ -1,6 +1,6 @@
 """Mod beat-repeat: costruisce patch.json da br.c.
 
-- compila br.c per ColdFire e lo collega nell'area mod a 0x46004000;
+- compila br.c per ColdFire e lo collega nell'area mod a +0x4000;
 - aggancia l'avanzamento degli step del sequencer (0x4008D152), i tasti di retrig 13-16 di KeyboardView
   (0x4002EA92) e il dispatcher degli eventi (0x4000B420);
 - RPT1 e RPT2 = id 269 ("CC8 Select" dei track MIDI della Digitakt, mai mostrato) e 124 nelle prime due caselle della pagina TRIG della FX track:
@@ -24,15 +24,16 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path.insert(0, str(REPO / "tools" / "unpack"))
+sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
 
 _vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
 vparams = importlib.util.module_from_spec(_vp)
 _vp.loader.exec_module(vparams)
 
 LOAD = 0x4000_0400
-MODAREA_RAM, MODAREA_IMG = 0x4600_0000, 0x4034_8000
+MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
 CODE_BASE, CODE_END = MODAREA_RAM + 0x4000, MODAREA_RAM + 0x5000
 TOOLS = "~/tools/m68k/root"
 CFLAGS = "-mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"

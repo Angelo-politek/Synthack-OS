@@ -22,8 +22,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path[:0] = [str(REPO / "tools" / "unpack"), str(HERE)]
+sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build"), str(HERE)]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
 from dsp import ATTACK, C_OCT, EXP_T, LOG_T, RATIO, RELEASE  # noqa: E402
 _vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
 vparams = importlib.util.module_from_spec(_vp)
@@ -67,8 +68,8 @@ def fmt_include() -> str:
     return "\n".join(out) + "\n"
 
 LOAD = 0x4000_0400
-# area mod (mods/modarea): collegato in RAM a 0x46000000, byte accodati alla sezione 3 a 0x40348000
-MODAREA_RAM, MODAREA_IMG, MODAREA_SIZE = 0x4600_0000, 0x4034_8000, 0x8000
+# area mod (mods/modarea, tools/build/modarea_layout.py): offset 0, byte accodati alla sezione 3
+MODAREA_RAM, MODAREA_IMG, MODAREA_SIZE = modarea_layout.RAM, modarea_layout.IMG, 0x2000
 CODE_BASE = MODAREA_RAM + 0x0000        # offset 0 dell'area mod
 FREE_END = MODAREA_RAM + MODAREA_SIZE
 HOOK, HOOK_END = 0x4009_053E, 0x4009_0562

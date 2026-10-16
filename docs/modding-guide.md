@@ -4,7 +4,7 @@ How the mods in this repository are built, and how to do the common things: hook
 
 ## 1. Workflow
 
-1. `mods/<name>/make_patch.py` compiles the code (GNU as or gcc for ColdFire, `-mcpu=54418`) and writes `patch.json`: for each change, the address, a SHA-256 of the original bytes and our bytes. Code larger than a few hundred bytes goes to the [mod area](../mods/modarea) (`"append": true`, linked at `0x46000000 + offset`).
+1. `mods/<name>/make_patch.py` compiles the code (GNU as or gcc for ColdFire, `-mcpu=54418`) and writes `patch.json`: for each change, the address, a SHA-256 of the original bytes and our bytes. Code larger than a few hundred bytes goes to the [mod area](../mods/modarea) (`"append": true`, linked at `modarea_layout.RAM + offset`, in the OS heap).
 2. `tests/test_<name>.py` loads the stock section 3 into Unicorn, applies the patch and runs the original code around it. EMAC instructions run in Python (`tools/emu/emac.py`): give it the list of EMAC sites of your code.
 3. `tools/build/build.py` checks every hash, overlaps and the boot decompression margin, and writes the `.syx`.
 4. Flash, test on the device, only then publish.

@@ -23,9 +23,14 @@ from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A0, UC_M68K_REG_A2,
                                 UC_M68K_REG_SR)
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack")]
+sys.path[:0] = [str(ROOT / "tools" / "build"), str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack")]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
+
+MA = modarea_layout.RAM                                    # area mod (mods/modarea)
+MA_PAGE, MA_MAP = 0x444E_0000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E1334)
+assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
 SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
 SPEC_F = ROOT / "mods" / "readable-values" / "patch.json"
@@ -53,11 +58,10 @@ class Machine:
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
         uc.mem_map(0x41B9_0000, 0x0002_0000)                   # oggetti per-parametro (BSS)
-        uc.mem_map(0x4600_0000, 0x1_0000)                      # area mod
+        uc.mem_map(MA_PAGE, MA_MAP)                      # area mod
         uc.mem_map(0x5000_0000, 0x1_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)                      # SRAM
         uc.mem_map(0x43BD_0000, 0x1_0000)                      # stato degli inviluppi del filtro
-        uc.mem_map(0x444E_0000, 0x1_0000)                      # singleton del progetto (*0x444E13F4)
         # finto progetto: selettore a +48 con metodo virtuale +40 che restituisce un oggetto con la
         # traccia attiva a +8 (catena letta da 0x4001FF74)
         S, VT, STUB, OBJ = 0x5000_9000, 0x5000_9800, 0x5000_9900, 0x5000_9A00

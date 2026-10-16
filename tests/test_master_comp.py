@@ -21,9 +21,14 @@ from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A3, UC_M68K_REG_A7,
                                 UC_M68K_REG_SR)
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack"), str(ROOT / "mods" / "master-comp")]
+sys.path[:0] = [str(ROOT / "tools" / "build"), str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack"), str(ROOT / "mods" / "master-comp")]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
+
+MA = modarea_layout.RAM                                    # area mod (mods/modarea)
+MA_PAGE, MA_MAP = 0x444E_0000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E1334)
+assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
 SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
 SPEC_F = ROOT / "mods" / "master-comp" / "patch.json"
@@ -59,7 +64,7 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x4600_0000, 0x1_0000)                      # area mod (dopo la rilocazione)
+        uc.mem_map(MA_PAGE, MA_MAP)                      # area mod (dopo la rilocazione)
         vp = json.loads((ROOT / "mods" / "vparams" / "patch.json").read_text(encoding="utf-8"))
         for p in spec["patches"] + vp["patches"]:          # i parametri virtuali passano da vparams
             dst = int(p["ram"], 16) if p.get("append") else int(p["addr"], 16)
@@ -68,7 +73,6 @@ class Machine:
         uc.mem_map(0x5000_0000, 0x2_0000)
         uc.mem_map(0x41B9_D000, 0xA000)                     # globale, pagine, oggetti (BSS, fino a id 268)
         uc.mem_map(0x43BD_E000, 0x1000)                     # bit global
-        uc.mem_map(0x444E_1000, 0x1000)                     # puntatore all'interfaccia
         uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
         uc.mem_write(KIT_PTR, struct.pack(">I", KIT if kit else 0))
         uc.mem_write(RET, b"\x4e\x75")

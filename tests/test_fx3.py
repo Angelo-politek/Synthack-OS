@@ -25,9 +25,14 @@ from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A0, UC_M68K_REG_A1,
                                 UC_M68K_REG_D2, UC_M68K_REG_D3, UC_M68K_REG_D7, UC_M68K_REG_SR)
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "tools" / "unpack"), str(ROOT / "tools" / "emu")]
+sys.path[:0] = [str(ROOT / "tools" / "build"), str(ROOT / "tools" / "unpack"), str(ROOT / "tools" / "emu")]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
+
+MA = modarea_layout.RAM                                    # area mod (mods/modarea)
+MA_PAGE, MA_MAP = 0x444E_0000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E1334)
+assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
 SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
 MODS = [ROOT / "mods" / m / "patch.json" for m in ("vparams", "fx3")]
@@ -60,8 +65,7 @@ class Machine:
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
         uc.mem_map(0x41B9_0000, 0x2_0000)
-        uc.mem_map(0x444E_0000, 0x1_0000)
-        uc.mem_map(0x4600_0000, 0x1_0000)
+        uc.mem_map(MA_PAGE, MA_MAP)
         uc.mem_map(0x5000_0000, 0x1_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
         for f in MODS:
@@ -553,18 +557,19 @@ def test_nothing_runs_when_nobody_listens(m):
 
 @pytest.mark.parametrize("dep, spd, time", [(127, 127, 127), (127, 127, 0), (60, 90, 30)])
 def test_chorus_reads_stay_in_the_line(m, dep, spd, time):
-    """Senza maschera per campione le prese devono restare nella linea doppia (4 KB a 0x4600E000)."""
+    """Senza maschera per campione le prese devono restare nella linea doppia (4 KB a MA + 0xE000)."""
     from unicorn import UC_HOOK_MEM_READ
     settle(m, DEP=dep, SPD=spd, TIME=time, FDBK=100, WID=127)
     loud(m)
     seen = []
     h = m.uc.hook_add(UC_HOOK_MEM_READ, lambda uc, acc, a, size, v, _: seen.append(a),
-                      begin=0x4600_D000, end=0x4601_0000)
+                      begin=(MA + 0xD000), end=(MA + 0x1_0000))
+    m.uc.ctl_flush_tb()                                         # i blocchi gia' tradotti non vedrebbero il gancio
     for _ in range(400):                                        # piu' di un periodo dell'LFO a 10 Hz
         run_block(m)
     m.uc.hook_del(h)
-    line = [a for a in seen if a >= 0x4600_E000]
-    assert line and min(line) >= 0x4600_E000 and max(line) < 0x4600_F000
+    line = [a for a in seen if a >= (MA + 0xE000)]
+    assert line and min(line) >= (MA + 0xE000) and max(line) < (MA + 0xF000)
 
 
 def test_track_hook_cheap_when_snd3_is_off(m):
@@ -743,14 +748,15 @@ def test_time_jumps_glide_and_reads_stay_in_the_line(m, t):
     loud(m)
     seen = []
     h = m.uc.hook_add(UC_HOOK_MEM_READ, lambda uc, acc, a, size, v, _: seen.append(a),
-                      begin=0x4600_D000, end=0x4601_0000)
+                      begin=(MA + 0xD000), end=(MA + 0x1_0000))
+    m.uc.ctl_flush_tb()                                         # i blocchi gia' tradotti non vedrebbero il gancio
     for k in range(300):                                        # TIME 0 <-> 127 di colpo, ripetutamente
         if k % 40 == 0:
             m.param("TIME", 127 if (k // 40) % 2 == 0 else 0)
         run_block(m)
     m.uc.hook_del(h)
-    line = [a for a in seen if a >= 0x4600_DC00 and not 0x4600_DFFC <= a < 0x4600_E000]  # tranne FDBK
-    assert line and min(line) >= 0x4600_E000 and max(line) < 0x4600_F000
+    line = [a for a in seen if a >= (MA + 0xDC00) and not (MA + 0xDFFC) <= a < (MA + 0xE000)]  # tranne FDBK
+    assert line and min(line) >= (MA + 0xE000) and max(line) < (MA + 0xF000)
 
 
 LOOK = {0: [(0x41B9_D6B0, 0), (0x41B9_D730, 0), (0x41B9_D7D0, 0), (0x41B9_DCD0, 0x41B9_D5E0), (0x41B9_D740, 0x41B9_D660)],

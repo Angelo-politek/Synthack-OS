@@ -1,6 +1,6 @@
 """Mod readable-values: costruisce patch.json da rv.c.
 
-- compila rv.c per ColdFire (gcc m68k, -mcpu=54418) e lo collega nell'area mod a 0x46002000;
+- compila rv.c per ColdFire (gcc m68k, -mcpu=54418) e lo collega nell'area mod a +0x2000;
 - per ogni id gestito, l'operando del `pea <prototipo>` (campo +20) nell'inizializzatore degli
   oggetti per-parametro passa dal formattatore numerico dell'OS (0x41B9DFB0) a rv_proto.
 
@@ -21,11 +21,12 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path.insert(0, str(REPO / "tools" / "unpack"))
+sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
 
 LOAD = 0x4000_0400
-MODAREA_RAM, MODAREA_IMG, MODAREA_SIZE = 0x4600_0000, 0x4034_8000, 0x8000
+MODAREA_RAM, MODAREA_IMG, MODAREA_SIZE = modarea_layout.RAM, modarea_layout.IMG, modarea_layout.SIZE
 CODE_BASE = MODAREA_RAM + 0x2000        # dopo master-comp (offset 0..0x1FFF)
 CODE_END = MODAREA_RAM + 0x4000
 # formattatori dell'OS (prototipi in BSS)

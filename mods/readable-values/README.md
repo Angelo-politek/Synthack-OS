@@ -24,7 +24,7 @@ Measurements: `tools/measure/analog.py` on recordings of the main out.
 
 ## How it works
 
-- `rv.c` (C, `m68k-linux-gnu-gcc -mcpu=54418`, no FPU, no libgcc) at `0x46002000` in the [mod area](../modarea).
+- `rv.c` (C, `m68k-linux-gnu-gcc -mcpu=54418`, no FPU, no libgcc) at offset `+0x2000` in the [mod area](../modarea).
 - At boot the OS copies each parameter's formatter (`std::function`, object `+20`) from a prototype; we patch the prototype operand of each handled id to `rv_proto`. One invoker finds the id from the object address.
 - Track parameters (58–85) are shared by all tracks: the formatter asks the OS for the active track the same way the parameter pages do (`0x4001FF74(project + 48)`, project = `*0x444E13F4`).
 

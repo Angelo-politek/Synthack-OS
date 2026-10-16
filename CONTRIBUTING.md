@@ -21,7 +21,7 @@
 
 - Start from [docs/modding-guide.md](docs/modding-guide.md): hooks, parameters, pages, icons, saving, audio cost.
 - `mods/<name>/make_patch.py` builds your code (`m68k-linux-gnu-as` or `-gcc`, `-mcpu=54418`) and writes `patch.json`.
-- The free fill of section 3 is nearly full: link at `0x46000000+` (mod area, see the guide for used offsets) and add `"requires": ["modarea"]`.
+- The free fill of section 3 is nearly full: link in the mod area (`tools/build/modarea_layout.py` + offset, see the guide for used offsets) and add `"requires": ["modarea"]`.
 - ColdFire gotchas: no `exg`, `movem` only with `(An)`/`d16(An)`, `muls.l` takes no absolute address, short branches reach ±127 B.
 - Document new findings in [docs/](docs), briefly.
 

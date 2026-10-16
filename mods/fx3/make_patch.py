@@ -1,6 +1,6 @@
 """Mod fx3: costruisce patch.json da fx3.c (terza mandata effetti: chorus, flanger, phaser, crusher).
 
-- compila fx3.c per ColdFire e lo collega nell'area mod a 0x4600A000 (tabelle generate qui);
+- compila fx3.c per ColdFire e lo collega nell'area mod a +0xA000 (tabelle generate qui);
 - aggancia la funzione di mix a blocchi: ciclo per traccia (0x4008F3A0), delay (0x4008F828: mandata
   del chorus verso il delay), somme del master (0x4008FB04: bus 3, chorus a 24 kHz e ritorno);
 - SND3 = id 72 (nascosto, salvato per traccia) nella pagina AMP 1 accanto a DEL e REV (PAN in pagina 2);
@@ -24,18 +24,19 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
-sys.path.insert(0, str(REPO / "tools" / "unpack"))
+sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
+import modarea_layout  # noqa: E402
 
 _vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
 vparams = importlib.util.module_from_spec(_vp)
 _vp.loader.exec_module(vparams)
 
 LOAD = 0x4000_0400
-MODAREA_RAM, MODAREA_IMG = 0x4600_0000, 0x4034_8000
+MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
 CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # retroazione a +0xDFFC, linea a +0xE000 (4 KB)
 TOOLS = "~/tools/m68k/root"
-CFLAGS = "-mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
+CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
 FS = 24000                              # il chorus lavora a 24 kHz
 DESC = 0x4022_D59C
 P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_DFD0, 0x41B9_DCD0, 0x41B9_DBD0, 0x41B9_D5D0

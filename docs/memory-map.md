@@ -8,8 +8,8 @@ Two **ColdFire MCF5441x** (V4, EMAC, no FPU, ~250 MHz). 64 KB internal SRAM at `
 | `0x40338740–0x40339000` | linker fill, **free** (used by splash, dual-mono, mod-area loader) |
 | `0x40339000–0x40347B90` | initial SRAM content, copied at boot |
 | `0x40339000–0x45565490` | BSS, **zeroed at boot** |
-| `0x45565490–0x48000000` | unused by the OS (no code or data reference) |
-| `0x46000000–0x46010000` | **mod area** (ours) |
+| `0x444E38C0–0x454E38C0` | OS heap (buddy allocator `0x4010350C`, free `0x40103712`, 16 MB, 16-byte units); first 64 KB block = **mod area** |
+| `0x45565490–0x48000000` | no code or data reference, **but used at runtime** (sample loading writes all over it, #4) |
 | `0x48000000` | boot stack top |
 | `0x4D570000…`, `0x4FC00000…` | delay / reverb lines |
 | `0x80000000–0x8000FFFF` | SRAM: audio buffers, DMA rings, engine parameter arrays |
@@ -24,7 +24,7 @@ Two **ColdFire MCF5441x** (V4, EMAC, no FPU, ~250 MHz). 64 KB internal SRAM at `
 
 ## Mod area
 
-Mods larger than the free fill are **appended to section 3** at `0x40348000`, compressed (SHLZ), and linked at `0x46000000`. A loader hooked at the start of `0x400004B2` unpacks them into 64 KB of RAM before BSS is zeroed. See [mods/modarea](../mods/modarea); offsets in use: [modding guide](modding-guide.md#1-workflow).
+Mods larger than the free fill are **appended to section 3** at `0x40348000`, compressed (SHLZ), and linked at `0x444E38D0` (`tools/build/modarea_layout.py`): the first 64 KB block of the OS heap, + 0x10. A loader replacing the BSS clear (`0x400004B2`) unpacks them and zeroes the BSS around the area; a hook at the end of the heap initialization (`0x4010358E`) asks the allocator for 64 KB before any other request, so the OS never hands that block out. Up to v0.8.1 the area was at `0x46000000`, above the BSS: RAM with no static reference that the OS still uses at runtime. See [mods/modarea](../mods/modarea); offsets in use: [modding guide](modding-guide.md#1-workflow).
 
 ## Screen
 
