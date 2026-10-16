@@ -62,7 +62,7 @@ unsigned char fx3_p[NP] DATA = {0, 60, 64, 64, 0, 64, 0, 100};
 static u16 fallback[0x47] DATA = {0};                     /* nessun kit (ancora): valori in RAM */
 static u32 seen[2] DATA = {1, 1};                         /* ultime parole lette, a coppie (1: rilettura) */
 
-s32 fx3_tgt[16] DATA = {0};                              /* bersagli mono (meta'): 0..7 digitali, 8..11 analogiche */
+s32 fx3_tgt[16] DATA = {0};                              /* bersagli mono (meta'): 0..7 digitali, 8..11 analogiche, 12..13 ingresso */
 s32 fx3_cur[16] DATA = {0};                              /* guadagni del blocco (levigati verso i bersagli) */
 s32 fx3_moving DATA = 0;                                  /* != 0: un bersaglio e' cambiato */
 static u32 ramp DATA = 0;                                 /* != 0: un guadagno non ha ancora raggiunto il bersaglio */
@@ -347,7 +347,7 @@ void fx3_run(void)
     if (fx3_moving | ramp) {
         fx3_moving = 0;
         ramp = 0;
-        for (k = 0; k < 12; k++) {
+        for (k = 0; k < 14; k++) {                     /* 0..11 tracce, 12..13 ingresso L/R */
             s32 g = c[k];
             if (t[k] != g) {
                 s32 d = t[k] - g;                          /* senza l'aggancio un piccolo resto non si */
@@ -372,8 +372,18 @@ void fx3_run(void)
                 add = 1;
             } while (mask);
             mask = live;
-        } else
-            fx3_sum(fx3_bus, c, (mask & 0xFF ? 1 : 0) | (mask >> 8 ? 2 : 0));
+        } else {                                       /* tracce insieme, poi l'ingresso (ADC 4/5) */
+            u32 trk = mask & 0xFFF, add = 0;
+            if (trk) {
+                fx3_sum(fx3_bus, c, (trk & 0xFF ? 1 : 0) | (trk >> 8 ? 2 : 0));
+                add = 1;
+            }
+            for (k = 12; k < 14; k++)
+                if ((mask >> k) & 1) {
+                    fx3_sum1(fx3_bus, SRC_A + 128 * (k - 8), c[k], add);
+                    add = 1;
+                }
+        }
         for (k = 0; k < H; k++)                            /* ingresso udibile? (tracce ferme: no) */
             if ((u32)(fx3_bus[k] + LOUD) > 2 * LOUD) {
                 loud = 1;
@@ -449,6 +459,54 @@ s32 fx3_set(void *obj, s32 id, s32 value)
     if (ui)
         ui[96] = 1;
     return 0;
+}
+
+/* ---- SND3 dell'ingresso esterno: id 269 (vparams), byte basso della parola 0x37 del kit della FX track.
+ * Bersagli come le mandate DEL/REV dell'ingresso (0x4008F480..): guadagni L/R da livello e bilanciamento,
+ * per (v/32768)^2; ogni lato pesa meta' nel bus mono, come una traccia al centro. */
+#define W_IN      (2 * 0x37)
+
+static u32 in_snd(void)
+{
+    u32 v = *(const volatile u16 *)(kit() + W_IN) & 0xFF;
+    return v > 127 ? 127 : v;
+}
+
+s32 fx3_in_get(void *obj, s32 id)
+{
+    (void)obj;
+    (void)id;
+    return (s32)in_snd() << 8;
+}
+
+s32 fx3_in_set(void *obj, s32 id, s32 value)
+{
+    char *ui = UI_ROOT;
+    volatile u16 *w = (volatile u16 *)(kit() + W_IN);
+    (void)obj;
+    (void)id;
+    value = (value + 0x80) >> 8;
+    value = value < 0 ? 0 : value > 127 ? 127 : value;
+    *w = (u16)((*w & 0xFF00) | (u32)value);
+    if (ui)
+        ui[96] = 1;
+    return 0;
+}
+
+void fx3_in(s32 gl, s32 gr)                               /* dal ciclo delle mandate dell'ingresso */
+{
+    u32 v = in_snd() << 8;
+    s32 s = (s32)(short)((2 * v * v) >> 16), tl = 0, tr = 0;
+
+    if (v) {
+        tl = (s32)(short)((u32)(gl >> 1) >> 16) * s;
+        tr = (s32)(short)((u32)(gr >> 1) >> 16) * s;
+    }
+    if (tl != fx3_tgt[12] || tr != fx3_tgt[13]) {
+        fx3_tgt[12] = tl;
+        fx3_tgt[13] = tr;
+        fx3_moving = 1;
+    }
 }
 
 /* ---- testi (std::function come in readable-values) */
@@ -628,6 +686,7 @@ PROTO(fx3_proto_type_gfx, fx3_type_gfx);
 const u32 fx3_reverb_pages[2] = {21, 25};                  /* tab REVERB: pagina dell'OS + la nostra */
 const char fx3_page_s[] = "FX3";
 const char fx3_snd_s[] = "FX3";
+const char fx3_in_l[] = "Input FX3 Send";
 const char fx3_snd_l[] = "FX3 Send";
 
 /* cicli caldi in assembly */
@@ -1122,6 +1181,29 @@ __asm__(
      * (scrittura) e 0x400A6D2E (lettura) con una tabella di posizioni che perde le parole degli id
      * interni 0x1A e 0x46 e rilegge nella 0 il valore della 0x1A. Le tre parole di fx3 vanno nei byte
      * +148..+155 del blocco nel file, che l'OS azzera e non legge: marcatore "SH" e le tre parole. */
+    "        .globl  fx3_in_hook\n"
+    "fx3_in_hook:\n"                           /* mandate dell'ingresso (0x4008F4C4): d1/a0 = guadagni L/R; */
+    "        move.l  (%sp),4(%sp)\n"            /* istruzioni sostituite: addq.l #4,sp (argomento della */
+    "        addq.l  #4,%sp\n"                  /* legge di bilanciamento), move.w 1812(a2),d2 (REV) */
+    "        move.w  1812(%a2),%d2\n"
+    "        lea     -16(%sp),%sp\n"
+    "        movem.l %d0-%d2/%a1,(%sp)\n"
+    "        move.l  %a0,-(%sp)\n"
+    "        move.l  %a0,-(%sp)\n"
+    "        move.l  %d1,-(%sp)\n"
+    "        jsr     fx3_in\n"
+    "        addq.l  #8,%sp\n"
+    "        movea.l (%sp)+,%a0\n"
+    "        movem.l (%sp),%d0-%d2/%a1\n"
+    "        lea     16(%sp),%sp\n"
+    "        rts\n"
+    "        .globl  fx3_in_page\n"
+    "fx3_in_page:\n"                          /* al posto di clr.l 0x41B9F7F8 (External Mixer, casella C) */
+    "        move.l  %d0,-(%sp)\n"
+    "        move.l  #269,%d0\n"
+    "        move.l  %d0,0x41B9F7F8\n"
+    "        move.l  (%sp)+,%d0\n"
+    "        rts\n"
     "        .globl  fx3_kser_hook\n"
     "fx3_kser_hook:\n"                         /* al posto di 0x400A6D96 (file, kit) */
     "        move.l  8(%sp),-(%sp)\n"

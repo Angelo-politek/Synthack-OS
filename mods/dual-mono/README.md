@@ -2,7 +2,7 @@
 
 With **SETTINGS → AUDIO ROUTING → EXTERNAL IN = mono**, the two inputs get independent levels.
 
-- External Mixer page: `IN L · IN R · – · –` / `DEL · REV · – · FX` (sends stay shared).
+- External Mixer page: `IN L · IN R · FX3 · –` / `DEL · REV · – · FX` (sends stay shared; FX3 comes from [fx3](../fx3)).
 - In stereo mode everything is **identical to stock** (verified bit-for-bit in emulation).
 
 ## How it works

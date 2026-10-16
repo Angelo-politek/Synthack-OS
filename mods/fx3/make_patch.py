@@ -49,6 +49,8 @@ HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
      "somme del master: jsr fx3_mix_hook (bus 3, chorus, ritorno) ; nop ; nop"),
     (0x4019_4E2A, "42b941b9f83c", "fx3_page_stub", "pagina 25 (FX3): caselle all'avvio"),
     (0x4019_4A50, "42b941b9f6a0", "fx3_amp_stub", "pagine AMP: SND3 (72) in G della pagina 1, PAN (80) in E della pagina 2"),
+    (0x4008_F4C4, "588f342a0714", "fx3_in_hook", "mandate dell'ingresso: jsr fx3_in_hook (SND3 dell'ingresso)"),
+    (0x4019_4DC4, "42b941b9f7f8", "fx3_in_page", "pagina External Mixer: SND3 dell'ingresso (269) nella casella C"),
 ]
 # tab REVERB: vettore delle pagine {21} -> {21, 25}; nomi della pagina 25
 REVERB_COUNT, REVERB_ARRAY = 0x4003_588C, 0x4003_5892
@@ -87,6 +89,10 @@ PARAMS = [
      [(0x4018_F476, "2f05", "2f03"), (0x4018_F47E, "7004", "7000")]),
 ]
 G_MOD = 0x41B9_D730                     # icona MOD delle macchine (id 176)
+# SND3 dell'ingresso: id 269 (vparams), oggetto come DEL di fx3 (249): {offset: (operando, atteso, nuovo)}
+SND_IN = {"id": 269, "slot": 7, "objs": {20: (0x4018_F9AA, 0x41B9_DFD0, "fx3_proto_vol"),
+                                         36: (0x4018_F9BC, 0x41B9_D8B0, G_SEND), 68: (0x4018_F9D8, 0x41B9_D670, S_BAR)},
+          "fix": [(0x4018_F996, "2f05", "2f03"), (0x4018_F99E, "7201", "7200")]}
 SND3 = {"id": 72, "g36": (0x4018_B37A, G_KNOB, G_MOD), "s68": (0x4018_B396, 0x41B9_D670, S_BAR)}
 
 
@@ -220,6 +226,16 @@ def main() -> None:
                 fixed(r + 48, long(syms["fx3_snd_s"]), "id 72: nome breve 'FX3'"),
                 fixed(r + 36, long(0xE00), "id 72: destinazione di modulazione (LFO), come la mandata DEL (78)",
                       "00000000")]
+    # SND3 dell'ingresso
+    r = DESC + 52 * SND_IN["id"]
+    patches.append(vparams.entry(SND_IN["slot"], SND_IN["id"], syms["fx3_in_get"], syms["fx3_in_set"], "fx3 SND3 IN"))
+    for off, (addr, orig, new) in SND_IN["objs"].items():
+        patches.append(fixed(addr, long(resolve(new)), f"id 269 +{off}: {resolve(new):#010x}", f"{orig:08x}"))
+    for addr, orig, new in SND_IN["fix"]:
+        patches.append(fixed(addr, bytes.fromhex(new), "id 269: campo dell'oggetto come DEL (249)", orig))
+    patches += [fixed(r + 8, struct.pack(">III", 0, 0x7F00, 0), "id 269 -> SND3 dell'ingresso: min, max, default"),
+                fixed(r + 40, long(syms["fx3_in_l"]), "id 269: nome lungo 'Input FX3 Send'"),
+                fixed(r + 48, long(syms["fx3_snd_s"]), "id 269: nome breve 'FX3'")]
     # pagina FX3
     for n, (pid, short, ln, mx, df, protos, extra) in enumerate(PARAMS):
         r = DESC + 52 * pid
@@ -242,7 +258,7 @@ def main() -> None:
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
-            "fx3_kser_hook", "fx3_kdes_hook")},
+            "fx3_kser_hook", "fx3_kdes_hook", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,
     }

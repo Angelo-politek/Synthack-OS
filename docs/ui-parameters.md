@@ -49,6 +49,7 @@ Slots are read at draw time: changing them at runtime changes the page (0 = empt
 | 262–268 | Digitakt MIDI-track "CC1–CC7 Select" (page never shown, no MIDI CC) | master-comp (virtual, via [vparams](../mods/vparams)) |
 | 144 | amp delay time | the kit word of 144 stores fx3 |
 | 72 | amp "Delay Time", saved per track, unused | fx3 SND3 (native, per track) |
+| 269 | Digitakt MIDI-track "CC8 Select" | fx3: SND3 of the external input (virtual), External Mixer slot C |
 | 48–51 | Trig modifier Mod A, M1–M4 | perf-fx: effect of keys 13–16 (native storage in the kit, text formatter) |
 | 246–253 | Digitakt MIDI-track parameters (no MIDI tracks on Syntakt) | fx3 page (virtual) |
 

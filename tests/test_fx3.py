@@ -20,7 +20,7 @@ import pytest
 
 pytest.importorskip("unicorn")
 from unicorn import UC_ARCH_M68K, UC_HOOK_CODE, UC_MODE_BIG_ENDIAN, Uc  # noqa: E402
-from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A0, UC_M68K_REG_A1, UC_M68K_REG_A3,  # noqa: E402
+from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A0, UC_M68K_REG_A1, UC_M68K_REG_A2, UC_M68K_REG_A3,  # noqa: E402
                                 UC_M68K_REG_A6, UC_M68K_REG_A7, UC_M68K_REG_D0, UC_M68K_REG_D1,
                                 UC_M68K_REG_D2, UC_M68K_REG_D3, UC_M68K_REG_D7, UC_M68K_REG_SR)
 
@@ -869,3 +869,84 @@ def test_kit_hooks_keep_failure_paths():
     assert m.call(KSER, [0, KBLK]) & 0xFF == 0
     m.uc.mem_write(FILE, struct.pack(">I", 7))              # tipo di blocco sbagliato: l'OS rifiuta
     assert m.call(KDES, [KIT2, FILE]) & 0xFF == 0
+
+
+# ----------------------------------------------------------------------------- SND3 dell'ingresso (v0.9)
+IN_ID, IN_HOOK_RET = 269, 0x5000_E000
+A2 = 0x5000_9000                                    # array dei parametri levigati (a2 nel mix)
+
+
+def test_input_snd3_through_vparams_in_kit_word_0x37(m):
+    kit = 0x5000_6000
+    m.uc.mem_write(0x8000_30BC, struct.pack(">I", kit))
+    m.uc.mem_write(kit, bytes(142))
+    m.uc.mem_write(kit + 110, b"\xAB\x00")                      # byte alto: non nostro
+    assert m.call(KIT, [0x5000_0000, IN_ID]) == 1
+    assert m.call(GET, [0x5000_0000, IN_ID]) == 0
+    m.call(SET, [0x5000_0000, IN_ID, 90 << 8, 1])
+    assert m.call(GET, [0x5000_0000, IN_ID]) == 90 << 8
+    assert bytes(m.uc.mem_read(kit + 110, 2)) == b"\xAB\x5A"
+    m.call(SET, [0x5000_0000, IN_ID, 0x9000, 1])
+    assert m.call(GET, [0x5000_0000, IN_ID]) == 127 << 8         # limitato
+
+
+def in_hook(m, gl, gr, rev=0x1357):
+    """Come a 0x4008F4C4: in pila l'argomento della legge di bilanciamento, d1/a0 guadagni L/R."""
+    m.uc.mem_write(A2 + 1812, struct.pack(">H", rev))
+    sp = STACK - 8
+    m.uc.mem_write(sp, struct.pack(">II", RET, 0xBA1A))
+    regs = {UC_M68K_REG_D0: 0xD0, UC_M68K_REG_D1: gl, UC_M68K_REG_D2: 0xD2, UC_M68K_REG_A0: gr,
+            UC_M68K_REG_A1: 0xA1, UC_M68K_REG_A2: A2, UC_M68K_REG_D3: 0xD3}
+    for r, v in regs.items():
+        m.uc.reg_write(r, v & 0xFFFFFFFF)
+    m.uc.reg_write(UC_M68K_REG_SR, 0x2700)
+    m.uc.reg_write(UC_M68K_REG_A7, sp)
+    m.uc.emu_start(m.sym["fx3_in_hook"], RET, count=10_000)
+    assert m.uc.reg_read(UC_M68K_REG_A7) == STACK              # argomento tolto (addq.l #4,sp)
+    assert m.uc.reg_read(UC_M68K_REG_D2) & 0xFFFF == rev       # move.w 1812(a2),d2
+    for r, v in regs.items():
+        if r != UC_M68K_REG_D2:
+            assert m.uc.reg_read(r) & 0xFFFFFFFF == v & 0xFFFFFFFF
+    return m.longs(m.sym["fx3_tgt"], 16)
+
+
+@pytest.mark.parametrize("v", [0, 40, 127])
+def test_input_targets_like_the_os_input_sends(m, v):
+    kit = 0x5000_6000
+    m.uc.mem_write(0x8000_30BC, struct.pack(">I", kit))
+    m.uc.mem_write(kit, bytes(142))
+    m.call(SET, [0x5000_0000, IN_ID, v << 8, 1])
+    m.put(m.sym["fx3_moving"], [0])
+    gl, gr = s32(-0x5000_0000), s32(-0x2000_0000)               # come escono da msac (negativi)
+    tgt = in_hook(m, gl, gr)
+    s = (2 * (v << 8) ** 2) >> 16
+    sw = lambda x: struct.unpack(">h", struct.pack(">H", ((x >> 1) >> 16) & 0xFFFF))[0]
+    assert tgt[12] == (sw(gl) * s if v else 0) and tgt[13] == (sw(gr) * s if v else 0)
+    assert tgt[:12] == [0] * 12
+    assert (m.longs(m.sym["fx3_moving"], 1)[0] != 0) == (v > 0)
+
+
+@pytest.mark.parametrize("on", [[12], [13], [12, 13], [3, 12], [0, 5, 9, 12, 13]])
+def test_bus_includes_the_input(m, on):
+    dig = [((k * 7919 + n * 104729) % 65536 - 32768) << 12 for k in range(8) for n in range(32)]
+    ana = [((k * 31337 + n * 7) % 65536 - 32768) << 12 for k in range(6) for n in range(32)]
+    m.put(SRC_DIG, dig)
+    m.put(SRC_ANA, ana)
+    m.put(m.sym["fx3_bus"], [12345] * 16)
+    g = [0x0800_0000 * (k + 1) if k in on else 0 for k in range(14)]
+    gains(m, g)
+    run_block(m)
+    bus = m.longs(m.sym["fx3_bus"], 16)
+    pair = lambda x, k, n: x[32 * k + 2 * n] + x[32 * k + 2 * n + 1]
+    for n in range(16):
+        want = (-sum(g[k] * pair(dig, k, n) for k in range(8)) * 2
+                - sum(g[8 + k] * pair(ana, k, n) for k in range(6)) * 2)
+        assert abs(bus[n] - want / 2 ** 32) < 64, n
+
+
+def test_input_snd3_on_the_external_mixer_page(m):
+    m.uc.mem_write(0x41B9_F7F8, struct.pack(">I", 0))
+    m.uc.reg_write(UC_M68K_REG_D0, 0x1234)
+    m.call(m.sym["fx3_in_page"])
+    assert struct.unpack(">I", m.uc.mem_read(0x41B9_F7F8, 4))[0] == IN_ID
+    assert m.uc.reg_read(UC_M68K_REG_D0) == 0x1234

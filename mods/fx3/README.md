@@ -4,6 +4,7 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 
 ## Use
 
+- **External input** (v0.9): its own FX3 send, slot C of the External Mixer page, stereo and mono. Same gain law as the input's DEL/REV sends (level and balance, then (v/32768)²), from ADC 4/5 into the FX3 bus; value saved with the kit (low byte of FX-track word 0x37).
 - **SND3**: every audio track, **AMP page 1**, slot G, next to DEL and REV (PAN moves to page 2, slot E). Saved per track with the kit, p-lockable, shown in dB like the other sends, with the machines' MOD icon. Since v0.9 it is also an LFO destination, like DEL and REV (same descriptor flags).
 - **FX3 page**: FX track → **REVERB** tab, press it again for page 2. TYPE picks the effect; the next five knobs change name and range with it:
 
