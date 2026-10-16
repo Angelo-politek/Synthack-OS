@@ -6,7 +6,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 > **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
 > Learn the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.
 
-**Status:** `v0.8.0` — seven mods running on real hardware.
+**Status:** `v0.8.1` — seven mods running on real hardware.
 
 ## Features
 
@@ -14,8 +14,8 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 |---|---|---|
 | [Master compressor](mods/master-comp) | ✅ v0.5.0 | Bus compressor on the **analog master** (via the master VCAs). Digitakt-style curves. THR · ATK · REL · MUP · RAT + gain-reduction meter + ON/OFF switch on the FX track SYN page, values in dB / ms / ratio. Saved per pattern, or global with *SYN global*. |
 | [Dual mono input](mods/dual-mono) | ✅ v0.5.0 | With EXTERNAL IN set to mono, **IN L** and **IN R** get independent levels on the External Mixer page. |
-| [Boot splash](mods/splash) | ✅ v0.8.0 | "SyntHack" logo and version after the official intro. Boot time unchanged. |
-| [Mod area](mods/modarea) | ✅ infra | 64 KB of RAM for mod code, stored compressed and unpacked at boot. |
+| [Boot splash](mods/splash) | ✅ v0.8.1 | "SyntHack" logo and version after the official intro. Boot time unchanged. |
+| [Mod area](mods/modarea) | ✅ infra | 64 KB for mod code, stored compressed and unpacked at boot into a block reserved from the OS heap. |
 | [Readable parameter values](mods/readable-values) | ✅ v0.5.0 | Hz, dB, ms and % instead of 0–127: filters, envelopes, levels, sends, delay and reverb, on every track and the FX track. Computed from the same data the DSP uses; analog parts measured on the device. |
 | [Beat repeat](mods/beat-repeat) | ✅ v0.6.0 | Sequencer stutter on **all tracks** (analog too): hold retrig keys 13/14 on the FX track to loop the last 1/16 … 1 bar (rates RPT1/RPT2 on the TRIG page, saved with the kit) and resume in time. |
 | [Third send FX](mods/fx3) | ✅ v0.8.0 | **SND3** on every track (AMP page 1, next to DEL and REV; PAN moves to page 2) into a **chorus, flanger, phaser or crusher**, with its own page (REVERB tab, page 2) saved with the kit, independent return level and a send into the delay. |

@@ -9,7 +9,7 @@
 | [vparams](vparams) | Virtual parameters shared by mods (kit-parameter hooks + registration table) | modarea |
 | [dual-mono](dual-mono) | Independent IN L / IN R levels when EXTERNAL IN is mono | — |
 | [splash](splash) | "SyntHack" logo and version after the official intro | — |
-| [modarea](modarea) | Unpacks the (compressed) mod code into 64 KB of RAM at boot | — |
+| [modarea](modarea) | Unpacks the (compressed) mod code at boot into a 64 KB block of the OS heap | — |
 | [mod-zero](mod-zero) | Example: renames a menu entry (smallest possible mod) | — |
 
 Each folder has `make_patch.py` (rebuilds `patch.json` from our sources) and a test in `tests/` (mod-zero: hand-written `patch.json`).

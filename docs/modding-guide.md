@@ -9,7 +9,7 @@ How the mods in this repository are built, and how to do the common things: hook
 3. `tools/build/build.py` checks every hash, overlaps and the boot decompression margin, and writes the `.syx`.
 4. Flash, test on the device, only then publish.
 
-Mod area (64 KB, unpacked at boot, zeroed beyond the code):
+Mod area (first 64 KB block of the OS heap, from `modarea_layout.RAM`; unpacked at boot, zeroed beyond the code):
 
 | Offset | Use |
 |---|---|
@@ -24,6 +24,7 @@ Section 3 free fill `0x40338740–0x40339000`: splash, dual-mono, modarea loader
 **Rules learned the hard way**
 
 - Never touch sections 2 and 6; never make the boot intro longer.
+- Never use the RAM above the BSS (`0x45565490–0x48000000`): no code refers to it, but the OS writes all over it when it loads samples ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)). Memory for mods comes from the mod area, i.e. from the OS heap.
 - Keep the boot decompression margin (build fails under 4 KB). Zero padding is the worst case.
 - No `.bss` in mod code: put variables in `.data` (`__attribute__((section(".data")))`). The mod area is zeroed anyway, but the build checks.
 - No libgcc: `nm -u` must be empty. ColdFire has `divu.l`/`remu.l`, `ff1`, `mvs`/`mvz`, `sats` — GCC uses them.
@@ -41,7 +42,7 @@ A hook replaces ≥ 6 bytes of OS code with `jsr ours` (padded with `nop`), and 
 
 ## 3. Parameters
 
-Logical id → descriptor (`0x4022D59C + 52·id`: group, internal id, min/max/default, MIDI, names at +40/+48). Hidden ids (no page, no MIDI) can be reused: see the table in [ui-parameters](ui-parameters.md#hidden-ids-used-by-the-mods). Patch min/max/default and the name pointers in the descriptor to make the id yours.
+Logical id → descriptor (`0x4022D59C + 52·id`: group, internal id, min/max/default, MIDI, names at +40/+48). An id without a page or a MIDI CC is not necessarily free: if another descriptor has the same group and internal id, it is an **alias** that the OS can put on a page in some modes (#3). `tests/test_id_audit.py` rejects aliases, MIDI CC/NRPN and ids shared between mods; ids in use are listed in [ui-parameters](ui-parameters.md#hidden-ids-used-by-the-mods). Patch min/max/default and the name pointers in the descriptor to make the id yours.
 
 **Virtual parameters** ([vparams](../mods/vparams)): register `{id, get, set}` in the table and the three kit functions (is-kit, get, set) call your functions for that id. Values are 0…0x7F00 (127 × 256). `set` must request a redraw: `*(*0x444E1334 + 96) = 1`.
 
@@ -49,6 +50,7 @@ Logical id → descriptor (`0x4022D59C + 52·id`: group, internal id, min/max/de
 
 - **Per track**: engine word +106 (internal id 39, hidden id 72 "amp delay time") is saved per track and p-lockable. fx3 uses it for SND3 (a real OS parameter: only its descriptor and page slot change).
 - **Per kit (pattern)**: `*0x800030BC` is the pattern kit = the FX track's parameters, one word per internal id (offset = 2 × id, 142 B). Words with no use: ids 0, 0x1A, 0x24, 0x27, 0x29, 0x2A, 0x37, 0x46 and 0x38 (hidden id 144). master-comp uses 0x24/0x27/0x29/0x2A, fx3 0/0x1A/0x38/0x46, beat-repeat 0x37: **all taken**. Store values **XOR their default**, so old projects (zero words) load with defaults. Read the word on every use (pattern changes swap the kit); fall back to RAM while the pointer is 0. With *global* FX blocks the OS uses a container at `0x41B9D3B0` instead (master-comp follows the SYN flag).
+- **Kit on storage** (FUNC+YES/NO, project save): the FX block goes through a position table that drops words 0x1A and 0x46 and reads word 0 back from 0x1A. fx3 keeps those three words in 8 reserved bytes of the stored block (hooks at `0x400A6D96` / `0x400A6D2E`). Any new kit word must survive the round trip tested in `tests/test_fx3.py`.
 
 ## 4. Pages and tabs
 
