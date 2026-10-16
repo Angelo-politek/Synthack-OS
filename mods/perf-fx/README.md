@@ -19,7 +19,7 @@ Performance effects on the sequencer, played with trig keys 13–16. Replaces be
 
 - Sequencer tick `0x4008C924`: per track, the step index `0x43BD73FC + t` advances and wraps on the track/pattern length. A hook at the end of each track's iteration (`0x4008D152`) moves it inside the slice and keeps the real position.
 - Keys: hook in the keys 13–16 branch of `KeyboardView::consumeKeyEvent` (`0x4002EA92`), after the OS mode checks. It takes the keys only when the active modifier is Mod A (byte +29 of the project settings, read with `0x40015AF6`). Releases are also caught at the event dispatcher (`0x4000B420`).
-- Settings: Mod A M1–M4 are ids 48–51 (group 63), stored in the active kit (`*0x800030B8 + 0x15B6`, words). Their descriptors get range 0–11, the objects a text formatter and a text slot graphic. TRIG and DEST leave the page. Page name "Perf FX", message "Perf FX ON".
+- Settings: Mod A M1–M4 are ids 48–51 (group 63), stored in the active kit (`*0x800030B8 + 0x15B6`, words). Their descriptors get range 0–11, the objects a text formatter and a text slot graphic. DEST leaves the page (slot D). Page name "Perf FX", message "Perf FX ON".
 - `perf.c` (C, ColdFire gcc) in the mod area at offset `+0x4000`.
 
 Test: `tests/test_perf_fx.py` (repeat, reverse and half speed at every length, release in time, short tracks, effect switch, out-of-range values, keys only in Mod A, native fallback, dispatcher, texts, page and descriptors).

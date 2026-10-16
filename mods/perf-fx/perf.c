@@ -253,9 +253,8 @@ __asm__(
     "        jmp     0x4000839E\n"
     "        .globl  pf_page_stub\n"
     "pf_page_stub:\n"                           /* al posto di clr.l 0x41B9F9DC (pagina Mod A, all'avvio): */
-    "        clr.l   0x41B9F9DC\n"              /* via TRIG e DEST, restano M1..M4; oggetti 48..51 */
+    "        clr.l   0x41B9F9DC\n"              /* casella D (DEST) vuota, restano M1..M4; oggetti 48..51 */
     "        clr.l   0x41B9F9E0\n"              /* con tipo 0 (valore discreto, come LFO MODE) */
-    "        clr.l   0x41B9F9F4\n"
     "        clr.l   0x41BA09E4\n"
     "        clr.l   0x41BA0A38\n"
     "        clr.l   0x41BA0A8C\n"

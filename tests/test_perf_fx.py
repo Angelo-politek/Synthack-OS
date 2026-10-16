@@ -344,7 +344,7 @@ def test_mod_a_page_and_objects_at_boot(m):
     for pid in range(48, 52):
         m.uc.mem_write(0x41B9_FA24 + 84 * pid, struct.pack(">I", 1))
     m.call(m.sym["pf_page_stub"], [])
-    assert struct.unpack(">7I", m.uc.mem_read(page, 28)) == (0, 0, 48, 49, 50, 51, 0)
+    assert struct.unpack(">7I", m.uc.mem_read(page, 28)) == (0, 0, 48, 49, 50, 51, 46)  # +40 (TRIG) resta
     for pid in range(48, 52):
         assert struct.unpack(">I", m.uc.mem_read(0x41B9_FA24 + 84 * pid, 4))[0] == 0
 
