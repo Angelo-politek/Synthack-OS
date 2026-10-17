@@ -429,6 +429,7 @@ def test_send_graphics():
     fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
     assert fixes[0x4018_F356] == "41b9dbd0" and fixes[0x4018_F372] == "41b9d5d0"   # DEL (249): come la mandata DEL
     assert fixes[0x4018_B37A] == "41b9d730" and fixes[0x4018_B396] == "41b9d5d0"   # SND3 (72): icona MOD + barra
+    assert fixes[0x4018_F49C] == "41b9dba0"                                        # REV (253): come la mandata REV (79)
 
 
 def test_type_drawn_as_text(m):

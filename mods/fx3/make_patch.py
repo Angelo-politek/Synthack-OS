@@ -41,6 +41,7 @@ CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x}u -DDM_HDR={DL.HDR:#x}u -DKS_FX3
 FS = 24000                              # il chorus lavora a 24 kHz
 DESC = 0x4022_D59C
 P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_DFD0, 0x41B9_DCD0, 0x41B9_DBD0, 0x41B9_D5D0
+G_REV = 0x41B9_DBA0                     # icona della mandata al riverbero delle tracce (id 79)
 VP_SLOT = 9                             # posti 9..15 della tabella di vparams
 
 HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
@@ -92,7 +93,7 @@ PARAMS = [
       68: (0x4018_F372, 0x41B9_D670, S_BAR)},
      [(0x4018_F332, "2f04", "2f03")]),
     (253, "REV", "FX3 to Reverb", 127, 0,
-     {20: (0x4018_F48A, 0x41B9_DF60, "fx3_proto_vol"), 36: (0x4018_F49C, 0x41B9_DCC0, G_SEND),
+     {20: (0x4018_F48A, 0x41B9_DF60, "fx3_proto_vol"), 36: (0x4018_F49C, 0x41B9_DCC0, G_REV),
       68: (0x4018_F4B8, 0x41B9_D670, S_BAR)},
      [(0x4018_F476, "2f05", "2f03"), (0x4018_F47E, "7004", "7000")]),
 ]
