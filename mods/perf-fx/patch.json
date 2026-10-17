@@ -90,6 +90,14 @@
     },
     {
       "section": 3,
+      "addr": "0X40047D7A",
+      "len": 2,
+      "expect_sha256": "3c91f28914dc53b5b5d790e6268305cef1a47f85e6f6f6e080d45e08cc39a83b",
+      "hex": "72fe",
+      "what": "encoder sull'id 47: niente menu delle destinazioni (moveq #-2), Mod B (53) invariato"
+    },
+    {
+      "section": 3,
       "addr": "0X4018AB96",
       "len": 2,
       "expect_sha256": "e66b395a5f86146eab65009f9115f9e1b261f84c1df3aa5fb4090ac4a88cd069",

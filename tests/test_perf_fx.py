@@ -639,8 +639,16 @@ def test_retrig_page_and_qnt_parameter(m):
 
 
 def test_qnt_patched_bytes():
-    want = {0x4002_E18C: "4e56ff68700b", 0x4019_51C0: "42b941b9f988", 0x4018_AB96: "2f04",
+    want = {0x4002_E18C: "4e56ff68700b", 0x4019_51C0: "42b941b9f988", 0x4018_AB96: "2f04", 0x4004_7D7A: "722fb2806764",
             0x4018_ABB6: "41b9dfd0", 0x4018_ABC8: "41b9daa0"}
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig
+
+
+def test_qnt_does_not_open_the_destination_menu():
+    """L'encoder sull'id 47 non apre piu' il menu DEST (0x40047D7A); quello di Mod B (53) resta."""
+    spec = json.loads(SPEC_F.read_text(encoding="utf-8"))
+    fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
+    assert fixes[0x4004_7D7A] == "72fe"
+    assert 0x4004_7D80 not in fixes

@@ -42,6 +42,7 @@ PAGE_HOOK, PAGE_ORIG = 0x4019_5294, "42b941b9f9dc"      # clr.l 0x41B9F9DC (pagi
 QR_HOOK, QR_ORIG = 0x4002_E18C, "4e56ff68700b"            # link.w fp,#-152 ; moveq #11,d0
 QR_PAGE, QR_PAGE_ORIG = 0x4019_51C0, "42b941b9f988"      # clr.l 0x41B9F988 (pagina Retrig, casella D)
 QNT_ID = 47
+DEST_MENU = (0x4004_7D7A, "722f", "72fe")              # moveq #47,d1: id sotto l'encoder = DEST di Mod A -> menu
 QNT_OBJ = (0x4018_AB96, 0x4018_ABB6, 0x4018_ABC8)          # push del prototipo, +20, +36 dell'oggetto 47
 NAMES = [(0x4019_5202, "4024f87b", "pf_page_s", "pagina Mod A: nome breve 'PERF'"),
          (0x4019_5236, "40251b59", "pf_page_l", "pagina Mod A: nome lungo 'Perf FX'"),
@@ -124,6 +125,8 @@ def main() -> None:
     patches += [
         fixed(QR_HOOK, jmp("qr_hook"), "FUN_4002E18C (nota con retrig dei tasti): jmp qr_hook", QR_ORIG),
         fixed(QR_PAGE, jsr("qr_page_stub"), "pagina Retrig all'avvio: QNT (47) nella casella D", QR_PAGE_ORIG),
+        fixed(DEST_MENU[0], bytes.fromhex(DEST_MENU[2]),
+              "encoder sull'id 47: niente menu delle destinazioni (moveq #-2), Mod B (53) invariato", DEST_MENU[1]),
         fixed(QNT_OBJ[0], bytes.fromhex("2f03"), "id 47 +4: prototipo discreto (come 48..51)", "2f04"),
         fixed(QNT_OBJ[1], long(syms["qr_proto"]), "id 47 +20: testo OFF/ON", "41b9dfd0"),
         fixed(QNT_OBJ[2], long(syms["qr_gfx_proto"]), "id 47 +36: casella a testo", "41b9daa0"),
