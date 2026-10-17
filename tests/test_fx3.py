@@ -1078,12 +1078,30 @@ def test_routing_other_entries_go_to_the_os(m):
 
 
 def test_routing_entry_13_drawn_as_fx3(m):
-    m.uc.mem_write(0x400F_8A0C, b"\x4e\x75")
-    box = stub_calls(m, 0x400F_7BD6, 6, m.sym["fx3_rt_draw"], [0xC0, 70, 45 - 6, 74, 1])
-    txt = stub_calls(m, 0x400F_8A0C, 6, m.sym["fx3_rt_draw"], [0xC0, 70, 45 - 6, 74, 1])
-    assert box[0] == [0xC0, 66, 39, 78, 51, 1]                   # come le caselle delle tracce
-    assert txt[0][:5] == [0xC0, 0x443D_A218, 72, 43, 2]
-    assert text(m, txt[0][5]).startswith("FX3")
+    """Come le tracce (0x4004C1F4): casella (x-4, base-12, x+8, base) e testo in x+2 sulla riga d7,
+    con x = a2, base = d3 dalla riga del ciclo (51, poi 23)."""
+    m.uc.mem_write(0x400F_8A0C, bytes.fromhex("4e75"))
+    for base in (51, 23):
+        regs = {UC_M68K_REG_D2: 0xC0, UC_M68K_REG_A2: 70, UC_M68K_REG_D3: base, UC_M68K_REG_D7: base - 8}
+        args = [0xC0, 70, base - 6, 74, 1]                       # quello che spinge l'OS (ignorato)
+        box = stub_calls_regs(m, 0x400F_7BD6, 6, m.sym["fx3_rt_draw"], args, regs)
+        txt = stub_calls_regs(m, 0x400F_8A0C, 6, m.sym["fx3_rt_draw"], args, regs)
+        assert box == [[0xC0, 66, base - 12, 78, base, 1]]
+        assert txt[0][:5] == [0xC0, 0x443D_A218, 72, base - 8, 2]
+        assert text(m, txt[0][5]).startswith("FX3")
+
+
+def stub_calls_regs(m, addr, nargs, fn, args, regs):
+    m.uc.mem_write(addr, bytes.fromhex("4e75"))
+    got = []
+
+    def at(uc, a, size, _):
+        sp = uc.reg_read(UC_M68K_REG_A7)
+        got.append([s32(v) for v in struct.unpack(f">{nargs}I", uc.mem_read(sp + 4, 4 * nargs))])
+    h = m.uc.hook_add(UC_HOOK_CODE, at, begin=addr, end=addr)
+    m.call(fn, args, regs)
+    m.uc.hook_del(h)
+    return got
 
 
 def test_routing_led_of_key_13_enabled():

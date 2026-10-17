@@ -550,10 +550,10 @@ void fx3_route_toggle(void)
         ui[96] = 1;
 }
 
-void fx3_route_draw(void *ctx, s32 x, s32 y)              /* al posto del segnaposto della voce 13 */
-{
-    DRAW_BOX(ctx, x - 4, y - 6, x + 8, y + 6, 1);
-    DRAW_STR(ctx, FONT_RT, x + 2, y - 2, 2, "FX3");
+void fx3_route_draw(void *ctx, s32 x, s32 base, s32 ty)  /* al posto del segnaposto della voce 13: */
+{                                                          /* casella e testo come le tracce (0x4004C1F4) */
+    DRAW_BOX(ctx, x - 4, base - 12, x + 8, base, 1);
+    DRAW_STR(ctx, FONT_RT, x + 2, ty, 2, "FX3");
 }
 
 /* ---- testi (std::function come in readable-values) */
@@ -1235,14 +1235,13 @@ __asm__(
     "        movem.l %d2-%d4/%a2,(%sp)\n"
     "        jmp     0x4004BF8E\n"
     "        .globl  fx3_rt_draw\n"
-    "fx3_rt_draw:\n"                            /* 0x4004C242: segnaposto (ctx, x, y - 6, x + 4, 1) */
-    "        move.l  12(%sp),%d0\n"
-    "        addq.l  #6,%d0\n"
-    "        move.l  %d0,-(%sp)\n"
-    "        move.l  12(%sp),-(%sp)\n"
-    "        move.l  12(%sp),-(%sp)\n"
+    "fx3_rt_draw:\n"                            /* 0x4004C242: d2 = contesto, a2 = x, d3 = base della riga, */
+    "        move.l  %d7,-(%sp)\n"                    /* d7 = riga del testo (registri del ciclo dell'OS) */
+    "        move.l  %d3,-(%sp)\n"
+    "        move.l  %a2,-(%sp)\n"
+    "        move.l  %d2,-(%sp)\n"
     "        jsr     fx3_route_draw\n"
-    "        lea     12(%sp),%sp\n"
+    "        lea     16(%sp),%sp\n"
     "        rts\n"
     "        .globl  fx3_mix_hook\n"
     "fx3_mix_hook:\n"                           /* 0x4008FB04: al posto di pea -296(fp) ; pea 0x8000E0F0 */
