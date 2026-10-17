@@ -114,7 +114,6 @@ ui_mono:
         bne.s   6f
         | (il ColdFire non ammette move.l #imm verso memoria indirizzata: passiamo da d0/a1)
         clr.l   4(%a0)                          | manopola B: vuota (IN R ha la sua pagina, v2)
-        clr.l   24(%a0)                         | manopola G: vuota (BAL non serve in mono)
         lea     str_inl,%a1
         move.l  %a1,NAME_INLR
         lea     str_inr,%a1

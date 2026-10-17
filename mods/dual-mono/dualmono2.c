@@ -72,11 +72,22 @@ u32 dm_page_r(void)                                                     /* pagin
     return i >= 0 && i < n && b[i] == PAGE_R;
 }
 
+/* External Mixer (pagina 24): in mono FX3 in G accanto a DEL e REV (BAL non serve), in stereo in C con
+ * BAL in G come prima. dm_fx3 = casella C all'avvio (269 con fx3, 0 senza), letta da dm_page_stub. */
+#define MIX_C     (*(volatile s32 *)0x41B9F7F8u)
+#define MIX_G     (*(volatile s32 *)0x41B9F808u)
+#define ID_BAL    128
+s32 dm_fx3 DATA = -1;
+
 void dm_update(void)                                                    /* 4 pagine in mono, 3 in stereo */
 {
     char *v = dm_view;
     s32 *b, n;
 
+    if (dm_fx3 >= 0) {
+        MIX_C = MONO() ? 0 : dm_fx3;
+        MIX_G = MONO() ? dm_fx3 : ID_BAL;
+    }
     if (!v)
         return;
     b = *(s32 **)(v + V_BEGIN);
@@ -228,14 +239,15 @@ __asm__(
     "        moveq   #125,%d0\n"                /* A: IN R (alias 125 = BAL) */
     "        move.l  %d0,0x41B9F874\n"
     "        clr.l   0x41B9F878\n"
-    "        move.l  0x41B9F7F8,%d0\n"          /* C: FX3 come la casella C della pagina IN L */
-    "        move.l  %d0,0x41B9F87C\n"          /* (269 con fx3, altrimenti vuota) */
+    "        clr.l   0x41B9F87C\n"
     "        clr.l   0x41B9F880\n"
     "        move.l  #129,%d0\n"                /* E: DEL, F: REV */
     "        move.l  %d0,0x41B9F884\n"
     "        move.l  #130,%d0\n"
     "        move.l  %d0,0x41B9F888\n"
-    "        clr.l   0x41B9F88C\n"
+    "        move.l  0x41B9F7F8,%d0\n"          /* G: FX3 accanto al riverbero, come la casella C */
+    "        move.l  %d0,0x41B9F88C\n"          /* della pagina IN L (269 con fx3, altrimenti vuota) */
+    "        move.l  %d0,dm_fx3\n"
     "        clr.l   0x41B9F890\n"
     "        clr.l   0x41B9F894\n"
     "        rts\n");

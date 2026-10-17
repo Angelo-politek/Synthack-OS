@@ -33,7 +33,7 @@ FLAG = 0x8000_3146
 PARAMS, HW, STACK = 0x5000_0000, 0x5000_2000, 0x5001_0000
 MIX3 = 0x41B9_F7F0
 STEREO_LAYOUT = [126, 0, 0, 0, 129, 130, 128, 132]
-MONO_LAYOUT = [126, 0, 0, 0, 129, 130, 0, 132]       # IN R (alias 125 = BAL) sta nella pagina IN R (v2)
+MONO_LAYOUT = [126, 0, 0, 0, 129, 130, 128, 132]     # B: IN R nella sua pagina; C e G (FX3) li sposta dualmono2.c
 DESC = 0x4022D59C                                       # descrittori: record da 52 B, indice = id logico
 NAMES = {i: DESC + 52 * i + 48 for i in (125, 126, 127, 128)}
 ORIG_NAMES = {125: 0x4024F8A7, 126: 0x40253B6E, 127: 0x40266015, 128: 0x40265CC9}

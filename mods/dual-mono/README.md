@@ -2,8 +2,8 @@
 
 With **SETTINGS → AUDIO ROUTING → EXTERNAL IN = mono**, the two inputs become two separate mono inputs.
 
-- **External Mixer** page = IN L: `IN L · – · FX3 · –` / `DEL · REV · – · FX`.
-- **IN R** page (MIXER tab, 4th page, only in mono): `IN R · – · FX3 · –` / `DEL · REV · – · –`. Its DEL, REV and FX3 are the sends of IN R, saved with the kit ([kitstore](../kitstore), block 0). Kits from older versions start with them at 0.
+- **External Mixer** page = IN L: `IN L · – · – · –` / `DEL · REV · FX3 · FX`.
+- **IN R** page (MIXER tab, 4th page, only in mono): `IN R · – · – · –` / `DEL · REV · FX3 · –`. FX3 sits next to the reverb on both pages; in stereo it goes back to slot C, with BAL in G. Its DEL, REV and FX3 are the sends of IN R, saved with the kit ([kitstore](../kitstore), block 0). Kits from older versions start with them at 0.
 - Each input goes to the delay, the reverb, FX3 and the FX track (routing: FUNC+FX, trig 16) centred, with its own level and sends.
 - In stereo everything is **identical to stock** (verified in emulation), and the MIXER tab has its 3 pages.
 

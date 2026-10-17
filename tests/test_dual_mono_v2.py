@@ -257,7 +257,31 @@ def test_r_page_slots_at_boot(mod):
     mod.uc.mem_write(0x41B9_F7F8, struct.pack(">I", 269))
     mod.uc.mem_write(0x41B9_F874, struct.pack(">9I", *range(246, 255)))
     mod.call(mod.sym["dm_page_stub"])
-    assert list(struct.unpack(">9I", mod.uc.mem_read(0x41B9_F874, 36))) == [125, 0, 269, 0, 129, 130, 0, 0, 0]
+    assert list(struct.unpack(">9I", mod.uc.mem_read(0x41B9_F874, 36))) == [125, 0, 0, 0, 129, 130, 269, 0, 0]
+
+
+MIX = 0x41B9_F7F0                                       # External Mixer (pagina 24), caselle A..H
+
+
+@pytest.mark.parametrize("fx3", [269, 0])
+def test_fx3_next_to_reverb_in_mono(mod, fx3):
+    """Mono: FX3 in G accanto a DEL e REV (anche nella pagina IN L); stereo: in C, BAL in G come prima."""
+    mod.uc.mem_write(MIX, struct.pack(">8I", 126, 0, fx3, 0, 129, 130, 128, 132))
+    mod.call(mod.sym["dm_page_stub"])
+    view(mod, 0, True)
+    mod.uc.mem_write(mod.sym["dm_view"], struct.pack(">I", VIEW))
+    mod.call(mod.sym["dm_update"])
+    assert list(struct.unpack(">8I", mod.uc.mem_read(MIX, 32))) == [126, 0, 0, 0, 129, 130, fx3, 132]
+    mod.uc.mem_write(FLAG, b"\x01")
+    mod.call(mod.sym["dm_update"])
+    assert list(struct.unpack(">8I", mod.uc.mem_read(MIX, 32))) == [126, 0, fx3, 0, 129, 130, 128, 132]
+
+
+def test_slots_untouched_before_the_page_init(mod):
+    mod.uc.mem_write(MIX, struct.pack(">8I", 126, 0, 269, 0, 129, 130, 128, 132))
+    mod.uc.mem_write(FLAG, b"\x00")
+    mod.call(mod.sym["dm_update"])
+    assert list(struct.unpack(">8I", mod.uc.mem_read(MIX, 32))) == [126, 0, 269, 0, 129, 130, 128, 132]
 
 
 def test_header_and_patched_bytes():
