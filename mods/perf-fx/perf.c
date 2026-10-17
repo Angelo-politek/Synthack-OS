@@ -17,6 +17,13 @@
  * controlli di modo dell'OS, solo se il modificatore attivo e' Mod A (pattern corrente + 44, come a
  * 0x4002E6F4); i rilasci passano anche dal
  * dispatcher degli eventi (0x4000B420). Con piu' tasti premuti vale l'ultimo.
+ *
+ * Retrig quantizzato (QNT, casella D della pagina Retrig; id 47 = DEST di Mod A, che perf-fx non usa):
+ * in modo Retrig, a sequencer in moto, la nota con retrig dei tasti (FUN_4002E18C) parte allo step
+ * successivo della sua traccia. Il tick (interrupt) manda alla coda dell'interfaccia (0x405D3A7C) un
+ * messaggio 6 (std::function eseguita dal ciclo dell'interfaccia) che chiama FUN_4002E18C; se il tasto
+ * e' gia' stato rilasciato, il rilascio e' trattenuto e rimandato (messaggio 0, evento del tasto) allo
+ * step dopo: il retrig dura almeno uno step.
  */
 
 typedef unsigned int u32;
@@ -38,6 +45,17 @@ typedef int s32;
 #define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...)) \
                    0x400F8C18u)                             /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
 #define FONT      ((const void *)0x402A91C0u)               /* 4x6 */
+#define RETRIG    0
+#define QNT_ID    47                                        /* DEST di Mod A: QNT nella pagina Retrig */
+#define MODEL     ((u32 (*)(void *))0x400186E8u)            /* (progetto) -> modello dei parametri del kit */
+#define TRIG_KEY  ((void (*)(void *, s32))0x4002E18Cu)      /* (vista, tasto 0..15): nota con retrig */
+#define HELD_MOD  ((s32 (*)(void *))0x4002D61Au)            /* tasto 13-16 tenuto, -1 nessuno */
+#define KB_MODE   ((s32 (*)(void *))0x4002DD86u)            /* tastiera cromatica (byte) */
+#define ACTIVE    ((u32 (*)(void *))0x4001FFA4u)            /* traccia attiva */
+#define VIEW_TRK  0xA0
+#define RUNNING   ((s32 (*)(void))0x4008B7C0u)              /* sequencer in moto */
+#define POST      ((void (*)(void *, void *))0x40001C0Eu)   /* (coda, messaggio): anche da interrupt */
+#define UI_QUEUE  ((void *)0x405D3A7Cu)
 
 #define DATA __attribute__((section(".data")))
 
@@ -87,6 +105,130 @@ static u32 cur_fx(void)
     return fx_of(k);
 }
 
+/* ---- retrig quantizzato */
+enum { Q_FREE, Q_WAIT, Q_DUE, Q_REL };          /* in attesa, allo step (da suonare), suonato e rilasciato */
+#define NQ 4
+typedef struct { unsigned char type, pad[3]; u32 fn[4], arg, busy; } msg_t;   /* fn: std::function */
+typedef struct { unsigned char type, pad[3]; u32 code, flags, src; } key_t;   /* evento di un tasto */
+unsigned char qr_state[NQ] __attribute__((aligned(4))) DATA = {0};
+static unsigned char q_idx[NQ] DATA = {0}, q_trk[NQ] DATA = {0}, q_rel[NQ] DATA = {0};
+static void *q_view[NQ] DATA = {0};
+key_t qr_up[NQ] DATA = {{0}};
+msg_t qr_msg DATA = {0};
+static unsigned char replay DATA = 0;
+
+void qr_invoke(const void *fn, u32 arg);
+int pf_mgr(void *dst, const void *src, int op);
+
+static s32 qnt_on(void *proj)                   /* QNT del kit (1 = ON; DEST di Mod A da altri valori: OFF) */
+{
+    u32 m = MODEL(proj);
+    s32 (*get)(u32, s32) = *(s32 (**)(u32, s32))(*(const u32 *)m + 0x28);
+    return ((get(m, QNT_ID) + 0x80) >> 8) == 1;
+}
+
+static void post_fire(void)                     /* da interrupt o dall'interfaccia */
+{
+    if (qr_msg.busy)
+        return;
+    qr_msg.type = 6;
+    qr_msg.fn[2] = (u32)pf_mgr;
+    qr_msg.fn[3] = (u32)qr_invoke;
+    qr_msg.busy = 1;
+    POST(UI_QUEUE, &qr_msg);
+}
+
+/* ingresso di FUN_4002E18C: 1 = trattenuto fino allo step */
+s32 qr_defer(void *view, s32 idx)
+{
+    void *proj = *(void *const *)((char *)view + VIEW_PROJ);
+    u32 i, t;
+
+    if (replay || !proj || MOD_MODE((void *)(PATTERN(proj) + 44)) != RETRIG || HELD_MOD(view) < 0 ||
+        (KB_MODE(view) & 0xFF) || !RUNNING() || !qnt_on(proj))
+        return 0;
+    for (i = 0; i < NQ && qr_state[i] != Q_FREE; i++)
+        ;
+    if (i == NQ)
+        return 0;
+    t = idx > 11 ? ACTIVE(*(void *const *)((char *)view + VIEW_TRK)) : (u32)idx;
+    q_view[i] = view;
+    q_idx[i] = (unsigned char)idx;
+    q_trk[i] = (unsigned char)(t < N_TRACKS ? t : 0);
+    q_rel[i] = 0;
+    qr_state[i] = Q_WAIT;
+    return 1;
+}
+
+static void fire(u32 i)                         /* nel ciclo dell'interfaccia */
+{
+    replay = 1;
+    TRIG_KEY(q_view[i], q_idx[i]);
+    replay = 0;
+    qr_state[i] = q_rel[i] ? Q_REL : Q_FREE;
+}
+
+void qr_invoke(const void *fn, u32 arg)         /* messaggio 6: suona le note arrivate allo step */
+{
+    u32 i;
+
+    (void)fn;
+    (void)arg;
+    for (i = 0; i < NQ; i++)
+        if (qr_state[i] == Q_DUE)
+            fire(i);
+}
+
+/* tick del sequencer, traccia t (adv: lo step e' avanzato) */
+static void qr_step(u32 t, u32 adv)
+{
+    u32 i, due = 0;
+
+    for (i = 0; i < NQ; i++) {
+        if (adv && q_trk[i] == t) {
+            if (qr_state[i] == Q_WAIT)
+                qr_state[i] = Q_DUE;
+            else if (qr_state[i] == Q_REL) {    /* suonato uno step fa: ora il rilascio */
+                qr_state[i] = Q_FREE;
+                POST(UI_QUEUE, &qr_up[i]);
+            }
+        }
+        due |= qr_state[i] == Q_DUE;
+    }
+    if (due)
+        post_fire();
+}
+
+/* rilascio di un tasto in attesa: trattenuto (1); a sequencer fermo si suona subito */
+static s32 qr_ev(const unsigned char *ev)
+{
+    u32 code = *(const u32 *)(ev + 12), fl = *(const u32 *)(ev + 16), i;
+    s32 eat = 0, run = RUNNING();
+
+    for (i = 0; i < NQ; i++) {
+        u32 st = qr_state[i];
+        if (st == Q_FREE)
+            continue;
+        if (run && !(fl & EV_DOWN) && (st == Q_WAIT || st == Q_DUE) && !q_rel[i] && code == q_idx[i] + 24u) {
+            qr_up[i].type = 0;
+            qr_up[i].code = code;
+            qr_up[i].flags = fl;
+            qr_up[i].src = *(const u32 *)(ev + 8);
+            q_rel[i] = 1;
+            eat = 1;
+        }
+        if (!run) {                             /* fermato prima dello step */
+            if (st == Q_WAIT || st == Q_DUE)
+                fire(i);
+            if (qr_state[i] == Q_REL) {
+                qr_state[i] = Q_FREE;
+                POST(UI_QUEUE, &qr_up[i]);
+            }
+        }
+    }
+    return eat;
+}
+
 void pf_step(u32 next_track, unsigned char *step, const unsigned char *pat, const unsigned char *trk)
 {
     u32 t = next_track - 1, fx = cur_fx(), p, L, i;
@@ -95,6 +237,8 @@ void pf_step(u32 next_track, unsigned char *step, const unsigned char *pat, cons
 
     if (t >= N_TRACKS || len <= 0)
         return;
+    if (*(const volatile u32 *)qr_state)
+        qr_step(t, cur != last[t]);
     if (!fx) {                                  /* rilascio: si riprende dove si sarebbe */
         if (act[t]) {
             act[t] = 0;
@@ -146,7 +290,8 @@ s32 pf_kbd(const char *view, const unsigned char *ev, u32 code)
     u32 k = code - KEY_13;
     void *proj;
 
-    if (k > 3 || !(proj = *(void *const *)(view + VIEW_PROJ)) || MOD_MODE((void *)(PATTERN(proj) + 44)) != MOD_A)
+    if (k > 3 || !(proj = *(void *const *)(view + VIEW_PROJ)) || MOD_MODE((void *)(PATTERN(proj) + 44)) != MOD_A ||
+        (KB_MODE((void *)view) & 0xFF))                     /* modo keyboard: i tasti 13-16 sono note */
         return -1;
     if (*(const u32 *)(ev + 16) & EV_DOWN) {
         key[k] = (unsigned char)code;
@@ -157,16 +302,16 @@ s32 pf_kbd(const char *view, const unsigned char *ev, u32 code)
     return 1;
 }
 
-void pf_ev(void *root, const unsigned char *ev)  /* ogni evento di tasto: rilascio ovunque */
+s32 pf_ev(void *root, const unsigned char *ev)   /* ogni evento di tasto: rilascio ovunque; 1 = trattenuto */
 {
     u32 code = *(const u32 *)(ev + 12), fl = *(const u32 *)(ev + 16), k;
 
     (void)root;
-    if (fl & EV_DOWN)
-        return;
-    for (k = 0; k < 4; k++)
-        if (key[k] == code)
-            pf_held &= (unsigned char)~(1u << k);
+    if (!(fl & EV_DOWN))
+        for (k = 0; k < 4; k++)
+            if (key[k] == code)
+                pf_held &= (unsigned char)~(1u << k);
+    return *(const volatile u32 *)qr_state ? qr_ev(ev) : 0;
 }
 
 /* testo del valore; fuori scala (kit da versioni precedenti) il default del tasto, come suona.
@@ -202,6 +347,31 @@ int pf_mgr(void *dst, const void *src, int op)
     (void)op;
     return 0;
 }
+
+/* QNT: OFF/ON */
+static const char *qtext(s32 value)
+{
+    return ((value + 0x80) >> 8) == 1 ? "ON" : "OFF";
+}
+
+void qr_text(const void *fn, s32 value, char *buf)
+{
+    const char *s = qtext(value);
+    (void)fn;
+    while ((*buf++ = *s++))
+        ;
+}
+
+void qr_gfx(const void *fn, s32 value, void *ctx, s32 x, s32 y)
+{
+    (void)fn;
+    DRAW_TEXT(ctx, FONT, x + 8, y + 5, 1, 0, "XXXX", "%s", qtext(value));
+}
+
+const void *const qr_proto[4] __attribute__((aligned(4))) = {0, 0, (const void *)pf_mgr, (const void *)qr_text};
+const void *const qr_gfx_proto[4] __attribute__((aligned(4))) = {0, 0, (const void *)pf_mgr, (const void *)qr_gfx};
+const char qr_name_l[] = "Quantize";
+const char qr_name_s[] = "QNT";
 
 const void *const pf_proto[4] __attribute__((aligned(4))) = {0, 0, (const void *)pf_mgr, (const void *)pf_invoke};
 const void *const pf_gfx_proto[4] __attribute__((aligned(4))) = {0, 0, (const void *)pf_mgr, (const void *)pf_gfx};
@@ -258,7 +428,28 @@ __asm__(
     "        move.l  8(%sp),-(%sp)\n"
     "        jsr     pf_ev\n"
     "        addq.l  #8,%sp\n"
+    "        tst.l   %d0\n"
+    "        bne.s   1f\n"                        /* trattenuto: niente dispatcher */
     "        jmp     0x4000839E\n"
+    "1:      rts\n"
+    "        .globl  qr_hook\n"
+    "qr_hook:\n"                                /* ingresso di FUN_4002E18C (vista, tasto) */
+    "        move.l  8(%sp),-(%sp)\n"
+    "        move.l  8(%sp),-(%sp)\n"
+    "        jsr     qr_defer\n"
+    "        addq.l  #8,%sp\n"
+    "        tst.l   %d0\n"
+    "        beq.s   1f\n"
+    "        rts\n"                            /* suonera allo step */
+    "1:      link.w  %fp,#-152\n"                 /* istruzioni sostituite */
+    "        moveq   #11,%d0\n"
+    "        jmp     0x4002E192\n"
+    "        .globl  qr_page_stub\n"
+    "qr_page_stub:\n"                           /* al posto di clr.l 0x41B9F988 (pagina Retrig): */
+    "        moveq   #47,%d0\n"                      /* casella D = QNT, oggetto 47 di tipo 0 */
+    "        move.l  %d0,0x41B9F988\n"
+    "        clr.l   0x41BA0990\n"
+    "        rts\n"
     "        .globl  pf_page_stub\n"
     "pf_page_stub:\n"                           /* al posto di clr.l 0x41B9F9DC (pagina Mod A, all'avvio): */
     "        clr.l   0x41B9F9DC\n"              /* casella D (DEST) vuota, restano M1..M4; oggetti 48..51 */

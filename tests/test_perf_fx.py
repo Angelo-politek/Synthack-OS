@@ -46,6 +46,11 @@ FX = {"--": 0, "1/16": 1, "1/8": 2, "3/16": 3, "1/4": 4, "1/2": 5, "1BAR": 6,
       "R1/8": 7, "R1/4": 8, "R1/2": 9, "RBAR": 10, "HALF": 11}
 MOD_A, RETRIG = 2, 0
 OBJ = lambda pid: 0x41B9_FA24 + 84 * pid                  # oggetto del parametro
+KB_MODE, KBV = 0x4002_DD86, 0x5000_2700                   # modo keyboard (byte di prova)
+RUNNING, RUNV = 0x4008_B7C0, 0x5000_2704                  # sequencer in moto
+MODEL, MODEL_OBJ, MODEL_VT, MODEL_GET, QNTV = 0x4001_86E8, 0x5000_2710, 0x5000_2720, 0x5000_2780, 0x5000_2708
+ACTIVE, POST, QUEUE = 0x4001_FFA4, 0x4000_1C0E, 0x405D_3A7C
+TRIG, TRIG_BODY = 0x4002_E18C, 0x4002_E192                 # FUN_4002E18C, corpo dopo le istruzioni sostituite
 
 
 @pytest.fixture()
@@ -80,6 +85,25 @@ class Machine:
         self.mode(MOD_A)
         uc.mem_write(KIT_PTR, struct.pack(">I", KIT))
         self.keys("1/16", "1/8", "R1/4", "HALF")
+        # modo keyboard (0x4002DD86) e retrig quantizzato: funzioni dell'OS sostituite da letture di prova
+        abs_l = lambda a: struct.pack(">I", a).hex()
+        uc.mem_write(KB_MODE, bytes.fromhex("7000" + "1039" + abs_l(KBV) + "4e75"))     # moveq ; move.b abs,d0
+        uc.mem_write(RUNNING, bytes.fromhex("2039" + abs_l(RUNV) + "4e75"))            # move.l abs,d0
+        uc.mem_write(MODEL, bytes.fromhex("203c" + abs_l(MODEL_OBJ) + "4e75"))         # move.l #modello,d0
+        uc.mem_write(MODEL_OBJ, struct.pack(">I", MODEL_VT))
+        uc.mem_write(MODEL_VT + 0x28, struct.pack(">I", MODEL_GET))
+        # get(modello, id): solo id 47 -> valore di prova (move.l 8(sp),d0 ; cmpi.l #47,d0 ; bne ; move.l abs,d0)
+        uc.mem_write(MODEL_GET, bytes.fromhex("202f0008" + "0c800000002f" + "6608" + "2039" + abs_l(QNTV) +
+                                              "4e75" + "7000" + "4e75"))
+        uc.mem_write(ACTIVE, bytes.fromhex("202f00044e75"))                           # traccia = argomento
+        uc.mem_write(POST, b"\x4e\x75")
+        uc.mem_write(TRIG_BODY, bytes.fromhex("4e5e4e75"))                            # unlk ; rts
+        uc.mem_write(VIEW + 0xDC, struct.pack(">4i", -1, -1, -1, -1))                 # nessun tasto 13-16 tenuto
+        self.posts, self.trigs = [], []
+        uc.hook_add(UC_HOOK_CODE, lambda u, a, sz, _: self.posts.append(
+            struct.unpack(">2I", u.mem_read(u.reg_read(UC_M68K_REG_A7) + 4, 8))), begin=POST, end=POST)
+        uc.hook_add(UC_HOOK_CODE, lambda u, a, sz, _: self.trigs.append(
+            struct.unpack(">2i", u.mem_read(u.reg_read(UC_M68K_REG_A6) + 8, 8))), begin=TRIG_BODY, end=TRIG_BODY)
 
     def mode(self, v):
         self.uc.mem_write(MODE, bytes([v]))
@@ -396,3 +420,227 @@ def test_release_on_an_advancing_tick_resumes_in_time(m, name, at):
     m.keys(name, "--", "--", "--")
     seq = play_direct(m, 0, 16, {5: hold(13), at: release(13)})
     assert seq[at:] == list(range(at, 16))
+
+
+# ----------------------------------------------------------------------------- modo keyboard
+@pytest.mark.parametrize("n", [13, 14, 15, 16])
+def test_keyboard_mode_keys_are_notes(m, n):
+    """In modo keyboard i tasti 13-16 sono note: nessun effetto, ramo originale."""
+    m.uc.mem_write(KBV, b"\x01")
+    where, d0, sp = m.key(n, True)
+    assert (where, d0, sp) == (NATIVE, 23 + n, STACK) and m.held() == 0
+    seq = play(m, 0, 16, {4: hold(n)})
+    assert seq == list(range(16))
+
+
+# ----------------------------------------------------------------------------- retrig quantizzato
+UI_FN, UI_FRAME = 0x5000_3400, 0x5000_3500
+
+
+def qnt(m, on=True, run=True, mode=RETRIG, held=0):
+    m.mode(mode)
+    m.uc.mem_write(QNTV, struct.pack(">I", 0x100 if on else 0))
+    m.uc.mem_write(RUNV, struct.pack(">I", 1 if run else 0))
+    m.uc.mem_write(VIEW + 0xA0, struct.pack(">I", 3))                               # traccia attiva 4
+    m.uc.mem_write(VIEW + 0xDC, struct.pack(">4i", *[(5 if k == held else -1) for k in range(4)]))
+    m.posts.clear()
+    m.trigs.clear()
+
+
+def press(m, idx):
+    """FUN_4002E18C(vista, tasto) come dal gestore dei tasti: -> True se suonata subito."""
+    n = len(m.trigs)
+    m.call(TRIG, [VIEW, idx])
+    assert m.uc.reg_read(UC_M68K_REG_A7) == STACK - 12 + 4             # rts al chiamante
+    return len(m.trigs) > n
+
+
+def ui(m):
+    """Il ciclo dell'interfaccia riceve il messaggio: codice dell'OS del tipo 6 (0x4000B496..0x4000B500)."""
+    queue, msg = m.posts.pop(0)
+    assert queue == QUEUE
+    uc = m.uc
+    typ = uc.mem_read(msg, 1)[0]
+    if typ == 0:                                       # evento di un tasto: (codice, flag, sorgente)
+        return struct.unpack(">3I", uc.mem_read(msg + 4, 12))
+    assert typ == 6
+    uc.reg_write(UC_M68K_REG_A2, msg)
+    uc.reg_write(UC_M68K_REG_D2, UI_FN)
+    uc.reg_write(UC_M68K_REG_A6, UI_FRAME + 0x40)
+    uc.reg_write(UC_M68K_REG_SR, 0x2700)
+    uc.reg_write(UC_M68K_REG_A7, STACK)
+    uc.emu_start(0x4000_B496, 0x4000_B500, count=200_000)
+    assert struct.unpack(">I", uc.mem_read(msg + 24, 4))[0] == 0                   # libero per il prossimo
+    return None
+
+
+def tick(m, t, adv=True):
+    if adv:
+        m.advance(t, 16)
+    else:
+        m.hook(t)
+
+
+def test_quantized_retrig_waits_for_the_next_step(m):
+    qnt(m)
+    m.uc.mem_write(STEPS + 3, bytes([5]))
+    m.hook(3)
+    assert not press(m, 12)                            # tasto 13: traccia attiva (4)
+    tick(m, 3, adv=False)
+    tick(m, 0)                                         # un'altra traccia avanza: niente
+    assert m.posts == [] and m.trigs == []
+    tick(m, 3)
+    assert len(m.posts) == 1
+    tick(m, 3, adv=False)                              # messaggio gia' in coda: non si ripete
+    assert len(m.posts) == 1
+    assert ui(m) is None
+    assert m.trigs == [(VIEW, 12)]
+    tick(m, 3)
+    assert m.posts == [] and m.trigs == [(VIEW, 12)]   # suonata una volta sola
+
+
+def test_track_keys_wait_for_their_own_track(m):
+    qnt(m)
+    assert not press(m, 6)                             # tenendo 13, tasto 7: traccia 7
+    tick(m, 3)
+    assert m.posts == []
+    tick(m, 6)
+    ui(m)
+    assert m.trigs == [(VIEW, 6)]
+
+
+@pytest.mark.parametrize("case", ["qnt off", "stopped", "velocity mode", "mod a mode", "no modifier", "keyboard"])
+def test_plays_at_once_otherwise(m, case):
+    qnt(m, on=case != "qnt off", run=case != "stopped",
+        mode={"velocity mode": 1, "mod a mode": 2}.get(case, RETRIG), held=-1 if case == "no modifier" else 0)
+    if case == "keyboard":
+        m.uc.mem_write(KBV, b"\x01")
+    assert press(m, 12)
+    assert m.trigs == [(VIEW, 12)]
+    tick(m, 3)
+    assert m.posts == []
+
+
+def test_old_mod_a_destinations_read_as_off(m):
+    qnt(m)
+    for v in (0x200, 0x1400):
+        m.uc.mem_write(QNTV, struct.pack(">I", v))
+        assert press(m, 12)
+
+
+def test_release_before_the_step_plays_one_step(m):
+    qnt(m)
+    press(m, 12)
+    m.event(36, 0)
+    m.uc.mem_write(EV + 8, struct.pack(">I", 0x1234))
+    assert not dispatched(m)                           # rilascio trattenuto
+    tick(m, 3)
+    ui(m)
+    assert m.trigs == [(VIEW, 12)]
+    tick(m, 3, adv=False)
+    assert m.posts == []
+    tick(m, 3)                                         # step dopo: il rilascio
+    assert ui(m) == (36, 0, 0x1234)
+    tick(m, 3)
+    assert m.posts == []
+
+
+def test_release_after_the_step_goes_through(m):
+    qnt(m)
+    press(m, 12)
+    tick(m, 3)
+    ui(m)
+    m.event(36, 0)
+    assert dispatched(m)
+    tick(m, 3)
+    assert m.posts == []
+
+
+def test_other_events_pass_while_waiting(m):
+    qnt(m)
+    press(m, 12)
+    m.event(30, 0)                                     # rilascio di un altro tasto
+    assert dispatched(m)
+    m.event(36, 1)
+    assert dispatched(m)
+
+
+def test_stopped_before_the_step_plays_on_the_next_event(m):
+    qnt(m)
+    press(m, 12)
+    m.uc.mem_write(RUNV, struct.pack(">I", 0))
+    m.event(36, 0)
+    assert dispatched(m)                               # suonata e poi rilasciata dal suo evento
+    assert m.trigs == [(VIEW, 12)]
+    tick(m, 3)
+    assert m.posts == []
+
+
+def test_four_waiting_then_plays_at_once(m):
+    qnt(m)
+    for idx in (0, 1, 2, 4):
+        assert not press(m, idx)
+    assert press(m, 5)                                 # nessun posto libero: subito
+    for t in (0, 1, 2, 4):
+        tick(m, t)
+        ui(m)
+    assert m.trigs == [(VIEW, 5), (VIEW, 0), (VIEW, 1), (VIEW, 2), (VIEW, 4)]
+
+
+def test_busy_message_is_posted_again_on_a_later_tick(m):
+    qnt(m)
+    press(m, 12)
+    msg = m.sym["qr_msg"]
+    m.uc.mem_write(msg + 24, struct.pack(">I", 1))     # ancora in coda (l'interfaccia non l'ha letto)
+    tick(m, 3)
+    assert m.posts == []
+    m.uc.mem_write(msg + 24, struct.pack(">I", 0))
+    tick(m, 3, adv=False)
+    assert len(m.posts) == 1
+    ui(m)
+    assert m.trigs == [(VIEW, 12)]
+
+
+def dispatched(m):
+    uc = m.uc
+    sp = STACK - 12
+    uc.mem_write(sp, struct.pack(">3I", RET, 0x5000_0000, EV))
+    uc.reg_write(UC_M68K_REG_SR, 0x2700)
+    uc.reg_write(UC_M68K_REG_A7, sp)
+    hit = []
+
+    def at(uc_, addr, size, _):
+        if addr in (DISPATCH, RET):
+            hit.append(addr)
+            uc_.emu_stop()
+    h = uc.hook_add(UC_HOOK_CODE, at)
+    uc.emu_start(m.sym["pf_ev_hook"], 0, count=200_000)
+    uc.hook_del(h)
+    if hit == [RET]:
+        assert uc.reg_read(UC_M68K_REG_A7) == sp + 4
+    return hit == [DISPATCH]
+
+
+def test_retrig_page_and_qnt_parameter(m):
+    m.uc.mem_write(0x41B9_F988, struct.pack(">I", 9))
+    m.uc.mem_write(OBJ(47), struct.pack(">I", 1))
+    m.call(m.sym["qr_page_stub"], [])
+    assert struct.unpack(">I", m.uc.mem_read(0x41B9_F988, 4))[0] == 47
+    assert struct.unpack(">I", m.uc.mem_read(OBJ(47), 4))[0] == 0
+    d = 0x4022_D59C + 52 * 47
+    assert struct.unpack(">3i", m.uc.mem_read(d + 8, 12)) == (0, 0x100, 0)
+    cstr = lambda a: bytes(m.uc.mem_read(a, 12)).split(b"\0")[0].decode()
+    assert cstr(struct.unpack(">I", m.uc.mem_read(d + 40, 4))[0]) == "Quantize"
+    assert cstr(struct.unpack(">I", m.uc.mem_read(d + 48, 4))[0]) == "QNT"
+    buf = 0x5000_3000
+    for v, want in ((0, "OFF"), (0x100, "ON"), (0x80, "ON"), (0x200, "OFF")):
+        m.call(m.sym["qr_text"], [OBJ(47) + 20, v, buf])
+        assert cstr(buf) == want
+
+
+def test_qnt_patched_bytes():
+    want = {0x4002_E18C: "4e56ff68700b", 0x4019_51C0: "42b941b9f988", 0x4018_AB96: "2f04",
+            0x4018_ABB6: "41b9dfd0", 0x4018_ABC8: "41b9daa0"}
+    sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
+    for a, orig in want.items():
+        assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig

@@ -5,6 +5,8 @@
   (0x4002EA92) e il dispatcher degli eventi (0x4000B420);
 - pagina di impostazione di Mod A: M1..M4 (id 48..51) scelgono l'effetto di ogni tasto (testo, valore
   discreto); TRIG e DEST tolti dalla pagina; nomi "Perf FX".
+- retrig quantizzato: ingresso di FUN_4002E18C (nota con retrig dei tasti) e QNT (id 47, DEST di Mod A)
+  nella casella D della pagina Retrig.
 
     python mods/perf-fx/make_patch.py
 """
@@ -37,6 +39,10 @@ STEP_HOOK, STEP_ORIG = 0x4008_D152, "5283528e528d"      # addq d3 ; addq a6 ; ad
 KBD_HOOK, KBD_ORIG = 0x4002_EA92, "7223b2806c00010e"    # moveq #35,d1 ; cmp.l d0,d1 ; bge.w 0x4002EBA6
 EV_HOOK, EV_ORIG = 0x4000_B420, "4eb94000839e"          # jsr 0x4000839e (dispatcher degli eventi)
 PAGE_HOOK, PAGE_ORIG = 0x4019_5294, "42b941b9f9dc"      # clr.l 0x41B9F9DC (pagina Mod A)
+QR_HOOK, QR_ORIG = 0x4002_E18C, "4e56ff68700b"            # link.w fp,#-152 ; moveq #11,d0
+QR_PAGE, QR_PAGE_ORIG = 0x4019_51C0, "42b941b9f988"      # clr.l 0x41B9F988 (pagina Retrig, casella D)
+QNT_ID = 47
+QNT_OBJ = (0x4018_AB96, 0x4018_ABB6, 0x4018_ABC8)          # push del prototipo, +20, +36 dell'oggetto 47
 NAMES = [(0x4019_5202, "4024f87b", "pf_page_s", "pagina Mod A: nome breve 'PERF'"),
          (0x4019_5236, "40251b59", "pf_page_l", "pagina Mod A: nome lungo 'Perf FX'"),
          (0x4004_0B68, "4024e83b", "pf_on", "FUNC+15: messaggio 'Perf FX ON'")]
@@ -115,6 +121,16 @@ def main() -> None:
         fixed(EV_HOOK, jsr("pf_ev_hook"), "dispatcher degli eventi: jsr pf_ev_hook (rilascio)", EV_ORIG),
         fixed(PAGE_HOOK, jsr("pf_page_stub"), "pagina Mod A all'avvio: solo M1..M4, oggetti di tipo 0", PAGE_ORIG),
     ]
+    patches += [
+        fixed(QR_HOOK, jmp("qr_hook"), "FUN_4002E18C (nota con retrig dei tasti): jmp qr_hook", QR_ORIG),
+        fixed(QR_PAGE, jsr("qr_page_stub"), "pagina Retrig all'avvio: QNT (47) nella casella D", QR_PAGE_ORIG),
+        fixed(QNT_OBJ[0], bytes.fromhex("2f03"), "id 47 +4: prototipo discreto (come 48..51)", "2f04"),
+        fixed(QNT_OBJ[1], long(syms["qr_proto"]), "id 47 +20: testo OFF/ON", "41b9dfd0"),
+        fixed(QNT_OBJ[2], long(syms["qr_gfx_proto"]), "id 47 +36: casella a testo", "41b9daa0"),
+        fixed(DESC + 52 * QNT_ID + 8, struct.pack(">III", 0, 1 << 8, 0), "id 47 -> QNT: min 0, max 1, default 0"),
+        fixed(DESC + 52 * QNT_ID + 40, long(syms["qr_name_l"]), "id 47: nome lungo 'Quantize'"),
+        fixed(DESC + 52 * QNT_ID + 48, long(syms["qr_name_s"]), "id 47: nome breve 'QNT'"),
+    ]
     for addr, orig, sym, what in NAMES:
         patches.append(fixed(addr, long(syms[sym]), what, orig))
     for n, (pid, (proto, g20, g36)) in enumerate(OBJ_SITES.items()):
@@ -131,11 +147,14 @@ def main() -> None:
         "name": "perf-fx", "os": "1.41", "requires": ["modarea"],
         "description": "Effetti di performance sul sequencer: con il modificatore Mod A (FUNC+15) i tasti 13-16 "
                        "suonano ripetizione, ripetizione all'indietro o mezza velocita' su tutte le tracce, a "
-                       "tempo; l'effetto di ogni tasto si sceglie in M1..M4 della pagina Mod A (salvati con il kit).",
+                       "tempo; l'effetto di ogni tasto si sceglie in M1..M4 della pagina Mod A (salvati con il kit). "
+                       "Retrig quantizzato allo step successivo (QNT nella pagina Retrig).",
         "generated_by": "mods/perf-fx/make_patch.py",
         "symbols": {k: f"{syms[k]:#010x}" for k in ("pf_step", "pf_step_hook", "pf_kbd", "pf_kbd_hook", "pf_ev",
                                                      "pf_ev_hook", "pf_page_stub", "pf_invoke", "pf_gfx",
-                                                     "pf_proto", "pf_gfx_proto", "pf_held", "pf_last")},
+                                                     "pf_proto", "pf_gfx_proto", "pf_held", "pf_last",
+                                                     "qr_hook", "qr_defer", "qr_invoke", "qr_page_stub",
+                                                     "qr_text", "qr_gfx", "qr_state", "qr_msg", "qr_up")},
         "patches": patches,
     }
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
