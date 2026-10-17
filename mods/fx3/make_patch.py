@@ -45,6 +45,7 @@ VP_SLOT = 9                             # posti 9..15 della tabella di vparams
 HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
     (0x4008_F3A0, "ae000900ae810900", "fx3_trk_hook", "ciclo per traccia: jsr fx3_trk_hook ; nop"),
     (0x4008_F828, "4eb940096890", "fx3_del_hook", "delay: jsr fx3_del_hook (mandata del chorus al delay)"),
+    (0x4008_F952, "4eb940096e3c", "fx3_rev_hook", "riverbero: jsr fx3_rev_hook (mandata dell'effetto al riverbero)"),
     (0x4008_FB04, "486efed848798000e0f0", "fx3_mix_hook",
      "somme del master: jsr fx3_mix_hook (bus 3, chorus, ritorno) ; nop ; nop"),
     (0x4019_4E2A, "42b941b9f83c", "fx3_page_stub", "pagina 25 (FX3): caselle all'avvio"),
@@ -84,8 +85,9 @@ PARAMS = [
      {20: (0x4018_F344, 0x41B9_DF40, "fx3_proto_vol"), 36: (0x4018_F356, 0x41B9_DC40, G_SEND),
       68: (0x4018_F372, 0x41B9_D670, S_BAR)},
      [(0x4018_F332, "2f04", "2f03")]),
-    (253, "VOL", "FX3 Volume", 127, 100,
-     {20: (0x4018_F48A, 0x41B9_DF60, "fx3_proto_vol"), 36: (0x4018_F49C, 0x41B9_DCC0, G_KNOB)},
+    (253, "REV", "FX3 to Reverb", 127, 0,
+     {20: (0x4018_F48A, 0x41B9_DF60, "fx3_proto_vol"), 36: (0x4018_F49C, 0x41B9_DCC0, G_SEND),
+      68: (0x4018_F4B8, 0x41B9_D670, S_BAR)},
      [(0x4018_F476, "2f05", "2f03"), (0x4018_F47E, "7004", "7000")]),
 ]
 G_MOD = 0x41B9_D730                     # icona MOD delle macchine (id 176)
@@ -258,7 +260,7 @@ def main() -> None:
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
-            "fx3_kser_hook", "fx3_kdes_hook", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set")},
+            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rsnd", "fx3_rev_hook", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,
     }

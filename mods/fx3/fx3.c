@@ -52,13 +52,13 @@ typedef unsigned short u16;
 #define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...))                    0x400F8C18u)                            /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
 #define FONT      ((const void *)0x402A91C0u)              /* 4x6 */
 
-enum { P_TYPE, P_SPD, P_DEP, P_TIME, P_FDBK, P_WID, P_DSND, P_VOL, NP };
+enum { P_TYPE, P_SPD, P_DEP, P_TIME, P_FDBK, P_WID, P_DSND, P_RSND, NP };
 enum { CHOR, FLNG, PHSR, CRSH, NT };
 static const unsigned short ids[NP] = {246, 247, 248, 250, 251, 252, 249, 253};
 static const unsigned char maxv[NP] = {NT - 1, 127, 127, 127, 127, 127, 127, 127};
-static const unsigned char defv[NP] = {0, 60, 64, 64, 0, 64, 0, 100};
+static const unsigned char defv[NP] = {0, 60, 64, 64, 0, 64, 0, 0};
 static const unsigned char woff[4] = {0, 2 * 0x1A, 2 * 0x38, 2 * 0x46}; /* parole nel kit */
-unsigned char fx3_p[NP] DATA = {0, 60, 64, 64, 0, 64, 0, 100};
+unsigned char fx3_p[NP] DATA = {0, 60, 64, 64, 0, 64, 0, 0};
 static u16 fallback[0x47] DATA = {0};                     /* nessun kit (ancora): valori in RAM */
 static u32 seen[2] DATA = {1, 1};                         /* ultime parole lette, a coppie (1: rilettura) */
 
@@ -70,7 +70,7 @@ static u32 live DATA = 0;                                 /* tracce con guadagno
 s32 fx3_bus[H] DATA = {0};                               /* bus 3 mono a 24 kHz */
 s32 fx3_wet[2 * H] DATA = {0};                           /* uscita dell'effetto (scala 16 bit), L/R alternati */
 s32 fx3_idle DATA = 1;                                    /* 1 = niente da fare (e fx3_wet non valido) */
-static s32 ret_h[2] DATA = {0, 0}, dly_h[2] DATA = {0, 0}; /* ultimo mezzo campione L/R per l'interpolazione */
+static s32 ret_h[2] DATA = {0, 0}, dly_h[2] DATA = {0, 0}, rev_h[2] DATA = {0, 0}; /* ultimo mezzo campione L/R per l'interpolazione */
 static u32 quiet DATA = 0;                                /* blocchi consecutivi senza ingresso ne' coda */
 static u32 wpos DATA = 0, phase DATA = 0, dpos[2] DATA = {0, 0};
 static u32 dsp_type DATA = 0;                             /* tipo per cui e' preparato lo stato dell'effetto */
@@ -321,7 +321,7 @@ static void retype(u32 t)
 static void rest(void)
 {
     fx3_idle = 1;
-    ret_h[0] = ret_h[1] = dly_h[0] = dly_h[1] = 0;
+    ret_h[0] = ret_h[1] = dly_h[0] = dly_h[1] = rev_h[0] = rev_h[1] = 0;
 }
 
 /* dopo le somme del master (MACSR impostato dal trampolino): bus 3, effetto e ritorno sul bus diretto
@@ -335,11 +335,7 @@ void fx3_run(void)
     const s32 *in;
 
     sync();
-    vol = VOL_Q15[fx3_p[P_VOL]];
-    if (!(vol | fx3_p[P_DSND])) {                          /* nessuno ascolta l'uscita */
-        rest();
-        return;
-    }
+    vol = VOL_Q15[127];                                    /* ritorno sul master: pieno (0 dB) */
     if (!(fx3_moving | ramp | live) && quiet > DL / H) {   /* nessuna mandata e coda esaurita */
         rest();
         return;
@@ -425,6 +421,17 @@ void fx3_dsnd(void)
         fx3_ret(fx3_wet, -ds, DLY_IN, dly_h);
     else
         dly_h[0] = dly_h[1] = 0;
+}
+
+/* prima del riverbero (stesso bus d'ingresso del delay, riempito di nuovo per il riverbero) */
+void fx3_rsnd(void)
+{
+    s32 rs = VOL_Q15[fx3_p[P_RSND]];
+
+    if (rs)
+        fx3_ret(fx3_wet, -rs, DLY_IN, rev_h);
+    else
+        rev_h[0] = rev_h[1] = 0;
 }
 
 /* ---- parametri della pagina (vparams): letti e scritti nel kit */
@@ -1163,6 +1170,16 @@ __asm__(
     "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
     "        lea     16(%sp),%sp\n"
     "1:      jmp     0x40096890\n"              /* il delay, con gli argomenti al loro posto */
+    "        .globl  fx3_rev_hook\n"
+    "fx3_rev_hook:\n"                           /* al posto di jsr 0x40096E3C (riverbero), 0x4008F952 */
+    "        tst.l   fx3_idle\n"
+    "        bne.s   1f\n"
+    "        lea     -16(%sp),%sp\n"
+    "        movem.l %d0-%d1/%a0-%a1,(%sp)\n"
+    "        jsr     fx3_rsnd\n"                /* effetto del blocco precedente nel bus del riverbero */
+    "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
+    "        lea     16(%sp),%sp\n"
+    "1:      jmp     0x40096E3C\n"              /* il riverbero, con gli argomenti al loro posto */
     "        .globl  fx3_mix_hook\n"
     "fx3_mix_hook:\n"                           /* 0x4008FB04: al posto di pea -296(fp) ; pea 0x8000E0F0 */
     "        lea     -16(%sp),%sp\n"
@@ -1227,7 +1244,7 @@ __asm__(
     "        beq.s   2f\n"
     "        movea.l 4(%sp),%a0\n"              /* blocco nel file */
     "        movea.l 8(%sp),%a1\n"              /* blocco nel kit: una parola per id interno */
-    "        move.w  #0x5348,%d1\n"
+    "        move.w  #0x5349,%d1\n"                /* "SI": v0.9 (byte basso di 0x46 = REV) */
     "        move.w  %d1,148(%a0)\n"
     "        move.w  (%a1),150(%a0)\n"
     "        move.w  52(%a1),152(%a0)\n"
@@ -1248,11 +1265,17 @@ __asm__(
     "        movea.l 4(%sp),%a0\n"              /* blocco nel kit */
     "        movea.l 8(%sp),%a1\n"              /* blocco nel file */
     "        move.w  148(%a1),%d1\n"
-    "        cmpi.w  #0x5348,%d1\n"
-    "        bne.s   2f\n"
     "        move.w  150(%a1),(%a0)\n"
     "        move.w  152(%a1),52(%a0)\n"
+    "        cmpi.w  #0x5349,%d1\n"
+    "        bne.s   4f\n"
     "        move.w  154(%a1),140(%a0)\n"
+    "        rts\n"
+    "4:      cmpi.w  #0x5348,%d1\n"                /* "SH" (v0.8.1): il byte basso di 0x46 era VOL, */
+    "        bne.s   2f\n"                         /* REV riparte da 0 */
+    "        move.w  154(%a1),%d1\n"
+    "        andi.l  #0xFF00,%d1\n"
+    "        move.w  %d1,140(%a0)\n"
     "        rts\n"
     "2:      clr.w   (%a0)\n"                  /* file senza marcatore: valori di default */
     "        clr.w   52(%a0)\n"

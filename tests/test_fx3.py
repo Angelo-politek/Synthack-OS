@@ -42,8 +42,8 @@ LOAD, STACK, RET, UI = 0x4000_0400, 0x5000_8000, 0x5000_F000, 0x5000_0C00
 FRAME, TRK = 0x5000_4000, 0x5000_5000
 SRC_DIG, SRC_ANA, OUT_A, OUT_B = 0x8000_3D50, 0x8000_3950, 0x8000_DAD0, 0x8000_DFD0
 GET, SET, KIT = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
-IDS = {"TYPE": 246, "SPD": 247, "DEP": 248, "TIME": 250, "FDBK": 251, "WID": 252, "DSND": 249, "VOL": 253}
-DELAY, DLY_IN = 0x4009_6890, 0x8000_DBD0
+IDS = {"TYPE": 246, "SPD": 247, "DEP": 248, "TIME": 250, "FDBK": 251, "WID": 252, "DSND": 249, "RSND": 253}
+DELAY, REVERB, DLY_IN = 0x4009_6890, 0x4009_6E3C, 0x8000_DBD0
 
 
 def s32(v):
@@ -223,7 +223,7 @@ def impulse(m):
 
 
 def test_chorus_without_depth_is_a_pure_delay(m):
-    settle(m, DEP=0, TIME=0, FDBK=0, VOL=127)                  # 1 ms = 24 campioni a 24 kHz
+    settle(m, DEP=0, TIME=0, FDBK=0)                  # 1 ms = 24 campioni a 24 kHz
     bus5 = impulse(m)
     m.put(OUT_A, [0] * 64)
     run_block(m)
@@ -337,17 +337,12 @@ def test_return_added_with_os_sign(m):
 
 
 def test_return_only_on_the_direct_bus(m):
-    settle(m, DEP=0, TIME=0, FDBK=0, VOL=127)
+    settle(m, DEP=0, TIME=0, FDBK=0)
     m.put(OUT_B, [-1000] * 64)
     impulse(m)
     for _ in range(3):
         run_block(m)
     assert m.longs(OUT_B, 64) == [-1000] * 64                  # bus del blocco FX analogico: non toccato
-    m.param("VOL", 0)
-    m.param("DSND", 10)
-    m.put(OUT_A, [1000] * 64)
-    run_block(m)
-    assert m.longs(OUT_A, 64) == [1000] * 64
 
 
 def test_mix_hook_replays_pushes(m):
@@ -383,7 +378,7 @@ def test_page_slots_and_reverb_tab(m):
 def test_parameters_through_vparams(m):
     for name, pid in IDS.items():
         assert m.call(KIT, [0x5000_0000, pid]) == 1
-    assert m.call(GET, [0x5000_0000, IDS["VOL"]]) == 100 << 8
+    assert m.call(GET, [0x5000_0000, IDS["RSND"]]) == 0
     m.param("SPD", 90)
     assert m.call(GET, [0x5000_0000, IDS["SPD"]]) == 90 << 8
     m.param("TYPE", 3)                                          # CHOR FLNG PHSR CRSH
@@ -490,7 +485,7 @@ def test_object_fields_like_del():
 
 
 def test_send_to_delay_adds_scaled_chorus(m):
-    settle(m, DEP=0, TIME=0, FDBK=0, VOL=127, DSND=127)
+    settle(m, DEP=0, TIME=0, FDBK=0, DSND=127)
     impulse(m)
     run_block(m)
     wet = m.longs(m.sym["fx3_wet"], 32)                        # DEL = 127: guadagno 32767
@@ -506,7 +501,7 @@ def test_send_to_delay_adds_scaled_chorus(m):
 
 @pytest.mark.parametrize("fb", [0, 90])
 def test_send_to_delay_with_and_without_feedback(m, fb):
-    settle(m, DEP=40, TIME=20, FDBK=fb, VOL=0, DSND=100)       # VOL 0: la mandata al delay basta
+    settle(m, DEP=40, TIME=20, FDBK=fb, DSND=100)
     impulse(m)
     ds = round(32767 * (100 / 127) ** 2)
     prev, h, seen = m.longs(m.sym["fx3_wet"], 32), [0, 0], False
@@ -547,13 +542,14 @@ def test_back_to_idle_after_heavy_use(m):
     assert m.longs(m.sym["fx3_cur"], 16) == [0] * 16
 
 
-def test_nothing_runs_when_nobody_listens(m):
-    settle(m, VOL=0, DSND=0)
+def test_reverb_hook_passes_through_when_idle(m):
+    """Senza nulla da fare (FX3 a riposo) il trampolino va al riverbero senza toccare il suo bus."""
+    m.put(m.sym["fx3_idle"], [1])
     m.put(DLY_IN, [5] * 64)
-    run_block(m)
-    assert m.longs(m.sym["fx3_idle"], 1) == [1]
+    m.uc.mem_write(REVERB, b"\x4e\x75")
+    m.call(m.sym["fx3_rev_hook"], [0x1111, 0x2222, 0x3333])
     assert m.longs(DLY_IN, 64) == [5] * 64
-    assert block_cost(m) < 120
+    assert m.uc.reg_read(UC_M68K_REG_A7) == STACK - 16 + 4
 
 
 @pytest.mark.parametrize("dep, spd, time", [(127, 127, 127), (127, 127, 0), (60, 90, 30)])
@@ -587,7 +583,7 @@ def test_track_hook_cheap_when_snd3_is_off(m):
 
 KIT_PTR, KIT_A, KIT_B = 0x8000_30BC, 0x5000_A000, 0x5000_A100
 WOFF = (0, 52, 112, 140)                                        # id interni 0, 0x1A, 0x38, 0x46
-DEFV = (0, 60, 64, 64, 0, 64, 0, 100)
+DEFV = (0, 60, 64, 64, 0, 64, 0, 0)
 
 
 def kit_words(m, base):
@@ -608,12 +604,12 @@ def text(m, a, n=24):
 def test_params_saved_in_the_kit_words(m):
     m.put(KIT_PTR, [KIT_A])
     m.uc.mem_write(KIT_A, bytes(142))
-    assert m.call(GET, [0x5000_0000, IDS["VOL"]]) == 100 << 8     # parole a zero = default
+    assert m.call(GET, [0x5000_0000, IDS["DEP"]]) == 64 << 8      # parole a zero = default
     m.param("TYPE", 2)                                           # prima il tipo (riporta SPD..WID al via)
     m.param("SPD", 90)
     m.param("TIME", 3)
-    m.param("VOL", 127)
-    assert kit_words(m, KIT_A) == [2 << 8 | (90 ^ 60), 3 ^ 64, 64 << 8, 127 ^ 100]   # PHSR: FDBK al centro
+    m.param("RSND", 127)
+    assert kit_words(m, KIT_A) == [2 << 8 | (90 ^ 60), 3 ^ 64, 64 << 8, 127]   # PHSR: FDBK al centro
     raw = bytes(m.uc.mem_read(KIT_A, 142))
     others = [i for i in range(0, 142, 2) if i not in WOFF and raw[i:i + 2] != b"\0\0"]
     assert others == []                                          # il resto del kit non si tocca
@@ -694,7 +690,7 @@ def phaser_ref(bus, st, a, fb, w):
 
 @pytest.mark.parametrize("fdbk", [64, 127, 10])
 def test_phaser_matches_the_model(m, fdbk):
-    settle(m, TYPE=2, DEP=0, TIME=70, FDBK=fdbk, WID=90, VOL=127)
+    settle(m, TYPE=2, DEP=0, TIME=70, FDBK=fdbk, WID=90)
     x = (fdbk - 64) * 29491
     fb = max(-29491, min(29491, int(x / 63)))                     # come la divisione in C (verso zero)
     w = 16384 * 90 // 127
@@ -708,7 +704,7 @@ def test_phaser_matches_the_model(m, fdbk):
 
 def test_crusher_matches_the_model(m):
     spd, dep, tim = 40, 90, 60
-    settle(m, TYPE=3, SPD=spd, DEP=dep, TIME=tim, VOL=127)
+    settle(m, TYPE=3, SPD=spd, DEP=dep, TIME=tim)
     n = 1 + (31 * spd + 63) // 127
     sh = (15 * dep + 63) // 127
     g = round(256 * 10 ** (24 * tim / 127 / 20))
@@ -729,7 +725,7 @@ def test_crusher_matches_the_model(m):
 
 
 def test_type_change_drops_the_old_tail(m):
-    settle(m, TYPE=0, FDBK=120, VOL=127)
+    settle(m, TYPE=0, FDBK=120)
     loud(m)
     for _ in range(10):
         run_block(m)
@@ -847,7 +843,7 @@ def test_kit_file_keeps_every_word():
         words = valid([rnd.randrange(0x10000) for _ in range(71)])
         assert round_trip(m, words, file_fill=rnd.randrange(256)) == words
     raw = m.uc.mem_read(FILE + 148, 8)
-    assert struct.unpack(">4H", raw) == (0x5348, words[0], words[0x1A], words[0x46])
+    assert struct.unpack(">4H", raw) == (0x5349, words[0], words[0x1A], words[0x46])
 
 
 def test_kit_file_without_marker_gives_fx3_defaults():
@@ -954,18 +950,52 @@ def test_input_snd3_on_the_external_mixer_page(m):
 
 
 def test_type_change_resets_the_effect_knobs(m):
-    """Cambiare tipo riporta SPD..WID ai valori di partenza del tipo (il crusher neutro); DEL e VOL restano.
+    """Cambiare tipo riporta SPD..WID ai valori di partenza del tipo (il crusher neutro); DEL e REV restano.
     Riscrivere lo stesso tipo non tocca nulla."""
     get = lambda k: m.call(GET, [0x5000_0000, IDS[k]]) >> 8
-    for k, v in (("SPD", 100), ("DEP", 20), ("TIME", 120), ("FDBK", 90), ("WID", 3), ("DSND", 50), ("VOL", 70)):
+    for k, v in (("SPD", 100), ("DEP", 20), ("TIME", 120), ("FDBK", 90), ("WID", 3), ("DSND", 50), ("RSND", 70)):
         m.param(k, v)
     m.param("TYPE", 0)                                          # stesso tipo: niente reset
     assert [get(k) for k in ("SPD", "DEP", "TIME", "FDBK", "WID")] == [100, 20, 120, 90, 3]
     m.param("TYPE", 3)                                          # crusher: neutro
     assert [get(k) for k in ("SPD", "DEP", "TIME")] == [0, 0, 0]
-    assert get("DSND") == 50 and get("VOL") == 70
+    assert get("DSND") == 50 and get("RSND") == 70
     m.param("SPD", 30)
     m.param("TYPE", 1)                                          # flanger: retroazione al centro (nessuna)
     assert [get(k) for k in ("SPD", "DEP", "TIME", "FDBK", "WID")] == [60, 64, 64, 64, 64]
     m.param("TYPE", 0)
     assert [get(k) for k in ("SPD", "DEP", "TIME", "FDBK", "WID")] == [60, 64, 64, 0, 64]
+
+
+def test_send_to_reverb_into_its_input_bus(m):
+    """Prima del riverbero (0x4008F952) l'effetto del blocco precedente entra nel suo bus d'ingresso, come
+    la mandata al delay; il riverbero parte con gli argomenti al loro posto."""
+    settle(m, DEP=40, TIME=20, RSND=100)
+    impulse(m)
+    rs = round(32767 * (100 / 127) ** 2)
+    prev, h, seen = m.longs(m.sym["fx3_wet"], 32), [0, 0], False
+    m.uc.mem_write(REVERB, b"\x4e\x75")
+    for _ in range(12):                                         # ordine dell'OS: riverbero, poi somme
+        m.put(DLY_IN, [5] * 64)
+        m.call(m.sym["fx3_rev_hook"], [0x1111, 0x2222, 0x3333])
+        assert m.uc.reg_read(UC_M68K_REG_A7) == STACK - 16 + 4
+        want, h = ret_ref(prev, -rs, [5] * 64, h)
+        assert m.longs(DLY_IN, 64) == want
+        run_block(m)
+        prev = m.longs(m.sym["fx3_wet"], 32)
+        seen |= any(prev)
+    assert seen
+
+
+def test_kit_file_from_v081_resets_the_old_vol_byte():
+    """Kit salvati con v0.8.1 (marcatore "SH"): il byte basso della parola 0x46 era VOL; ora e' REV e
+    riparte da 0, il resto si rilegge."""
+    m = Machine()
+    words = valid([0x3000 + i for i in range(71)])
+    m.uc.mem_write(KBLK, struct.pack(">71H", *words))
+    m.call(KSER, [FILE, KBLK])
+    m.uc.mem_write(FILE + 148, struct.pack(">H", 0x5348))
+    m.uc.mem_write(KIT2, b"\xee" * 142)
+    m.call(KDES, [KIT2, FILE])
+    back = struct.unpack(">71H", m.uc.mem_read(KIT2, 142))
+    assert back[0] == words[0] and back[0x1A] == words[0x1A] and back[0x46] == words[0x46] & 0xFF00
