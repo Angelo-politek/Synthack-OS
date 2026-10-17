@@ -374,3 +374,25 @@ def test_patched_bytes(m):
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig
+
+
+def play_direct(m, t, n, events, steps=16):
+    """Come play, ma l'azione cade nello stesso tick di un avanzamento (nessun tick intermedio)."""
+    m.uc.mem_write(STEPS + t, bytes([0]))
+    m.hook(t)
+    out = [m.step(t)]
+    for i in range(1, steps):
+        if i in events:
+            events[i](m)
+        out.append(m.advance(t, n))
+    return out
+
+
+@pytest.mark.parametrize("name", ["1/16", "1/8", "3/16", "1/4", "1/2", "1BAR", "R1/8", "R1/4", "R1/2", "RBAR", "HALF"])
+@pytest.mark.parametrize("at", [7, 9, 12])
+def test_release_on_an_advancing_tick_resumes_in_time(m, name, at):
+    """Il rilascio letto proprio nel tick in cui il sequencer avanza: si riprende dallo step giusto,
+    non da quello prima (era il "fuori tempo" che capitava ogni tanto)."""
+    m.keys(name, "--", "--", "--")
+    seq = play_direct(m, 0, 16, {5: hold(13), at: release(13)})
+    assert seq[at:] == list(range(at, 16))

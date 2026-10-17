@@ -98,6 +98,8 @@ void pf_step(u32 next_track, unsigned char *step, const unsigned char *pat, cons
     if (!fx) {                                  /* rilascio: si riprende dove si sarebbe */
         if (act[t]) {
             act[t] = 0;
+            if (cur != last[t])                 /* rilascio nel tick di un avanzamento: anche lui conta */
+                real[t] = (unsigned char)(real[t] + 1u >= (u32)len ? 0 : real[t] + 1);
             *step = real[t];
         }
         last[t] = *step;
