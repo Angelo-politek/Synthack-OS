@@ -17,7 +17,7 @@ Per-block routine `0x400A3856` calls, in order: CV/gain function `0x400903CA` �
 | Buffer | Content |
 |---|---|
 | `0x80003D50` | 8 digital tracks from CPU #2 (8 × 128 B) |
-| `0x80003950` | 8 **ADC** channels (ring `0x80001800`, 8 slots/frame, phase-inverted): 0–3 analog tracks · 4–5 external in · **6–7 analog mix bus L/R, before the master VCAs** |
+| `0x80003950` | 8 **ADC** channels (ring `0x80001800`, 8 slots/frame, phase-inverted): 0–3 analog tracks · 4–5 external in · **6–7 FX track bus L/R (tracks routed to the FX track), before its VCAs** |
 | `0x8000DAD0` | digital bus to the analog mixer (tracks not routed to the FX track + delay/reverb returns) |
 | `0x8000DFD0` | digital tracks routed to the FX track |
 | `0x80004760` | Overbridge/USB, 20 ch/frame: 0–1 main, 2–9 digital tracks, 10–13 analog tracks, 14–15 ADC 6/7, 16–17 FX |
@@ -40,7 +40,7 @@ Engine copy of the kit (or global) blocks, base `0x800021B0`, written by `0x400A
 - VOL (delay, reverb) and delay→reverb send: gain `(v/32768)²`.
 - Reverb pre-delay: `(PRE² >> 16) + 37` samples, max 16384.
 
-**The final mix is analog.** Digital buses go out through DACs (TDM, 8 slots, ring `0x80000000`) into the analog mixer; nothing digital sits after the master VCAs.
+**The final mix is analog.** Digital buses go out through DACs (TDM, 8 slots, ring `0x80000000`) into the analog mixer; nothing digital sits after them. CV 35/36 (below) are the VCAs of the FX track bus, not of the whole output: on the device, only tracks routed to the FX track move with them (v0.9).
 
 ### Sends, returns and routing
 
@@ -76,7 +76,7 @@ Engine copy of the kit (or global) blocks, base `0x800021B0`, written by `0x400A
 | 0–3 / 5–8 | voice 1–4 left / right |
 | 4 / 9 | external in left / right (`hw+0x08`, `hw+0x12`) |
 | 10–33 | voice cutoff, resonance, tune, levels |
-| **35 / 36** | **master left / right** (`hw+70`, `hw+72`) — recomputed every block in `0x400904B2–0x4009055E` |
+| **35 / 36** | **FX track bus left / right** (named master in the OS; `hw+70`, `hw+72`) — recomputed every block in `0x400904B2–0x4009055E` |
 | 37 / 38 | master filter cutoff |
 
 - External-in gains: block `0x40090872–0x400908F8`; constant-power balance law `0x400A171A`.
