@@ -45,8 +45,10 @@ typedef unsigned short u16;
 #define SRC_D     0x80003D50u                              /* tracce digitali, 32 campioni a passo 128 B */
 #define SRC_A     0x80003950u                              /* tracce analogiche (canali 0..3) */
 #define OUT_A     ((s32 *)0x8000DAD0u)                     /* bus d'uscita, L/R alternati */
+#define OUT_FX    ((s32 *)0x8000DFD0u)                     /* bus della FX track (blocco FX analogico) */
 #define DLY_IN    ((s32 *)0x8000DBD0u)                     /* bus d'ingresso del delay, L/R alternati */
 #define KIT       (*(char *const volatile *)0x800030BCu)   /* kit del pattern attivo */
+#define W_IN      (2 * 0x37)                               /* parola del kit: SND3 dell'ingresso (basso), routing (bit 8) */
 #define LOUD      (10 << 16)                               /* ingresso udibile: oltre 10/32768 (-70 dB) */
 #define UI_ROOT   (*(char *const volatile *)0x444E1334u)
 #define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...))                    0x400F8C18u)                            /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
@@ -405,8 +407,8 @@ void fx3_run(void)
         silent = chorus(in, dsp_type == FLNG);
     }
     quiet = loud || !silent ? 0 : quiet + 1;
-    if (vol)
-        fx3_ret(fx3_wet, vol, OUT_A, ret_h);
+    if (vol)                                               /* ROUTING (FUNC+FX), tasto 13: nella FX track */
+        fx3_ret(fx3_wet, vol, *(const volatile u16 *)(kit() + W_IN) & 0x100 ? OUT_FX : OUT_A, ret_h);
     else
         ret_h[0] = ret_h[1] = 0;
 }
@@ -484,7 +486,6 @@ s32 fx3_set(void *obj, s32 id, s32 value)
 /* ---- SND3 dell'ingresso esterno: id 269 (vparams), byte basso della parola 0x37 del kit della FX track.
  * Bersagli come le mandate DEL/REV dell'ingresso (0x4008F480..): guadagni L/R da livello e bilanciamento,
  * per (v/32768)^2; ogni lato pesa meta' nel bus mono, come una traccia al centro. */
-#define W_IN      (2 * 0x37)
 
 static u32 in_snd(void)
 {
@@ -527,6 +528,32 @@ void fx3_in(s32 gl, s32 gr)                               /* dal ciclo delle man
         fx3_tgt[13] = tr;
         fx3_moving = 1;
     }
+}
+
+/* ---- ROUTING (FUNC+FX), tasto 13: il ritorno di FX3 nella FX track (bit 8 della parola 0x37 del kit), come
+ * il routing di delay e riverbero sui tasti 14 e 15 */
+#define DRAW_BOX  ((void (*)(void *, s32, s32, s32, s32, s32))0x400F7BD6u)
+#define DRAW_STR  ((void (*)(void *, const void *, s32, s32, s32, const char *, ...))0x400F8A0Cu)
+#define FONT_RT   ((const void *)0x443DA218u)
+
+u32 fx3_route(void)
+{
+    return (*(const volatile u16 *)(kit() + W_IN) >> 8) & 1;
+}
+
+void fx3_route_toggle(void)
+{
+    volatile u16 *w = (volatile u16 *)(kit() + W_IN);
+    char *ui = UI_ROOT;
+    *w = (u16)(*w ^ 0x100);
+    if (ui)
+        ui[96] = 1;
+}
+
+void fx3_route_draw(void *ctx, s32 x, s32 y)              /* al posto del segnaposto della voce 13 */
+{
+    DRAW_BOX(ctx, x - 4, y - 6, x + 8, y + 6, 1);
+    DRAW_STR(ctx, FONT_RT, x + 2, y - 2, 2, "FX3");
 }
 
 /* ---- testi (std::function come in readable-values) */
@@ -1180,6 +1207,43 @@ __asm__(
     "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
     "        lea     16(%sp),%sp\n"
     "1:      jmp     0x40096E3C\n"              /* il riverbero, con gli argomenti al loro posto */
+    "        .globl  fx3_rt_key\n"
+    "fx3_rt_key:\n"                             /* 0x4004C5E2 (ROUTING, tasti): d0 = codice, d2 = evento, */
+    "        moveq   #36,%d1\n"                         /* a2 = vista. Tasto 13: commuta FX3 */
+    "        cmp.l   %d0,%d1\n"
+    "        bne.s   1f\n"
+    "        move.l  %d2,-(%sp)\n"
+    "        jsr     0x400F966C\n"                    /* pressione? */
+    "        addq.l  #4,%sp\n"
+    "        tst.b   %d0\n"
+    "        beq.s   2f\n"
+    "        jsr     fx3_route_toggle\n"
+    "        move.l  %a2,-(%sp)\n"
+    "        jsr     0x400FFC5E\n"                    /* aggiorna la vista (come i tasti 14-16) */
+    "        addq.l  #4,%sp\n"
+    "2:      jmp     0x4004C80A\n"                    /* gestito */
+    "1:      bgt.s   3f\n"                            /* istruzioni sostituite: tracce sotto, 14-16 sopra */
+    "        jmp     0x4004C5EC\n"
+    "3:      jmp     0x4004C5FA\n"
+    "        .globl  fx3_rt_get\n"
+    "fx3_rt_get:\n"                             /* 0x4004BF86: stato della voce (vista, indice) */
+    "        moveq   #12,%d0\n"
+    "        cmp.l   8(%sp),%d0\n"
+    "        bne.s   1f\n"
+    "        jmp     fx3_route\n"                     /* voce 13: FX3 nella FX track */
+    "1:      lea     -16(%sp),%sp\n"                 /* istruzioni sostituite */
+    "        movem.l %d2-%d4/%a2,(%sp)\n"
+    "        jmp     0x4004BF8E\n"
+    "        .globl  fx3_rt_draw\n"
+    "fx3_rt_draw:\n"                            /* 0x4004C242: segnaposto (ctx, x, y - 6, x + 4, 1) */
+    "        move.l  12(%sp),%d0\n"
+    "        addq.l  #6,%d0\n"
+    "        move.l  %d0,-(%sp)\n"
+    "        move.l  12(%sp),-(%sp)\n"
+    "        move.l  12(%sp),-(%sp)\n"
+    "        jsr     fx3_route_draw\n"
+    "        lea     12(%sp),%sp\n"
+    "        rts\n"
     "        .globl  fx3_mix_hook\n"
     "fx3_mix_hook:\n"                           /* 0x4008FB04: al posto di pea -296(fp) ; pea 0x8000E0F0 */
     "        lea     -16(%sp),%sp\n"

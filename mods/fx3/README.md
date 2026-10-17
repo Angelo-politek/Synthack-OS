@@ -19,7 +19,7 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 - Changing TYPE resets SPD…WID to that type's starting values; CRSH starts neutral (24 kHz, 16 bits, no drive), so landing on it by accident doesn't wreck the sound. DEL and REV are kept.
 - FLNG and PHSR feedback is bipolar: centre = none. PHSR is four allpass stages; WID turns the right side into the complementary response (notches where the left has peaks). CRSH is mono and hides the two knobs it doesn't use.
 - Each knob takes the icon of a similar OS parameter (machine SPD, MOD, sweep time/depth, TONE, BAL, OVER…), so every effect looks different.
-- The return goes to the direct bus (like delay and reverb with *FX Routing* off).
+- **Routing** (v0.9): the return goes to the direct bus, or to the FX track (analog FX block and bus compressor) with **trig 13 on the ROUTING screen** (FUNC+FX), next to delay (14) and reverb (15). Saved with the kit (bit 8 of FX-track word 0x37). Hooks on the screen's key handler (`0x4004C5E2`), entry state (`0x4004BF86`), drawing of the empty entry 13 (`0x4004C242`) and its LED (`0x4004C480`).
 - **Saved with the kit** (per pattern, like delay and reverb): in four words of the pattern kit the OS never uses (internal ids 0, 0x1A, 0x38 = hidden id 144, 0x46), one byte per knob. Older projects load with the default values. The OS kit file format drops words 0x1A and 0x46 and reads word 0 back from 0x1A (FUNC+YES/NO, project save): hooks on the FX block writer/reader (`0x400A6D96` / `0x400A6D2E`) keep the three words in 8 bytes of the block the OS zeroes and never reads (marker `SH`). Files without the marker load the defaults.
 
 ## How it works
@@ -38,4 +38,4 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 python mods/fx3/make_patch.py
 ```
 
-Test: `tests/test_fx3.py` (send gains like the OS, mute, bus sums, chorus as a pure delay, reads inside the line with sudden TIME changes, phaser and crusher against bit-exact models, return interpolation, sign and saturation, send to delay, idle after heavy use and with silent inputs, cost per block and per type, kit storage and pattern change, kit file round trip through the OS writer/reader, names and texts per type, page and drawing hooks).
+Test: `tests/test_fx3.py` (send gains like the OS, mute, bus sums, chorus as a pure delay, reads inside the line with sudden TIME changes, phaser and crusher against bit-exact models, return interpolation, sign and saturation, send to delay, idle after heavy use and with silent inputs, cost per block and per type, kit storage and pattern change, kit file round trip through the OS writer/reader, names and texts per type, page and drawing hooks, ROUTING key 13 and the return on the FX-track bus).

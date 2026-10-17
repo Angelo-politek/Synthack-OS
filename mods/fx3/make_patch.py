@@ -65,6 +65,11 @@ KIT_HOOKS = [(0x400A_6D96, "2f0b2f0a246f000c", "fx3_kser_hook", "kit -> file (FX
 # classe del tab AMP: gli id sotto 73 (diversi da 73-74) erano trattati come parti dell'inviluppo, senza
 # grafica propria; con bra -> "casella normale" SND3 (72) disegna la sua icona
 AMP_FIX = (0x4004_1E84, "605c", "6058")
+# schermata ROUTING (FUNC+FX): la voce 13, vuota nell'OS, instrada il ritorno di FX3 nella FX track
+ROUTE_JMP = [(0x4004_C5E2, "7224b28067000222", "fx3_rt_key", "ROUTING: tasto 13 -> jmp fx3_rt_key ; nop"),
+             (0x4004_BF86, "4feffff048d7041c", "fx3_rt_get", "ROUTING: stato della voce -> jmp fx3_rt_get ; nop")]
+ROUTE_DRAW = (0x4004_C242, "4eb9400f72a4", "fx3_rt_draw", "ROUTING: voce 13 disegnata come 'FX3'")
+ROUTE_LED = (0x4004_C480, "6716", "6712", "ROUTING: LED del tasto 13 acceso come le voci 14-16")
 # parametri della pagina: id, nomi, massimo, default; prototipi dell'oggetto {offset: (operando, atteso,
 # nuovo)}; correzioni ai campi +0/+4 per comportarsi come DEL (250): tipo 0, prototipo d3
 PARAMS = [
@@ -216,6 +221,11 @@ def main() -> None:
         patches.append(fixed(addr, struct.pack(">HI", 0x4EF9, syms[sym]) + bytes.fromhex("4e71"), what, orig))
     patches.append(fixed(DRAW_HOOK, struct.pack(">HI", 0x4EF9, syms["fx3_draw_hook"]) + bytes.fromhex("4e71"),
                          "tab DELAY/REVERB: pagina 25 col disegno generico a 8 caselle", DRAW_ORIG))
+    for addr, orig, sym, what in ROUTE_JMP:
+        patches.append(fixed(addr, struct.pack(">HI", 0x4EF9, syms[sym]) + bytes.fromhex("4e71"), what, orig))
+    patches.append(fixed(ROUTE_DRAW[0], struct.pack(">HI", 0x4EB9, syms[ROUTE_DRAW[2]]), ROUTE_DRAW[3],
+                         ROUTE_DRAW[1]))
+    patches.append(fixed(ROUTE_LED[0], bytes.fromhex(ROUTE_LED[2]), ROUTE_LED[3], ROUTE_LED[1]))
     patches.append(fixed(AMP_FIX[0], bytes.fromhex(AMP_FIX[2]), "tab AMP: SND3 (72) come casella normale",
                          AMP_FIX[1]))
     resolve = lambda v: syms[v] if isinstance(v, str) else v
@@ -260,7 +270,8 @@ def main() -> None:
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
-            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rsnd", "fx3_rev_hook", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set")},
+            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rsnd", "fx3_rev_hook", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set",
+            "fx3_route", "fx3_rt_key", "fx3_rt_get", "fx3_rt_draw")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,
     }

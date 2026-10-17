@@ -752,7 +752,9 @@ def test_time_jumps_glide_and_reads_stay_in_the_line(m, t):
             m.param("TIME", 127 if (k // 40) % 2 == 0 else 0)
         run_block(m)
     m.uc.hook_del(h)
-    line = [a for a in seen if a >= (MA + 0xDC00) and not (MA + 0xDFFC) <= a < (MA + 0xE000)]  # tranne FDBK
+    blob = next(p for p in m.spec["patches"] if p.get("append"))
+    end = int(blob["ram"], 16) + blob["len"]                    # fine del codice e dei dati di fx3
+    line = [a for a in seen if a >= end and not (MA + 0xDFFC) <= a < (MA + 0xE000)]  # tranne FDBK
     assert line and min(line) >= (MA + 0xE000) and max(line) < (MA + 0xF000)
 
 
@@ -999,3 +1001,110 @@ def test_kit_file_from_v081_resets_the_old_vol_byte():
     m.call(KDES, [KIT2, FILE])
     back = struct.unpack(">71H", m.uc.mem_read(KIT2, 142))
     assert back[0] == words[0] and back[0x1A] == words[0x1A] and back[0x46] == words[0x46] & 0xFF00
+
+
+# ----------------------------------------------------------------------------- ROUTING (FUNC+FX), tasto 13
+RT_KIT, RT_VIEW, RT_EVENT = 0x5000_6000, 0x5000_6800, 0x5000_6900
+IS_PRESS, REFRESH, RT_DONE = 0x400F_966C, 0x400F_FC5E, 0x4004_C80A
+
+
+def route_kit(m, word):
+    m.uc.mem_write(0x8000_30BC, struct.pack(">I", RT_KIT))
+    m.uc.mem_write(RT_KIT, bytes(142))
+    m.uc.mem_write(RT_KIT + 110, struct.pack(">H", word))
+
+
+def rt_key(m, code, press=True):
+    """Come a 0x4004C5E2: d0 = codice del tasto, d2 = evento, a2 = vista. -> (dove continua l'OS, refresh)."""
+    uc = m.uc
+    uc.mem_write(IS_PRESS, bytes.fromhex("7001" if press else "7000") + b"\x4e\x75")
+    uc.mem_write(REFRESH, b"\x4e\x75")
+    refresh = []
+    h = uc.hook_add(UC_HOOK_CODE, lambda u, a, s, _: refresh.append(
+        struct.unpack(">I", u.mem_read(u.reg_read(UC_M68K_REG_A7) + 4, 4))[0]), begin=REFRESH, end=REFRESH)
+    stops = (RT_DONE, 0x4004_C5EC, 0x4004_C5FA)
+    for r, v in ((UC_M68K_REG_D0, code), (UC_M68K_REG_D2, RT_EVENT), (UC_M68K_REG_A2, RT_VIEW)):
+        uc.reg_write(r, v)
+    uc.reg_write(UC_M68K_REG_SR, 0x2700)
+    uc.reg_write(UC_M68K_REG_A7, STACK)
+    where = []
+
+    def at(u, a, s, _):
+        if a in stops:
+            where.append(a)
+            u.emu_stop()
+    h2 = uc.hook_add(UC_HOOK_CODE, at)
+    uc.emu_start(0x4004_C5E2, 0, count=10_000)
+    uc.hook_del(h)
+    uc.hook_del(h2)
+    assert uc.reg_read(UC_M68K_REG_A7) == STACK and uc.reg_read(UC_M68K_REG_A2) == RT_VIEW
+    return where[0], refresh
+
+
+def test_routing_key_13_toggles_fx3_and_keeps_the_rest(m):
+    route_kit(m, 0x005A)                                         # SND3 dell'ingresso = 90
+    assert rt_key(m, 36) == (RT_DONE, [RT_VIEW])
+    assert bytes(m.uc.mem_read(RT_KIT + 110, 2)) == b"\x01\x5A"
+    assert rt_key(m, 36, press=False) == (RT_DONE, [])           # rilascio: niente
+    assert rt_key(m, 36) == (RT_DONE, [RT_VIEW])
+    assert bytes(m.uc.mem_read(RT_KIT + 110, 2)) == b"\x00\x5A"
+    for code in range(24, 36):                                   # tracce: come l'OS
+        assert rt_key(m, code) == (0x4004_C5FA, [])
+    for code in (37, 38, 39, 40):                                # delay, riverbero, ingresso, oltre
+        assert rt_key(m, code) == (0x4004_C5EC, [])
+    assert bytes(m.uc.mem_read(RT_KIT + 110, 2)) == b"\x00\x5A"
+
+
+@pytest.mark.parametrize("word,want", [(0x0000, 0), (0x0100, 1), (0x017F, 1), (0x00FF, 0)])
+def test_routing_entry_13_reads_the_flag(m, word, want):
+    route_kit(m, word)
+    assert m.call(0x4004_BF86, [RT_VIEW, 12]) == want
+
+
+def test_routing_other_entries_go_to_the_os(m):
+    hit = []
+
+    def at(u, a, s, _):
+        sp = u.reg_read(UC_M68K_REG_A7)
+        hit.append((sp, struct.unpack(">4I", u.mem_read(sp, 16)), u.mem_read(sp + 16, 12)))
+        u.emu_stop()
+    h = m.uc.hook_add(UC_HOOK_CODE, at, begin=0x4004_BF8E, end=0x4004_BF8E)
+    regs = {UC_M68K_REG_D2: 0xD2, UC_M68K_REG_D3: 0xD3, UC_M68K_REG_A2: 0xA2}
+    m.call(0x4004_BF86, [RT_VIEW, 3], regs)
+    m.uc.hook_del(h)
+    sp, saved, args = hit[0]
+    assert sp == STACK - 12 - 16 and saved[0] == 0xD2 and saved[1] == 0xD3 and saved[3] == 0xA2
+    assert bytes(args) == struct.pack(">III", RET, RT_VIEW, 3)   # 24(sp) = indice, come l'OS
+
+
+def test_routing_entry_13_drawn_as_fx3(m):
+    m.uc.mem_write(0x400F_8A0C, b"\x4e\x75")
+    box = stub_calls(m, 0x400F_7BD6, 6, m.sym["fx3_rt_draw"], [0xC0, 70, 45 - 6, 74, 1])
+    txt = stub_calls(m, 0x400F_8A0C, 6, m.sym["fx3_rt_draw"], [0xC0, 70, 45 - 6, 74, 1])
+    assert box[0] == [0xC0, 66, 39, 78, 51, 1]                   # come le caselle delle tracce
+    assert txt[0][:5] == [0xC0, 0x443D_A218, 72, 43, 2]
+    assert text(m, txt[0][5]).startswith("FX3")
+
+
+def test_routing_led_of_key_13_enabled():
+    spec = json.loads(MODS[1].read_text(encoding="utf-8"))
+    fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
+    assert fixes[0x4004_C480] == "6712"                          # beq -> d4 = 1, come le voci 14-16
+    assert fixes[0x4004_C242][:4] == "4eb9" and fixes[0x4004_C5E2][:4] == "4ef9"
+
+
+@pytest.mark.parametrize("routed", [0, 1])
+def test_return_goes_to_the_fx_track_when_routed(m, routed):
+    route_kit(m, routed << 8)
+    settle(m, DEP=0, TIME=0, FDBK=0)
+    m.put(OUT_A, [-1000] * 64)
+    m.put(OUT_B, [-1000] * 64)
+    impulse(m)
+    seen = {OUT_A: False, OUT_B: False}
+    for _ in range(3):
+        m.put(OUT_A, [-1000] * 64)
+        m.put(OUT_B, [-1000] * 64)
+        run_block(m)
+        for bus in seen:
+            seen[bus] |= m.longs(bus, 64) != [-1000] * 64
+    assert seen == {OUT_A: not routed, OUT_B: bool(routed)}
