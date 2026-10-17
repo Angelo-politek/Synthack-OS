@@ -14,7 +14,8 @@
  * - HALF: mezza velocita' dentro un segmento di 8 step (ogni step due volte).
  *
  * Tasti: aggancio nel ramo dei tasti 13-16 di KeyboardView::consumeKeyEvent (0x4002EA92), dopo i
- * controlli di modo dell'OS, solo se il modificatore attivo e' Mod A; i rilasci passano anche dal
+ * controlli di modo dell'OS, solo se il modificatore attivo e' Mod A (pattern corrente + 44, come a
+ * 0x4002E6F4); i rilasci passano anche dal
  * dispatcher degli eventi (0x4000B420). Con piu' tasti premuti vale l'ultimo.
  */
 
@@ -30,7 +31,9 @@ typedef int s32;
 #define KIT       (*(const char *const volatile *)0x800030B8u)  /* kit attivo */
 #define KIT_MODA  0x15B6                                    /* kit: Mod A M1..M4 (parole, 0..127) */
 #define MOD_A     2                                         /* modificatori: 0 retrig, 1 velocity, 2 A, 3 B */
-#define PROJ      ((void *(*)(void))0x40019000u)            /* impostazioni del progetto (+44: modificatori) */
+/* le funzioni dell'OS restituiscono anche i puntatori in d0: per GCC (che li vuole in a0) sono interi */
+#define PATTERN   ((u32 (*)(void *))0x40019000u)           /* (progetto) -> pattern corrente (+44: modificatori) */
+#define VIEW_PROJ 0x94                                      /* KeyboardView: progetto */
 #define MOD_MODE  ((s32 (*)(void *))0x40015AF6u)            /* modificatore attivo */
 #define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...)) \
                    0x400F8C18u)                             /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
@@ -141,8 +144,7 @@ s32 pf_kbd(const char *view, const unsigned char *ev, u32 code)
     u32 k = code - KEY_13;
     void *proj;
 
-    (void)view;
-    if (k > 3 || !(proj = PROJ()) || MOD_MODE((char *)proj + 44) != MOD_A)
+    if (k > 3 || !(proj = *(void *const *)(view + VIEW_PROJ)) || MOD_MODE((void *)(PATTERN(proj) + 44)) != MOD_A)
         return -1;
     if (*(const u32 *)(ev + 16) & EV_DOWN) {
         key[k] = (unsigned char)code;

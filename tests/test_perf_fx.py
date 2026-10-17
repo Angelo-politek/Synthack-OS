@@ -37,7 +37,8 @@ pytestmark = pytest.mark.skipif(not (SY.exists() and SPEC_F.exists()), reason="O
 
 LOAD, STACK, RET = 0x4000_0400, 0x5000_8000, 0x5000_F000
 PAT, STEPS, EV = 0x5000_1000, 0x5000_0800, 0x5000_2400       # pattern finto, step[13], evento
-VIEW, MODE, KIT = 0x5000_2000, 0x5000_2500, 0x5000_4000     # vista finta, modificatore attivo, kit
+VIEW, PROJ_OBJ, KIT = 0x5000_2000, 0x5000_2600, 0x5000_4000  # vista finta, progetto finto, kit
+MODE = PROJ_OBJ + 0x100 + 44                               # pattern corrente (stub) + 44: modificatore
 HANDLED, NATIVE, LOWER = 0x4002_E954, 0x4002_EA9A, 0x4002_EBA6  # uscite del ramo dei tasti 13-16
 DISPATCH, PROJ, MOD_MODE, DRAW = 0x4000_839E, 0x4001_9000, 0x4001_5AF6, 0x400F_8C18
 KIT_PTR, KIT_MODA = 0x8000_30B8, 0x15B6
@@ -69,9 +70,12 @@ class Machine:
         uc.mem_write(RET, b"\x4e\x75")
         uc.mem_write(PAT + 136057, b"\x00")                      # lunghezza unica del pattern
         self.length(16)
-        # 0x40019000 -> move.l #VIEW,d0 ; rts ; 0x40015AF6 -> moveq #0,d0 ; move.b MODE,d0 ; rts
-        uc.mem_write(PROJ, struct.pack(">HIH", 0x203C, VIEW, 0x4E75))
-        uc.mem_write(MOD_MODE, struct.pack(">HHIH", 0x7000, 0x1039, MODE, 0x4E75))
+        # come l'OS: progetto in *(vista + 0x94); 0x40019000(progetto) -> pattern = progetto + 0x100
+        # (move.l 4(sp),d0 ; addi.l #0x100,d0 ; rts); 0x40015AF6(oggetto) -> byte a oggetto (movea.l 4(sp),a0 ;
+        # moveq #0,d0 ; move.b (a0),d0 ; rts): con argomenti sbagliati il modo letto non e' quello scritto
+        uc.mem_write(VIEW + 0x94, struct.pack(">I", PROJ_OBJ))
+        uc.mem_write(PROJ, bytes.fromhex("202f00040680000001004e75"))
+        uc.mem_write(MOD_MODE, bytes.fromhex("206f000470001010" + "4e75"))
         uc.mem_write(DRAW, b"\x4e\x75")
         self.mode(MOD_A)
         uc.mem_write(KIT_PTR, struct.pack(">I", KIT))
