@@ -9,6 +9,7 @@
 | [vparams](vparams) | Virtual parameters shared by mods (kit-parameter hooks + registration table) | modarea |
 | [dual-mono](dual-mono) | Independent IN L / IN R levels when EXTERNAL IN is mono | — |
 | [splash](splash) | "SyntHack" logo and version after the official intro | — |
+| [kitstore](kitstore) | 36 words for mods saved with the kit (reserved bytes of the per-track kit blocks) | modarea |
 | [projstore](projstore) | 256 bytes for mods saved with the project (reserved area of the project settings) | modarea |
 | [modarea](modarea) | Unpacks the (compressed) mod code at boot into a 64 KB block of the OS heap | — |
 | [mod-zero](mod-zero) | Example: renames a menu entry (smallest possible mod) | — |
