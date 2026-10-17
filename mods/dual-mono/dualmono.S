@@ -11,8 +11,8 @@
 |   passata 1: livello = IN LR  -> si tiene il VCA sinistro (hw+8)
 |   passata 2: livello = BAL    -> si tiene il VCA destro (hw+0x12)
 | poi i parametri originali di a2 vengono ripristinati.
-| La pagina EXTERNAL MIXER mostra IN L e IN R affiancati. IN R e' l'alias 125 ("Input Level",
-| disegnato a barra) con id interno reso 0x25 da make_patch.py, cosi' legge e scrive BAL.
+| IN R e' l'alias 125 ("Input Level", disegnato a barra) con id interno reso 0x25 da make_patch.py,
+| cosi' legge e scrive BAL; in mono sta nella pagina IN R del tab MIXER (dualmono2.c).
 
         .equ    DUALMONO_FLAG,  0x80003146      | byte globale EXTERNAL IN: 0 = MONO, != 0 = stereo
         .equ    P_LEVEL,        0x70A           | a2: IN LR
@@ -113,8 +113,7 @@ ui_mono:
         bsr.s   page_ok
         bne.s   6f
         | (il ColdFire non ammette move.l #imm verso memoria indirizzata: passiamo da d0/a1)
-        moveq   #ID_INR,%d0
-        move.l  %d0,4(%a0)                      | manopola B: alias 125 (barra) = valore di BAL
+        clr.l   4(%a0)                          | manopola B: vuota (IN R ha la sua pagina, v2)
         clr.l   24(%a0)                         | manopola G: vuota (BAL non serve in mono)
         lea     str_inl,%a1
         move.l  %a1,NAME_INLR

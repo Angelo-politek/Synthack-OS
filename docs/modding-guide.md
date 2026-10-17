@@ -16,6 +16,7 @@ Mod area (first 64 KB block of the OS heap, from `modarea_layout.RAM`; unpacked 
 | `+0x0000` | master-comp |
 | `+0x2000` | readable-values |
 | `+0x4000` | perf-fx |
+| `+0x5000` | dual-mono v2 (header read by fx3: `tools/build/dualmono_layout.py`) |
 | `+0x7000` | projstore code and its 256 saved bytes |
 | `+0x7200` | kitstore code |
 | `+0x7E00` | vparams code; `+0x8000` vparams table (32 × 12 B) |

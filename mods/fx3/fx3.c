@@ -487,9 +487,28 @@ s32 fx3_set(void *obj, s32 id, s32 value)
  * Bersagli come le mandate DEL/REV dell'ingresso (0x4008F480..): guadagni L/R da livello e bilanciamento,
  * per (v/32768)^2; ogni lato pesa meta' nel bus mono, come una traccia al centro. */
 
-static u32 in_snd(void)
+/* Dual mono v2 (mods/dual-mono): intestazione a DM_HDR (tools/build/dualmono_layout.py). In mono il
+ * blocco delle mandate dell'ingresso gira due volte: passata 1 = IN L (canale 12), passata 2 = IN R
+ * (canale 13, mandata FX3 R nella parola KS_FX3_R del kit attivo, kitstore). La pagina IN R del tab
+ * MIXER mostra 269 come la pagina IN L: con quella pagina aperta si legge e scrive FX3 R. */
+#define DM_MAGIC  0x444D5632u
+#define UI_KIT    (*(char *const volatile *)0x800030B8u)    /* kit attivo (kitstore) */
+
+static u32 dm_side(void)
 {
-    u32 v = *(const volatile u16 *)(kit() + W_IN) & 0xFF;
+    return *(const volatile u32 *)DM_HDR == DM_MAGIC ? *(const volatile unsigned char *)(DM_HDR + 4) : 0;
+}
+
+static u32 dm_page_r(void)                                /* solo dal codice dell'interfaccia */
+{
+    u32 (*f)(void) = *(u32 (*const volatile *)(void))(DM_HDR + 8);
+    return *(const volatile u32 *)DM_HDR == DM_MAGIC && f ? f() : 0;
+}
+
+static u32 in_snd(u32 r)
+{
+    const char *k = UI_KIT;
+    u32 v = r ? (k ? *(const volatile u16 *)(k + KS_FX3_R) : 0) : *(const volatile u16 *)(kit() + W_IN) & 0xFF;
     return v > 127 ? 127 : v;
 }
 
@@ -497,18 +516,22 @@ s32 fx3_in_get(void *obj, s32 id)
 {
     (void)obj;
     (void)id;
-    return (s32)in_snd() << 8;
+    return (s32)in_snd(dm_page_r()) << 8;
 }
 
 s32 fx3_in_set(void *obj, s32 id, s32 value)
 {
-    char *ui = UI_ROOT;
+    char *ui = UI_ROOT, *k = UI_KIT;
     volatile u16 *w = (volatile u16 *)(kit() + W_IN);
     (void)obj;
     (void)id;
     value = (value + 0x80) >> 8;
     value = value < 0 ? 0 : value > 127 ? 127 : value;
-    *w = (u16)((*w & 0xFF00) | (u32)value);
+    if (dm_page_r()) {
+        if (k)
+            *(volatile u16 *)(k + KS_FX3_R) = (u16)value;
+    } else
+        *w = (u16)((*w & 0xFF00) | (u32)value);
     if (ui)
         ui[96] = 1;
     return 0;
@@ -516,13 +539,17 @@ s32 fx3_in_set(void *obj, s32 id, s32 value)
 
 void fx3_in(s32 gl, s32 gr)                               /* dal ciclo delle mandate dell'ingresso */
 {
-    u32 v = in_snd() << 8;
+    u32 side = dm_side(), v = in_snd(side == 2) << 8;
     s32 s = (s32)(short)((2 * v * v) >> 16), tl = 0, tr = 0;
 
     if (v) {
         tl = (s32)(short)((u32)(gl >> 1) >> 16) * s;
         tr = (s32)(short)((u32)(gr >> 1) >> 16) * s;
     }
+    if (side == 1)                                        /* dual mono: passata IN L, solo il canale 12 */
+        tr = fx3_tgt[13];
+    else if (side == 2)                                   /* passata IN R, solo il canale 13 */
+        tl = fx3_tgt[12];
     if (tl != fx3_tgt[12] || tr != fx3_tgt[13]) {
         fx3_tgt[12] = tl;
         fx3_tgt[13] = tr;

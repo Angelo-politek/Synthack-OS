@@ -13,14 +13,13 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 | Feature | Status | What it does |
 |---|---|---|
 | [Bus compressor](mods/master-comp) | ✅ v0.5.0 | Compressor on the **FX track bus**: it listens to and compresses the tracks routed to the FX track (send kick, snare, bass there and compress them together); tracks not routed to it are untouched. Digitakt-style curves. THR · ATK · REL · MUP · RAT + gain-reduction meter + ON/OFF switch on the FX track SYN page, values in dB / ms / ratio. Saved per pattern, or global with *SYN global*. |
-| [Dual mono input](mods/dual-mono) | ✅ v0.5.0 | With EXTERNAL IN set to mono, **IN L** and **IN R** get independent levels on the External Mixer page. |
+| [Dual mono input](mods/dual-mono) | ✅ v0.9 | With EXTERNAL IN set to mono, **IN L** and **IN R** are two separate inputs: the External Mixer page is IN L, a new **IN R** page in the MIXER tab has its own level and DEL / REV / FX3 sends (saved with the kit). |
 | [Boot splash](mods/splash) | ✅ v0.8.1 | "SyntHack" logo and version after the official intro. Boot time unchanged. |
 | [Mod area](mods/modarea) | ✅ infra | 64 KB for mod code, stored compressed and unpacked at boot into a block reserved from the OS heap. |
 | [Readable parameter values](mods/readable-values) | ✅ v0.5.0 | Hz, dB, ms and % instead of 0–127: filters, envelopes, levels, sends, delay and reverb, on every track and the FX track. Computed from the same data the DSP uses; analog parts measured on the device. |
 | [Performance FX](mods/perf-fx) | ✅ v0.9 | Sequencer effects on **all tracks** (analog too): select Mod A (FUNC+15) and keys 13–16 play repeat (1/16 … 1 bar), reverse (1/8 … 1 bar) or half speed, resuming in time on release. Each key's effect is set in the Mod A setup page and saved with the kit. Replaces beat-repeat. Also **quantized retrig**: QNT in the Retrig setup page starts retrigs on the next step. |
 | [Third send FX](mods/fx3) | ✅ v0.8.0 | **SND3** on every track (AMP page 1, next to DEL and REV; PAN moves to page 2) into a **chorus, flanger, phaser or crusher**, with its own page (REVERB tab, page 2) saved with the kit, and sends into the delay and the reverb; the return can be routed to the FX track (FUNC+FX, trig 13). |
 | PIN lock | ⬜ planned | Optional PIN at power-on, as a theft deterrent. Recovery via OS reflash stays possible. |
-| Dual mono v2 | ⬜ planned | Separate IN L / IN R pages with their own FX sends. |
 | New LFO shapes · 3rd LFO / mod matrix | ⬜ planned | |
 | Arpeggiator · Euclidean circle UI | ⬜ planned | |
 | Resampling to SP TWINSHOT · advanced sampler | ⬜ planned | |
@@ -36,7 +35,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 ```mermaid
 flowchart LR
   A["Foundations ✅<br/>unpack/repack · emulator<br/>build tool · recovery"] --> B["First mods ✅<br/>splash · dual mono<br/>master compressor"]
-  B --> C["UI & usability<br/>readable values ✅ · PIN lock<br/>dual mono v2"]
+  B --> C["UI & usability<br/>readable values ✅ · PIN lock<br/>dual mono v2 ✅"]
   C --> D["FX & performance<br/>beat repeat ✅ · third send FX ✅<br/>arp · euclidean UI · LFOs"]
   D --> E["Engine mods<br/>new machines · sampler<br/>resampling"]
   B -.-> W["Web builder"]
@@ -59,8 +58,8 @@ Requires Python 3, WSL/Linux and your own `Syntakt_OS1.41.syx` (see [firmware/RE
 bash tools/unpack/setup_eft.sh                 # once (WSL/Linux)
 git config core.hooksPath tools/hooks          # once: blocks firmware files from commits
 python tools/build/build.py --stock firmware/Syntakt_OS1.41.syx \
-    mods/splash mods/dual-mono mods/modarea mods/vparams mods/master-comp mods/readable-values mods/perf-fx \
-    mods/fx3 -o out/synthack.syx
+    mods/splash mods/modarea mods/vparams mods/kitstore mods/dual-mono mods/master-comp mods/readable-values \
+    mods/perf-fx mods/fx3 -o out/synthack.syx
 ```
 
 Flash `out/synthack.syx` with Elektron Transfer (USB, *Drop* page). To go back, flash the stock OS the same way.

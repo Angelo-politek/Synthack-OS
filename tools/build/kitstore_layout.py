@@ -15,4 +15,4 @@ def word(block: int, k: int) -> int:
     return BLOCKS + STRIDE * block + FIRST + 2 * k
 
 
-PARTS = {}                              # nome della mod -> lista di (blocco, parola)
+PARTS = {"dual-mono": [(0, 0), (0, 1), (0, 2)]}   # nome della mod -> (blocco, parola): DEL R, REV R, FX3 R

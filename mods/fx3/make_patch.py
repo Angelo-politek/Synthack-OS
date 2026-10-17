@@ -26,6 +26,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
+import dualmono_layout as DL  # noqa: E402
 import modarea_layout  # noqa: E402
 
 _vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
@@ -36,7 +37,7 @@ LOAD = 0x4000_0400
 MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
 CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # retroazione a +0xDFFC, linea a +0xE000 (4 KB)
 TOOLS = "~/tools/m68k/root"
-CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
+CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x}u -DDM_HDR={DL.HDR:#x}u -DKS_FX3_R={DL.FX3_R:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
 FS = 24000                              # il chorus lavora a 24 kHz
 DESC = 0x4022_D59C
 P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_DFD0, 0x41B9_DCD0, 0x41B9_DBD0, 0x41B9_D5D0
