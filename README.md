@@ -19,6 +19,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 | [Readable parameter values](mods/readable-values) | ✅ v0.5.0 | Hz, dB, ms and % instead of 0–127: filters, envelopes, levels, sends, delay and reverb, on every track and the FX track. Computed from the same data the DSP uses; analog parts measured on the device. |
 | [Beat repeat](mods/beat-repeat) | ✅ v0.6.0 | Sequencer stutter on **all tracks** (analog too): hold retrig keys 13/14 on the FX track to loop the last 1/16 … 1 bar (rates RPT1/RPT2 on the TRIG page, saved with the kit) and resume in time. |
 | [Third send FX](mods/fx3) | ✅ v0.8.0 | **SND3** on every track (AMP page 1, next to DEL and REV; PAN moves to page 2) into a **chorus, flanger, phaser or crusher**, with its own page (REVERB tab, page 2) saved with the kit, independent return level and a send into the delay. |
+| [Déjà Vu LFO](mods/deja-vu) | 🧪 candidate | DV-F and DV-T looping random LFO shapes after RND; standalone validation pending. |
 | PIN lock | ⬜ planned | Optional PIN at power-on, as a theft deterrent. Recovery via OS reflash stays possible. |
 | Dual mono v2 | ⬜ planned | Separate IN L / IN R pages with their own FX sends. |
 | New LFO shapes · 3rd LFO / mod matrix | ⬜ planned | |

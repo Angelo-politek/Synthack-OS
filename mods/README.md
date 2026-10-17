@@ -11,6 +11,7 @@
 | [splash](splash) | "SyntHack" logo and version after the official intro | — |
 | [modarea](modarea) | Unpacks the (compressed) mod code at boot into a 64 KB block of the OS heap | — |
 | [mod-zero](mod-zero) | Example: renames a menu entry (smallest possible mod) | — |
+| [deja-vu](deja-vu) | DV-F / DV-T looping random LFO shapes; standalone hardware validation pending | — |
 
 Each folder has `make_patch.py` (rebuilds `patch.json` from our sources) and a test in `tests/` (mod-zero: hand-written `patch.json`).
 `patch.json` = list of `{section, addr, len, expect_sha256, hex}`; `"append": true` for mod-area code.
