@@ -16,6 +16,7 @@ A **third send effect** next to delay and reverb: **chorus**, **flanger**, **pha
 | CRSH | SRR 24 kHz … 750 Hz | BITS 16 … 1 | DRV 0 … 24 dB | – | – |
 
 - **DEL**: FX3 → delay send (the effect goes into the delay, and on to the reverb if the delay sends there). **VOL**: return level, independent of delay and reverb.
+- Changing TYPE resets SPD…WID to that type's starting values; CRSH starts neutral (24 kHz, 16 bits, no drive), so landing on it by accident doesn't wreck the sound. DEL and VOL are kept.
 - FLNG and PHSR feedback is bipolar: centre = none. PHSR is four allpass stages; WID turns the right side into the complementary response (notches where the left has peaks). CRSH is mono and hides the two knobs it doesn't use.
 - Each knob takes the icon of a similar OS parameter (machine SPD, MOD, sweep time/depth, TONE, BAL, OVER…), so every effect looks different.
 - The return goes to the direct bus (like delay and reverb with *FX Routing* off).

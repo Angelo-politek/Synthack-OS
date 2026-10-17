@@ -284,8 +284,9 @@ def test_cost_per_block(m):
     run_block(m)                                               # a regime (il primo blocco fa la rampa)
     one = block_cost(m)
     assert one < 1400, one                                     # era ~3100
-    for t, most in ((1, 1600), (2, 1800), (3, 950)):           # FLNG e PHSR con retroazione (FDBK 0 = -95/-90 %)
-        m.param("TYPE", t)
+    for t, most in ((1, 1600), (2, 1800), (3, 1050)):          # FLNG e PHSR con retroazione (-95/-90 %),
+        m.param("TYPE", t)                                     # CRSH neutro (un campione su uno)
+        m.param("FDBK", 0)
         run_block(m)
         assert block_cost(m) < most, t
     m.param("TYPE", 0)
@@ -608,11 +609,11 @@ def test_params_saved_in_the_kit_words(m):
     m.put(KIT_PTR, [KIT_A])
     m.uc.mem_write(KIT_A, bytes(142))
     assert m.call(GET, [0x5000_0000, IDS["VOL"]]) == 100 << 8     # parole a zero = default
+    m.param("TYPE", 2)                                           # prima il tipo (riporta SPD..WID al via)
     m.param("SPD", 90)
     m.param("TIME", 3)
     m.param("VOL", 127)
-    m.param("TYPE", 2)
-    assert kit_words(m, KIT_A) == [2 << 8 | (90 ^ 60), 3 ^ 64, 0, 127 ^ 100]
+    assert kit_words(m, KIT_A) == [2 << 8 | (90 ^ 60), 3 ^ 64, 64 << 8, 127 ^ 100]   # PHSR: FDBK al centro
     raw = bytes(m.uc.mem_read(KIT_A, 142))
     others = [i for i in range(0, 142, 2) if i not in WOFF and raw[i:i + 2] != b"\0\0"]
     assert others == []                                          # il resto del kit non si tocca
@@ -950,3 +951,21 @@ def test_input_snd3_on_the_external_mixer_page(m):
     m.call(m.sym["fx3_in_page"])
     assert struct.unpack(">I", m.uc.mem_read(0x41B9_F7F8, 4))[0] == IN_ID
     assert m.uc.reg_read(UC_M68K_REG_D0) == 0x1234
+
+
+def test_type_change_resets_the_effect_knobs(m):
+    """Cambiare tipo riporta SPD..WID ai valori di partenza del tipo (il crusher neutro); DEL e VOL restano.
+    Riscrivere lo stesso tipo non tocca nulla."""
+    get = lambda k: m.call(GET, [0x5000_0000, IDS[k]]) >> 8
+    for k, v in (("SPD", 100), ("DEP", 20), ("TIME", 120), ("FDBK", 90), ("WID", 3), ("DSND", 50), ("VOL", 70)):
+        m.param(k, v)
+    m.param("TYPE", 0)                                          # stesso tipo: niente reset
+    assert [get(k) for k in ("SPD", "DEP", "TIME", "FDBK", "WID")] == [100, 20, 120, 90, 3]
+    m.param("TYPE", 3)                                          # crusher: neutro
+    assert [get(k) for k in ("SPD", "DEP", "TIME")] == [0, 0, 0]
+    assert get("DSND") == 50 and get("VOL") == 70
+    m.param("SPD", 30)
+    m.param("TYPE", 1)                                          # flanger: retroazione al centro (nessuna)
+    assert [get(k) for k in ("SPD", "DEP", "TIME", "FDBK", "WID")] == [60, 64, 64, 64, 64]
+    m.param("TYPE", 0)
+    assert [get(k) for k in ("SPD", "DEP", "TIME", "FDBK", "WID")] == [60, 64, 64, 0, 64]

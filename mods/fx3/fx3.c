@@ -444,17 +444,30 @@ s32 fx3_get(void *obj, s32 id)
     return (s32)decode(word(kit(), (u32)i >> 1), (u32)i) << 8;
 }
 
-s32 fx3_set(void *obj, s32 id, s32 value)
+/* valori di partenza di SPD DEP TIME FDBK WID per tipo, scritti quando cambia il tipo: un tipo scelto
+ * per sbaglio parte morbido (il crusher senza riduzione di frequenza e bit e senza drive) */
+static const unsigned char tdef[NT][5] = {{60, 64, 64, 0, 64}, {60, 64, 64, 64, 64},
+                                          {60, 64, 64, 64, 64}, {0, 0, 0, 0, 0}};
+
+static void store(char *k, u32 i, u32 v)                   /* byte del parametro i nel kit, XOR default */
 {
-    char *ui = UI_ROOT, *k = kit();
-    u32 i = (u32)slot(id), v;
     volatile u16 *w = (volatile u16 *)(k + woff[i >> 1]);
-    (void)obj;
-    value = (value + 0x80) >> 8;
-    v = (u32)(value < 0 ? 0 : value > maxv[i] ? maxv[i] : value);
     v ^= defv[i];
     *w = (u16)(i & 1 ? (*w & 0xFF00) | v : (*w & 0x00FF) | v << 8);
     fx3_p[i] = (unsigned char)decode(*w, i);
+}
+
+s32 fx3_set(void *obj, s32 id, s32 value)
+{
+    char *ui = UI_ROOT, *k = kit();
+    u32 i = (u32)slot(id), v, old = decode(word(k, 0), P_TYPE);
+    (void)obj;
+    value = (value + 0x80) >> 8;
+    v = (u32)(value < 0 ? 0 : value > maxv[i] ? maxv[i] : value);
+    store(k, i, v);
+    if (i == P_TYPE && v != old)
+        for (i = 0; i < 5; i++)
+            store(k, P_SPD + i, tdef[v][i]);
     dress();
     if (ui)
         ui[96] = 1;
