@@ -17,6 +17,8 @@ def test_generator_layout_and_distinct_modes():
     assert free.endswith(bytes.fromhex('4cd7001c4fef000c4e75'))
     assert trig.endswith(bytes.fromhex('4cd7001c4fef000c4e75'))
     assert free != trig
+    assert len(free)==460
+    assert len(trig)==478
     assert len(free)<dv.L['CODE_DVT']-dv.L['CODE_DVF']
     assert dv.L['CODE_DVT']+len(trig)<=dv.L['SLOTS']
 

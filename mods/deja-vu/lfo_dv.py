@@ -35,7 +35,7 @@ def xorshift(seed): return bytes.fromhex('2039')+b32(seed)+bytes.fromhex('660000
 def generator(slots,seed,trig):
  B=lambda o,s:branch(o,s); Q=lambda reg,v:bytes((0x70|(reg<<1),v))
  rnd=xorshift(seed); top=bytes.fromhex('2200e089e089e089')
- i=[bytes.fromhex('4feffff448d7001c202f000010721ce2a8220ae68902810000ffff243c0000cccd4c0210007412e4a902810000001f2401ed89e98ad28241f9')+b32(slots)+bytes.fromhex('d1c1220ab2a8000c'),B(0x6700,'owned'),bytes.fromhex('42902141000c'),label('owned'),bytes.fromhex('240052822610'),B(0x6700,'fresh')]
+ i=[bytes.fromhex('4feffff448d7001c202f0010721ce2a8220ae68902810000ffff243c0000cccd4c0210007412e4a902810000001f2401ed89e98ad28241f9')+b32(slots)+bytes.fromhex('d1c1220ab2a8000c'),B(0x6700,'owned'),bytes.fromhex('42902141000c'),label('owned'),bytes.fromhex('240052822610'),B(0x6700,'fresh')]
  if trig:i += [bytes.fromhex('4a2a0001'),B(0x6700,'notrig'),bytes.fromhex('42a800042082'),B(0x6000,'out'),label('notrig')]
  i += [bytes.fromhex('b483'),B(0x6700,'out'),bytes.fromhex('53832200928302810000000f0c810000000f'),B(0x6700,'out'),B(0x6000,'step'),label('fresh'),bytes.fromhex('43e800107620'),label('fill'),rnd,bytes.fromhex('12c05383'),B(0x6600,'fill'),bytes.fromhex('42a8000442a80030'),label('step'),bytes.fromhex('208224280004382b000402840000ffffe08c02840000007f7600162b00060c8300000004'),B(0x6300,'lenok'),bytes.fromhex('7604'),label('lenok'),bytes.fromhex('7202e7a926015282b483'),B(0x6500,'nowrap'),bytes.fromhex('4282'),label('nowrap'),bytes.fromhex('0c8400000040'),B(0x6500,'replace'),bytes.fromhex('048400000040e58c'),rnd,top,bytes.fromhex('b284'),B(0x6400,'store'),bytes.fromhex('e088e0880280000000ff4c030000e0882400'),B(0x6000,'store'),label('replace'),bytes.fromhex('723f9284e5892801'),rnd,top,bytes.fromhex('b284'),B(0x6400,'store'),bytes.fromhex('e088e08811802810'),label('store'),bytes.fromhex('21420004'),label('out'),bytes.fromhex('24280004103028100280000000ff0480000000807218e3a84cd7001c4fef000c4e75')]
  return asm(i)
@@ -53,7 +53,7 @@ def step_tile(levels,widths,wrap):
   for y in ys:w|=0x80000000>>(14-y)
   out.append(w)
  return out
-DV_GLYPH=("..###############..",".#...............#.",".#...............#.",".#...............#.",".#...............#.",".#.....##........#.",".#.....##..##....#.",".#.##..##..##.##.#.",".#.##..##..##.##.#.",".#.##..##..##.##.#.",".#.##.###.###.##.#.",".#.#############.#.",".#...............#.",".#...............#.",".#...............#.",".#...............#.","..###############..")
+DV_GLYPH=("..###############..",".#...............#.",".#...............#.",".#...............#.",".#...............#.",".#.....##........#.",".#.....##..##....#.",".#.##..##..##....#.",".#.##..##..##.##.#.",".#.##..##..##.##.#.",".#.##.###.###.##.#.",".#.#############.#.",".#...............#.",".#...............#.",".#...............#.",".#...............#.","..###############..")
 DIGITS={
  '1':('..#..','.##..','..#..','..#..','..#..','..#..','.###.'),
  '2':('.###.','#...#','....#','...#.','..#..','.#...','#####'),
@@ -91,8 +91,10 @@ def build_section(raw:bytes)->bytes:
  levels=(3,11,6,13,1,9,4,12); widths=(4,3,4,3,4,3,4,3)
  for n,k,objs,live,master,wrap in (('DV-F',0,L['SET_OBJS_DVF'],L['LIVE_DVF'],L['MASTER_DVF'],'closed'),('DV-T',1,L['SET_OBJS_DVT'],L['LIVE_DVT'],L['MASTER_DVT'],True)):
   put(L['SET_ARR']+12*(7+k),b32(CAVE+objs)+b32(CAVE+objs+4*0x1c)*2)
-  for v in range(4):put(objs+v*0x1c,b32(BITMAP_VPTR)+b32(28)+b32(15)+b32(1)+b32(CAVE+live)+b32(TILE_MASK)+b32(TILE_EXTRA)+b32(0))
-  for c,w in enumerate(step_tile(levels,widths,wrap)):put(master+4*c,b32(w));put(live+4*c,b32(w))
+  for v in range(4):put(objs+v*0x1c,b32(BITMAP_VPTR)+b32(28)+b32(15)+b32(1)+b32(CAVE+live)+b32(TILE_MASK)+b32(TILE_EXTRA))
+  for c,w in enumerate(step_tile(levels,widths,wrap)):
+   put(master+4*c,b32(w))
+   put(live+4*c,b32(w))
  put(L['SLIDE2'],bytes.fromhex('23c5')+b32(CAVE+L['LASTWAVE'])+bytes.fromhex('4e714e714e710c85000000066d062ebc')+b32(NO_SLIDE_RETURN)+bytes.fromhex('4e75'))
  for k,t in enumerate(LENGTHS):put(L['LENSTR']+3*k,t.encode()) ; put(L['LENTAB']+4*k,b32(CAVE+L['LENSTR']+3*k))
  put(L['MODEHELP'],bytes.fromhex('41f9')+b32(MODE_NAMES)+bytes.fromhex('2039')+b32(CAVE+L['LASTWAVE'])+bytes.fromhex('5f800c8000000001620641f9')+b32(CAVE+L['LENTAB'])+bytes.fromhex('4e75'))
