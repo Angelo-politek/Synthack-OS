@@ -6,7 +6,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 > **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
 > Learn the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.
 
-**Status:** `v0.8.1` — seven mods running on real hardware.
+**Status:** `v0.9.0` — nine mods running on real hardware.
 
 ## Features
 
@@ -16,9 +16,10 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 | [Dual mono input](mods/dual-mono) | ✅ v0.9 | With EXTERNAL IN set to mono, **IN L** and **IN R** are two separate inputs: the External Mixer page is IN L, a new **IN R** page in the MIXER tab has its own level and DEL / REV / FX3 sends (saved with the kit). |
 | [Boot splash](mods/splash) | ✅ v0.8.1 | "SyntHack" logo and version after the official intro. Boot time unchanged. |
 | [Mod area](mods/modarea) | ✅ infra | 64 KB for mod code, stored compressed and unpacked at boot into a block reserved from the OS heap. |
+| [Kit storage](mods/kitstore) | ✅ infra | 36 words for mod settings, saved with the kit in bytes the OS file format leaves unused. |
 | [Readable parameter values](mods/readable-values) | ✅ v0.5.0 | Hz, dB, ms and % instead of 0–127: filters, envelopes, levels, sends, delay and reverb, on every track and the FX track. Computed from the same data the DSP uses; analog parts measured on the device. |
 | [Performance FX](mods/perf-fx) | ✅ v0.9 | Sequencer effects on **all tracks** (analog too): select Mod A (FUNC+15) and keys 13–16 play repeat (1/16 … 1 bar), reverse (1/8 … 1 bar) or half speed, resuming in time on release. Each key's effect is set in the Mod A setup page and saved with the kit. Replaces beat-repeat. Also **quantized retrig**: QNT in the Retrig setup page starts retrigs on the next step. |
-| [Third send FX](mods/fx3) | ✅ v0.8.0 | **SND3** on every track (AMP page 1, next to DEL and REV; PAN moves to page 2) into a **chorus, flanger, phaser or crusher**, with its own page (REVERB tab, page 2) saved with the kit, and sends into the delay and the reverb; the return can be routed to the FX track (FUNC+FX, trig 13). |
+| [Third send FX](mods/fx3) | ✅ v0.9 | **SND3** on every track (AMP page 1, next to DEL and REV; PAN moves to page 2) and on the external input into a **chorus, flanger, phaser or crusher**, with its own page (REVERB tab, page 2) saved with the kit. Sends into the delay and the reverb; SND3 is an LFO destination; the return can be routed to the FX track (FUNC+FX, trig 13). |
 | PIN lock | ⬜ planned | Optional PIN at power-on, as a theft deterrent. Recovery via OS reflash stays possible. |
 | New LFO shapes · 3rd LFO / mod matrix | ⬜ planned | |
 | Arpeggiator · Euclidean circle UI | ⬜ planned | |
