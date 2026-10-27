@@ -16,6 +16,7 @@
 3. **Never touch sections 2 (bootstrap) or 6 (boot).** `eft.py` refuses; don't work around it.
 4. **Don't change boot timing.** The OS hangs on "PREPARING SAMPLES" if the intro gets longer.
 5. One mod per folder (`mods/<name>/`), one topic per pull request.
+6. Open pull requests against the **`dev`** branch: `main` holds the latest release.
 
 ## Writing a mod
 
