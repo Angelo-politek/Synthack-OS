@@ -20,30 +20,30 @@ import projstore_layout  # noqa: E402
 
 # ---- area mod: (inizio, fine) come offset, proprietario, uso. Fine esclusa.
 MODAREA = [
-    (0x0000, 0x2000, "master-comp", "codice e dati"),
-    (0x2000, 0x4000, "readable-values", "codice e dati"),
-    (0x4000, 0x5000, "perf-fx", "codice e dati"),
-    (0x5000, 0x7000, "dual-mono", "dualmono2.c; intestazione letta da fx3 a +0x5000 (dualmono_layout.py)"),
-    (0x7000, 0x7200, "projstore", "codice, poi i 256 byte salvati col progetto"),
-    (0x7200, 0x7400, "kitstore", "codice"),
-    (0x7E00, 0x8000, "vparams", "codice"),
-    (0x8000, 0x8180, "vparams", "tabella: 32 voci da 12 B, una per parametro virtuale (VPARAMS_SLOTS)"),
-    (0xA000, 0xDFF0, "fx3", "codice e dati"),
-    (0xDFF0, 0xF000, "fx3", "retroazione (+0xDFFC) e linea di ritardo (+0xE000, 4 KB)"),
+    (0x0000, 0x2000, "master-comp", "code and data"),
+    (0x2000, 0x4000, "readable-values", "code and data"),
+    (0x4000, 0x5000, "perf-fx", "code and data"),
+    (0x5000, 0x7000, "dual-mono", "dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py)"),
+    (0x7000, 0x7200, "projstore", "code, then the 256 bytes saved with the project"),
+    (0x7200, 0x7400, "kitstore", "code"),
+    (0x7E00, 0x8000, "vparams", "code"),
+    (0x8000, 0x8180, "vparams", "table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS)"),
+    (0xA000, 0xDFF0, "fx3", "code and data"),
+    (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
 ]
 
 # ---- sezione 3, riempimento del linker 0x40338740..0x40339000 (byte a zero non usati dall'OS)
 SEC3_FREE = (0x4033_8740, 0x4033_9000)
 SEC3_FILL = [
-    (0x4033_8740, 0x4033_8BE0, "splash", "codice, logo, voci delle animazioni"),
-    (0x4033_8BE0, 0x4033_8D80, "dual-mono", "dualmono.S (VCA degli ingressi, nomi)"),
-    (0x4033_8D80, 0x4033_9000, "modarea", "caricatore dell'area mod"),
+    (0x4033_8740, 0x4033_8BE0, "splash", "code, logo, animation entries"),
+    (0x4033_8BE0, 0x4033_8D80, "dual-mono", "dualmono.S (input VCAs, names)"),
+    (0x4033_8D80, 0x4033_9000, "modarea", "mod-area loader"),
 ]
 
 # ---- zone che sembrano libere (a zero nello stock) ma che l'OS legge: mai da usare come spazio libero
 SEC3_NOT_FREE = [
-    (0x402A_B8EC, 0x402C_B8EC, "due tabelle 128x128 di long lette da 0x400AD408 (conversione di suoni/kit "
-                               "caricati); righe a zero ma lette (PR #5)"),
+    (0x402A_B8EC, 0x402C_B8EC, "two 128x128 tables of longs read by 0x400AD408 (conversion of loaded "
+                               "sounds/kits); rows are zero but read"),
 ]
 
 # ---- vparams: posto nella tabella -> (mod, id)
@@ -57,19 +57,19 @@ VPARAMS_SLOTS = {
 
 # ---- id dei parametri che una mod rinomina, rende virtuali o di cui cambia il comportamento
 IDS = {
-    47: ("perf-fx", "QNT (DEST di Mod A): retrig quantizzato, pagina Retrig"),
-    **{i: ("perf-fx", f"Perf FX {i - 47} (M{i - 47} di Mod A)") for i in range(48, 52)},
-    72: ("fx3", "SND3 (\"Delay Time\" dell'amp, salvato per traccia)"),
-    125: ("dual-mono", "IN R: alias di BAL"),
-    129: ("dual-mono", "DEL: lato R quando la pagina IN R e' aperta"),
-    130: ("dual-mono", "REV: lato R quando la pagina IN R e' aperta"),
-    **{i: ("fx3", "pagina FX3") for i in range(246, 254)},
-    **{i: ("master-comp", "compressore") for i in range(262, 269)},
-    269: ("fx3", "SND3 dell'ingresso"),
+    47: ("perf-fx", "QNT (Mod A DEST): quantized retrig, Retrig page"),
+    **{i: ("perf-fx", f"Perf FX {i - 47} (Mod A M{i - 47})") for i in range(48, 52)},
+    72: ("fx3", "SND3 (amp \"Delay Time\", saved per track)"),
+    125: ("dual-mono", "IN R: alias of BAL"),
+    129: ("dual-mono", "DEL: R side while the IN R page is open"),
+    130: ("dual-mono", "REV: R side while the IN R page is open"),
+    **{i: ("fx3", "FX3 page") for i in range(246, 254)},
+    **{i: ("master-comp", "compressor") for i in range(262, 269)},
+    269: ("fx3", "external input SND3"),
 }
 
 # ---- pagine dell'interfaccia (indice -> mod) riusate
-PAGES = {25: ("fx3", "REVERB pagina 2 (era OB8)"), 27: ("dual-mono", "IN R nel tab MIXER (era MIDI Source)")}
+PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 27: ("dual-mono", "IN R in the MIXER tab (was MIDI Source)")}
 
 
 def modarea_owner(off: int) -> str | None:
