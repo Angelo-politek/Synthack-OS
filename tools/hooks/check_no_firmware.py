@@ -42,10 +42,18 @@ def staged_files() -> list[str]:
     return [p.decode("utf-8") for p in out.split(b"\0") if p]
 
 
+def tracked_files() -> list[str]:
+    out = subprocess.run(["git", "ls-files", "-z"], capture_output=True, check=True).stdout
+    return [p.decode("utf-8") for p in out.split(b"\0") if p]
+
+
 def main() -> int:
+    """Senza argomenti: i file in staging (hook). Con --all: tutti i file tracciati (CI)."""
+    every = "--all" in sys.argv[1:]
     problems = []
-    for path in staged_files():
-        data = subprocess.run(["git", "show", f":{path}"], capture_output=True, check=True).stdout
+    for path in tracked_files() if every else staged_files():
+        data = subprocess.run(["git", "show", f"HEAD:{path}" if every else f":{path}"],
+                              capture_output=True, check=True).stdout
         if reason := check_blob(path, data):
             problems.append((path, reason))
     if not problems:
