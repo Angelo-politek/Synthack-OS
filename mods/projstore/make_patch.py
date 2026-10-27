@@ -19,11 +19,12 @@ REPO = HERE.parents[1]
 sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
 import modarea_layout  # noqa: E402
+import registry  # noqa: E402
 import projstore_layout as L  # noqa: E402
 
 LOAD = 0x4000_0400
 CODE_BASE = modarea_layout.RAM + L.OFFSET
-CODE_END = modarea_layout.RAM + 0x7E00            # vparams
+CODE_END = modarea_layout.RAM + next(e for a, e, who, _ in registry.MODAREA if who == "projstore")   # poi kitstore
 HOOKS = [(0x400A_90BC, "4feffff448d70c04", "ps_wr", "impostazioni del progetto -> file: jmp ps_wr ; nop"),
          (0x400A_8478, "4feffff048d70c0c", "ps_rd", "file -> impostazioni del progetto: jmp ps_rd ; nop")]
 WSL_BINUTILS = "~/tools/m68k/root"

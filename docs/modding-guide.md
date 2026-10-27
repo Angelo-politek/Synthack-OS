@@ -9,20 +9,7 @@ How the mods in this repository are built, and how to do the common things: hook
 3. `tools/build/build.py` checks every hash, overlaps and the boot decompression margin, and writes the `.syx`.
 4. Flash, test on the device, only then publish.
 
-Mod area (first 64 KB block of the OS heap, from `modarea_layout.RAM`; unpacked at boot, zeroed beyond the code):
-
-| Offset | Use |
-|---|---|
-| `+0x0000` | master-comp |
-| `+0x2000` | readable-values |
-| `+0x4000` | perf-fx |
-| `+0x5000` | dual-mono v2 (header read by fx3: `tools/build/dualmono_layout.py`) |
-| `+0x7000` | projstore code and its 256 saved bytes |
-| `+0x7200` | kitstore code |
-| `+0x7E00` | vparams code; `+0x8000` vparams table (32 × 12 B) |
-| `+0xA000` | fx3 code and data; `+0xE000` fx3 delay line (4 KB) |
-
-Section 3 free fill `0x40338740–0x40339000`: splash, dual-mono, modarea loader (nearly full).
+Mod area: first 64 KB block of the OS heap, from `modarea_layout.RAM`, unpacked at boot and zeroed beyond the code. Who uses which offsets, the section 3 free fill, vparams slots, parameter ids and pages: **[registry.md](registry.md)**. A new mod claims its space in `tools/build/registry.py` first; `tests/test_registry.py` checks every `patch.json` against it.
 
 **Rules learned the hard way**
 
