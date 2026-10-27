@@ -25,7 +25,7 @@ Each mod is a small patch applied to the stock OS you download from elektron.se 
 | Arpeggiator · Euclidean circle UI | ⬜ planned | |
 | Resampling to SP TWINSHOT · advanced sampler | ⬜ planned | |
 | New machines: RISER / DOWNFILTER, SY SWARM+ | ⬜ planned | Requires custom audio-engine code (CPU #2). |
-| Web builder | ⬜ planned | Pick mods in the browser, build your `.syx` locally. |
+| [Web builder](web-builder) | 🔄 in progress | Pick mods in the browser, build your `.syx` locally (nothing uploaded). Same bytes as `build.py`; not online yet. |
 
 ## Known issues
 

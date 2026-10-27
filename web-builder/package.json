@@ -1,0 +1,24 @@
+{
+  "name": "synthack-web-builder",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Build a SyntHack OS .syx in the browser from your own stock Syntakt OS.",
+  "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "node --test \"test/**/*.test.ts\"",
+    "typecheck": "tsc",
+    "cli": "node scripts/build-cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.7"
+  }
+}

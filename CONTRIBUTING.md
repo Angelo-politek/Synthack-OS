@@ -22,6 +22,7 @@
 
 - Start from [docs/modding-guide.md](docs/modding-guide.md): hooks, parameters, pages, icons, saving, audio cost.
 - `mods/<name>/make_patch.py` builds your code (`m68k-linux-gnu-as` or `-gcc`, `-mcpu=54418`) and writes `patch.json`.
+- Add `mods/<name>/mod.json` — `{"title", "kind", "summary"}` in English, `kind` `feature` (or `infra` for a mod others require) — so the [web builder](web-builder) lists it.
 - **Claim your resources first** in `tools/build/registry.py` (mod-area offsets, vparams slots, parameter ids, pages) and run `python tools/build/registry.py` to refresh [docs/registry.md](docs/registry.md); `tests/test_registry.py` fails otherwise.
 - The free fill of section 3 is nearly full: link in the mod area (`tools/build/modarea_layout.py` + your offset) and add `"requires": ["modarea"]`.
 - **Zero bytes in the OS image are not free space**: tables and buffers can be zero and still be read. The registry test rejects writes over stock zeros outside the registered free zones.

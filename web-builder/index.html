@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SyntHack OS builder</title>
+  <meta name="description" content="Build a modded Elektron Syntakt OS in your browser, from your own stock OS file. Nothing is uploaded.">
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>SyntHack OS builder</h1>
+      <p class="lead">Pick your mods and build a modded <strong>Elektron Syntakt OS 1.41</strong> right here.
+        Everything runs in your browser: your OS file is never uploaded.</p>
+    </header>
+
+    <aside class="warn" role="note">
+      <strong>Not affiliated with Elektron.</strong> Modified firmware can make your device unusable and may void your
+      warranty. Learn the <a href="https://github.com/Angelo-politek/Synthack-OS/blob/main/RECOVERY.md">recovery procedure</a>
+      before flashing. Use at your own risk.
+    </aside>
+
+    <section aria-labelledby="s1">
+      <h2 id="s1"><span class="n">1</span> Your stock OS</h2>
+      <p>Download <code>Syntakt_OS1.41.syx</code> from
+        <a href="https://www.elektron.se/support-downloads/syntakt">elektron.se</a>, then choose it here.</p>
+      <label class="drop" id="drop">
+        <input type="file" id="stock" accept=".syx">
+        <span id="drop-text">Choose the .syx file, or drop it here</span>
+      </label>
+      <p id="stock-status" class="status" aria-live="polite"></p>
+    </section>
+
+    <section aria-labelledby="s2">
+      <h2 id="s2"><span class="n">2</span> Mods</h2>
+      <ul id="mods" class="mods"></ul>
+      <p id="deps" class="hint" aria-live="polite"></p>
+    </section>
+
+    <section aria-labelledby="s3">
+      <h2 id="s3"><span class="n">3</span> Build</h2>
+      <button id="build" disabled>Build my OS</button>
+      <div id="progress" class="progress" hidden>
+        <progress id="bar" max="100"></progress>
+        <span id="stage" aria-live="polite"></span>
+      </div>
+      <div id="result" hidden>
+        <p class="ok">Built and verified.</p>
+        <p><a id="dl-syx" class="button" download>Download synthack.syx</a>
+          <a id="dl-json" download>build report (.json)</a></p>
+        <ul id="log" class="log"></ul>
+        <p>Flash it with <strong>Elektron Transfer</strong> (USB, <em>Drop</em> page). To go back, flash the stock OS
+          the same way.</p>
+      </div>
+      <p id="error" class="error" role="alert" hidden></p>
+    </section>
+
+    <footer>
+      <a href="https://github.com/Angelo-politek/Synthack-OS">Source on GitHub</a> · MIT ·
+      <a href="./THIRD-PARTY-NOTICES.txt">third-party notices</a>
+      <br>Every build is checked like the command-line tool: original bytes, overlaps, protected sections,
+      boot decompression margin and a final section-by-section comparison.
+    </footer>
+  </main>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

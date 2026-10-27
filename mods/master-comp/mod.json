@@ -1,0 +1,5 @@
+{
+  "title": "Bus compressor",
+  "kind": "feature",
+  "summary": "Compressor on the FX track bus: compresses the tracks routed to the FX track together. THR, ATK, REL, MUP, RAT, gain-reduction meter and ON/OFF on the FX track SYN page."
+}

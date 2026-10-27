@@ -1,0 +1,5 @@
+{
+  "title": "Performance FX",
+  "kind": "feature",
+  "summary": "Repeat, reverse and half speed on keys 13-16 with Mod A (FUNC+15), on all tracks, resuming in time on release. Also quantized retrig (QNT)."
+}

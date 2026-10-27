@@ -18,9 +18,19 @@ jobs:
           python-version: "3.12"
       - name: No Elektron firmware in the repository
         run: python tools/hooks/check_no_firmware.py --all
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web-builder/package-lock.json
       - name: Install
-        run: pip install pytest unicorn numpy pyfiglet
+        run: |
+          pip install pytest unicorn numpy pyfiglet
+          npm ci --prefix web-builder
       - name: Tests (those needing the stock OS are skipped)
         run: python -m pytest -q -rs
+      - name: Web builder (unit tests, types, page build)
+        working-directory: web-builder
+        run: npm test && npm run build
       - name: docs/registry.md up to date
         run: python tools/build/registry.py && git diff --exit-code docs/registry.md
