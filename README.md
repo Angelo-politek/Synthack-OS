@@ -59,9 +59,10 @@ Requires Python 3, WSL/Linux and your own `Syntakt_OS1.41.syx` (see [firmware/RE
 bash tools/unpack/setup_eft.sh                 # once (WSL/Linux)
 git config core.hooksPath tools/hooks          # once: blocks firmware files from commits
 python tools/build/build.py --stock firmware/Syntakt_OS1.41.syx \
-    mods/splash mods/modarea mods/vparams mods/kitstore mods/dual-mono mods/master-comp mods/readable-values \
-    mods/perf-fx mods/fx3 -o out/synthack.syx
+    mods/splash mods/dual-mono mods/master-comp mods/readable-values mods/perf-fx mods/fx3 -o out/synthack.syx
 ```
+
+List the mods you want; the ones they need (`modarea`, `vparams`, `kitstore`) are added automatically.
 
 Flash `out/synthack.syx` with Elektron Transfer (USB, *Drop* page). To go back, flash the stock OS the same way.
 

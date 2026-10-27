@@ -20,7 +20,11 @@ Formato di mods/<nome>/patch.json:
 
 Patch accodate ("append": true, solo "hex"): byte NUOVI oltre la fine della sezione stock (area
 mod, vedi mods/modarea); lo spazio tra la fine stock e "addr" viene riempito di zeri. Non hanno
-impronta (non sostituiscono byte Elektron). Una mod puo' dichiarare "requires": ["modarea"].
+impronta (non sostituiscono byte Elektron). Solo nella sezione 3: per la sezione 7 il limite del
+caricatore della CPU #2 non e' ancora noto.
+
+Dipendenze: una mod dichiara "requires": ["modarea", ...]. Le mod richieste e non indicate vengono
+aggiunte da sole (cercate tra le cartelle indicate, poi in mods/), prima di chi le richiede.
 
 Area mod compressa: se modarea dichiara "compress": "shlz", i byte accodati (da "img" in poi)
 vengono sostituiti dal loro flusso SHLZ (lz.py), che il rilocatore decomprime in RAM all'avvio.
@@ -49,6 +53,7 @@ import lz  # noqa: E402
 
 LOAD_ADDR = 0x4000_0400                 # sezioni 3 e 7 si caricano qui (vedi docs/)
 PATCHABLE = {3, 7}
+APPENDABLE = {3}                        # sezione 7: limite del caricatore della CPU #2 da trovare (modarea7)
 STOCK_SHA256 = {"1.41": "8e2488f462c4a5656396a895f113bcd415e9900fa8709340dccf45d4cb9ed19e"}
 
 
@@ -78,8 +83,53 @@ class Patch:
         return self.offset + len(self.data)
 
 
+def read_spec(moddir: Path) -> dict:
+    return json.loads((Path(moddir) / "patch.json").read_text(encoding="utf-8"))
+
+
+def resolve(moddirs: list[Path], search: tuple[Path, ...] = (REPO / "mods",)) -> tuple[list[Path], list[str]]:
+    """Cartelle delle mod in ordine (prima le dipendenze) e nomi delle mod aggiunte perche' richieste."""
+    given: dict[str, Path] = {}
+    for d in moddirs:
+        name = read_spec(d)["name"]
+        if name in given and Path(given[name]).resolve() != Path(d).resolve():
+            raise BuildError(f"mod {name} indicata due volte ({given[name]}, {d})")
+        given[name] = Path(d)
+
+    def find(name: str) -> Path:
+        if name in given:
+            return given[name]
+        for root in search:
+            d = Path(root) / name
+            if (d / "patch.json").exists() and read_spec(d)["name"] == name:
+                return d
+        raise BuildError(f"dipendenza {name} non trovata (cercata tra le mod indicate e in {[str(r) for r in search]})")
+
+    order: list[Path] = []
+    added: list[str] = []
+    state: dict[str, str] = {}
+
+    def visit(name: str, chain: list[str]) -> None:
+        if state.get(name) == "fatto":
+            return
+        if state.get(name) == "in corso":
+            raise BuildError("dipendenze circolari: " + " -> ".join(chain + [name]))
+        state[name] = "in corso"
+        d = find(name)
+        for req in read_spec(d).get("requires", []):
+            visit(req, chain + [name])
+        state[name] = "fatto"
+        order.append(d)
+        if name not in given:
+            added.append(name)
+
+    for name in given:
+        visit(name, [])
+    return order, added
+
+
 def load_mod(moddir: Path, os_version: str) -> list[Patch]:
-    spec = json.loads((Path(moddir) / "patch.json").read_text(encoding="utf-8"))
+    spec = read_spec(moddir)
     name = spec["name"]
     if spec.get("os") != os_version:
         raise BuildError(f"{name}: scritta per OS {spec.get('os')}, non per {os_version}")
@@ -137,6 +187,9 @@ def apply_patches(sections: dict[int, bytearray], patches: list[Patch]) -> None:
             if p.offset < q.end and q.offset < p.end:
                 raise BuildError(f"{p.mod} e {q.mod} modificano gli stessi byte ({p.addr:#x})")
         if p.append:
+            if p.section not in APPENDABLE:
+                raise BuildError(f"{p.mod}: patch accodata alla sezione {p.section}: per ora solo la sezione 3 "
+                                 f"(il limite del caricatore della CPU #2 non e' ancora noto)")
             if p.offset < stock_len[p.section]:
                 raise BuildError(f"{p.mod}: patch accodata a {p.addr:#x} dentro la sezione stock")
         else:
@@ -161,12 +214,9 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
     version = info.version
     if STOCK_SHA256.get(version) != sha256(Path(stock).read_bytes()):
         raise BuildError(f"{stock}: non e' l'OS stock {version} atteso (impronta diversa)")
-    names = {json.loads((Path(d) / "patch.json").read_text(encoding="utf-8"))["name"] for d in moddirs}
-    for d in moddirs:
-        spec = json.loads((Path(d) / "patch.json").read_text(encoding="utf-8"))
-        missing = set(spec.get("requires", [])) - names
-        if missing:
-            raise BuildError(f"{spec['name']}: richiede anche {sorted(missing)}")
+    moddirs, added = resolve(moddirs)
+    if added:
+        log(f"  dipendenze aggiunte: {', '.join(added)}")
     patches = [p for d in moddirs for p in load_mod(d, version)]
     needed = sorted({p.section for p in patches})
 

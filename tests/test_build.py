@@ -75,3 +75,57 @@ def test_build_mod_zero(tmp_path):
     assert m["boot_margin"] >= 4096
     assert lines[1:] == ["  sezione 3: 8 byte modificati, tutti dentro le patch"]
     assert build.eft.info(out).checksums_ok
+
+
+# ----------------------------------------------------------------------------- dipendenze
+def fake(root, name, requires=()):
+    d = root / name
+    d.mkdir()
+    (d / "patch.json").write_text(json.dumps({"name": name, "os": "1.41", "requires": list(requires), "patches": []}))
+    return d
+
+
+def test_dependencies_added_before_who_needs_them(tmp_path):
+    lib = tmp_path / "mods"
+    lib.mkdir()
+    base, mid = fake(lib, "base"), fake(lib, "mid", ["base"])
+    top = fake(tmp_path, "top", ["mid", "base"])
+    order, added = build.resolve([top], search=(lib,))
+    assert order == [base, mid, top] and added == ["base", "mid"]
+
+
+def test_given_order_kept_when_complete(tmp_path):
+    a, b = fake(tmp_path, "a"), fake(tmp_path, "b", ["a"])
+    c = fake(tmp_path, "c")
+    order, added = build.resolve([c, a, b], search=())
+    assert order == [c, a, b] and added == []
+
+
+def test_missing_and_circular_dependencies(tmp_path):
+    with pytest.raises(build.BuildError, match="non trovata"):
+        build.resolve([fake(tmp_path, "x", ["nowhere"])], search=(tmp_path,))
+    a, b = fake(tmp_path, "p", ["q"]), fake(tmp_path, "q", ["p"])
+    with pytest.raises(build.BuildError, match="circolari"):
+        build.resolve([a, b], search=())
+
+
+def test_same_name_twice_refused(tmp_path):
+    a = fake(tmp_path, "dup")
+    (tmp_path / "other").mkdir()
+    (tmp_path / "other" / "patch.json").write_text((a / "patch.json").read_text())
+    with pytest.raises(build.BuildError, match="due volte"):
+        build.resolve([a, tmp_path / "other"], search=())
+
+
+def test_real_mods_resolve():
+    order, added = build.resolve([ROOT / "mods" / "dual-mono"])
+    names = [build.read_spec(d)["name"] for d in order]
+    assert names[-1] == "dual-mono" and set(added) == {"modarea", "vparams", "kitstore"}
+    assert names.index("modarea") < names.index("vparams") < names.index("dual-mono")
+
+
+def test_append_to_section_7_refused():
+    s = sections()
+    p = build.Patch("x", 7, build.LOAD_ADDR + 8, b"\x4e\x71", "", append=True)
+    with pytest.raises(build.BuildError, match="sezione 7"):
+        build.apply_patches(s, [p])
