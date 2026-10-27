@@ -1,9 +1,9 @@
 # Firmware format (`.syx`)
 
-Three layers, handled by [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool):
+Three layers, handled by [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool) (and by its TypeScript port in [web-builder/](../web-builder)):
 
 1. **SysEx transport** — 7-bit packed data, per-packet checksum.
-2. **ELE3 container** — header, section table, HMAC-SHA256 over everything. The key is derived from the image itself, so the MAC can be recomputed.
+2. **ELE3 container** — header, section table, content checksum in the transport preamble, optional HMAC-SHA256 trailer (key derived from the image itself, so it can be recomputed). Syntakt OS 1.41 has **no** HMAC trailer: the container ends at the 16-aligned end of the last section.
 3. **Sections** — aPLib-style LZ77 compression (some sections raw).
 
 ## Syntakt OS 1.41
