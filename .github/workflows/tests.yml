@@ -19,7 +19,7 @@ jobs:
       - name: No Elektron firmware in the repository
         run: python tools/hooks/check_no_firmware.py --all
       - name: Install
-        run: pip install pytest unicorn
+        run: pip install pytest unicorn numpy pyfiglet
       - name: Tests (those needing the stock OS are skipped)
         run: python -m pytest -q -rs
       - name: docs/registry.md up to date
