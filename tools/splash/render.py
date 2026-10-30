@@ -99,7 +99,7 @@ class Bitmap:
         return Bitmap(rows)
 
     def to_bytes_syntakt(self) -> bytes:
-        """Formato del framebuffer Syntakt (verificato su set_pixel 0x400F7140, OS 1.41):
+        """Formato del framebuffer Syntakt (verificato su set_pixel 0x400F7304, OS 1.41):
         per colonne, 8 byte per colonna; byte = fb[x*8 + y//8], bit = 7 - (y % 8), 1 = acceso."""
         out = bytearray(W * H // 8)
         for y, row in enumerate(self.px):

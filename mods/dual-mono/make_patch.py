@@ -3,10 +3,10 @@
 1. assembla dualmono.S e lo collega all'indirizzo CODE_BASE (spazio libero della sezione 3);
 2. scrive patch.json: codice+dati nello spazio libero e due agganci attorno al blocco originale
    (che resta al suo posto):
-       0x40090872: jsr pre_hook.l ; nop   (al posto di due move.w, rieseguite da pre_hook)
-       0x400908FC: jsr post_hook.l        (al posto di move.l #32639,d1, rieseguita da post_hook)
+       0x400908EA: jsr pre_hook.l ; nop   (al posto di due move.w, rieseguite da pre_hook)
+       0x40090974: jsr post_hook.l        (al posto di move.l #32639,d1, rieseguita da post_hook)
 3. v2 (dualmono2.c, C nell'area mod a +0x5000): pagina IN R nel tab MIXER con mandate proprie, blocco
-   delle mandate dell'ingresso (0x4008F478..0x4008F5F2) in due passate, 129/130 da vparams.
+   delle mandate dell'ingresso (0x4008F4F0..0x4008F66A) in due passate, 129/130 da vparams.
 
     python mods/dual-mono/make_patch.py         # richiede binutils m68k in WSL (CONTRIBUTING.md)
 """
@@ -36,9 +36,9 @@ vparams = importlib.util.module_from_spec(_vp)
 _vp.loader.exec_module(vparams)
 
 LOAD = 0x4000_0400
-CODE_BASE = 0x4033_8BE0                 # dopo lo splash (0x40338740..0x40338BD8), stesso riempimento libero
-FREE_END = 0x4033_8D80                  # inizio del rilocatore di modarea
-BLOCK_START, BLOCK_END = 0x4009_0872, 0x4009_08FC
+CODE_BASE = 0x4033_9BE0                 # dopo lo splash (0x40339740..0x40339BD8), stesso riempimento libero
+FREE_END = 0x4033_9D80                  # inizio del rilocatore di modarea
+BLOCK_START, BLOCK_END = 0x4009_08EA, 0x4009_0974
 ENTRY_ORIG = "342a070a302a0740"         # move.w 1802(a2),d2 ; move.w 1856(a2),d0
 EXIT_ORIG = "223c00007f7f"              # move.l #32639,d1
 WSL_BINUTILS = "~/tools/m68k/root"
@@ -46,16 +46,16 @@ CFLAGS = (f"-DKS_DEL_R={DL.DEL_R:#x}u -DKS_REV_R={DL.REV_R:#x}u -mcpu=54418 -O2 
           "-nostdlib -fno-pic -fno-common -fno-toplevel-reorder -Wall -Wextra")
 # v2: (indirizzo, byte originali, simbolo o byte nuovi, salto, descrizione)
 V2_HOOKS = [
-    (0x4008_F478, "4a3980003146", "dm_pre", "jsr", "mandate dell'ingresso, inizio: jsr dm_pre (tst.b 0x80003146)"),
-    (0x4008_F5F2, "7f6a0746736a0018", "dm_mid", "jsr", "mandate dell'ingresso, fine: jsr dm_mid ; nop"),
+    (0x4008_F4F0, "4a3980003146", "dm_pre", "jsr", "mandate dell'ingresso, inizio: jsr dm_pre (tst.b 0x80003146)"),
+    (0x4008_F66A, "7f6a0746736a0018", "dm_mid", "jsr", "mandate dell'ingresso, fine: jsr dm_mid ; nop"),
     (0x4003_5914, "4eb940044626", "dm_mixer_ctor", "jsr", "tab MIXER: costruzione della vista (dm_mixer_ctor)"),
-    (0x400A_3404, "13c080003146", "dm_flag_hook", "jsr", "impostazione EXTERNAL IN: jsr dm_flag_hook"),
-    (0x4019_4F1A, "42b941b9f894", "dm_page_stub", "jsr", "pagina 27 all'avvio: IN R, FX3, DEL, REV"),
+    (0x400A_347C, "13c080003146", "dm_flag_hook", "jsr", "impostazione EXTERNAL IN: jsr dm_flag_hook"),
+    (0x4019_50DE, "42b941ba0894", "dm_page_stub", "jsr", "pagina 27 all'avvio: IN R, FX3, DEL, REV"),
 ]
 V2_LONGS = [
-    (0x4003_58EE, "401c7f9c", "dm_pages", "tab MIXER: pagine {22, 23, 24, 27}"),
-    (0x4019_4E4A, "40251b0c", "dm_page_s", "pagina 27: nome breve 'IN R'"),
-    (0x4019_4EB0, "40251b10", "dm_page_l", "pagina 27: nome lungo 'External In R'"),
+    (0x4003_58EE, "401c823c", "dm_pages", "tab MIXER: pagine {22, 23, 24, 27}"),
+    (0x4019_500E, "40251e2c", "dm_page_s", "pagina 27: nome breve 'IN R'"),
+    (0x4019_5074, "40251e30", "dm_page_l", "pagina 27: nome lungo 'External In R'"),
 ]
 MIXER_COUNT = (0x4003_58E8, "7203", "7204")
 VP_SLOTS = {129: 17, 130: 18}            # posti della tabella di vparams (master-comp 0..6, fx3 7, 9..16)
@@ -132,7 +132,7 @@ def build_c() -> tuple[bytes, dict[str, int], str]:
 
 
 def main() -> None:
-    stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
+    stock = REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     blob, syms, emac, dis = build_blob()
     end = CODE_BASE + len(blob)
@@ -147,10 +147,10 @@ def main() -> None:
 
     # IN R = alias 125 ("Input Level"): nessuna pagina, nessun CC/NRPN, e il suo oggetto in RAM
     # usa gli stessi prototipi di IN LR (renderer a barra). Lo facciamo diventare un alias di BAL:
-    #  - id interno 0x23 (IN LR) -> 0x25 (BAL) nel descrittore (0x4022D59C + 52*125 + 4);
+    #  - id interno 0x23 (IN LR) -> 0x25 (BAL) nel descrittore (0x4022D83C + 52*125 + 4);
     #  - lettura/scrittura del valore: switch sull'id logico 125..132 in 0x4000C87E (get) e
     #    0x4000C922 (set); voce 125 = 0x0010 (campo di IN LR) -> 0x0022 (campo di BAL, come 127/128).
-    alias_id = 0x4022D59C + 52 * 125 + 4
+    alias_id = 0x4022D83C + 52 * 125 + 4
     if sec3[alias_id - LOAD:alias_id - LOAD + 4] != bytes.fromhex("00000023"):
         raise SystemExit("l'alias 125 non ha l'id interno atteso (0x23)")
     switches = {"lettura": 0x4000C8B0, "scrittura": 0x4000C9A4}      # tabelle: 8 voci .w (id 125..132)
@@ -184,7 +184,7 @@ def main() -> None:
     t_in = struct.pack(">HIH", 0x4EB9, syms["pre_hook"], 0x4E71)        # jsr.l pre_hook ; nop
     t_out = struct.pack(">HI", 0x4EB9, syms["post_hook"])               # jsr.l post_hook
     spec = {
-        "name": "dual-mono", "os": "1.41", "requires": ["modarea", "vparams", "kitstore"],
+        "name": "dual-mono", "os": "1.42", "requires": ["modarea", "vparams", "kitstore"],
         "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati, ognuno "
                        "con livello e mandate DEL, REV, FX3 propri. Pagina External Mixer = IN L; pagina "
                        "IN R nel tab MIXER (solo in mono); in stereo tutto come l'originale.",

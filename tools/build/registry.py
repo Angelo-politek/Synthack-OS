@@ -32,17 +32,17 @@ MODAREA = [
     (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
 ]
 
-# ---- sezione 3, riempimento del linker 0x40338740..0x40339000 (byte a zero non usati dall'OS)
-SEC3_FREE = (0x4033_8740, 0x4033_9000)
+# ---- sezione 3, riempimento del linker 0x40339740..0x4033A000 (byte a zero non usati dall'OS)
+SEC3_FREE = (0x4033_9740, 0x4033_A000)
 SEC3_FILL = [
-    (0x4033_8740, 0x4033_8BE0, "splash", "code, logo, animation entries"),
-    (0x4033_8BE0, 0x4033_8D80, "dual-mono", "dualmono.S (input VCAs, names)"),
-    (0x4033_8D80, 0x4033_9000, "modarea", "mod-area loader"),
+    (0x4033_9740, 0x4033_9BE0, "splash", "code, logo, animation entries"),
+    (0x4033_9BE0, 0x4033_9D80, "dual-mono", "dualmono.S (input VCAs, names)"),
+    (0x4033_9D80, 0x4033_A000, "modarea", "mod-area loader"),
 ]
 
 # ---- zone che sembrano libere (a zero nello stock) ma che l'OS legge: mai da usare come spazio libero
 SEC3_NOT_FREE = [
-    (0x402A_B8EC, 0x402C_B8EC, "two 128x128 tables of longs read by 0x400AD408 (conversion of loaded "
+    (0x402A_BC3C, 0x402C_BC3C, "two 128x128 tables of longs read by 0x400AD480 (conversion of loaded "
                                "sounds/kits); rows are zero but read"),
 ]
 

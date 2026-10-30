@@ -29,19 +29,19 @@ import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
 MA = modarea_layout.RAM                                    # area mod (mods/modarea)
-MA_PAGE, MA_MAP = 0x444E_0000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E1334)
+MA_PAGE, MA_MAP = 0x444E_1000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E2334)
 assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 SPEC_F = ROOT / "mods" / "readable-values" / "patch.json"
 pytestmark = pytest.mark.skipif(not (SY.exists() and SPEC_F.exists()), reason="OS Syntakt o patch assenti")
 
 LOAD = 0x4000_0400
-OBJS = 0x41B9_FA24
+OBJS = 0x41BA_0A24
 SRAM = 0x8000_21B0
 DLY, REV = SRAM + 1766, SRAM + 1786     # blocchi di parametri copiati per il motore
 STACK, RET, BUF = 0x5000_8000, 0x5000_F000, 0x5000_C000
-POLE = 0x4029_BFFC
+POLE = 0x4029_C34C
 
 
 @pytest.fixture(scope="module")
@@ -57,15 +57,15 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x41B9_0000, 0x0002_0000)                   # oggetti per-parametro (BSS)
+        uc.mem_map(0x41B9_1000, 0x0002_0000)                   # oggetti per-parametro (BSS)
         uc.mem_map(MA_PAGE, MA_MAP)                      # area mod
         uc.mem_map(0x5000_0000, 0x1_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)                      # SRAM
-        uc.mem_map(0x43BD_0000, 0x1_0000)                      # stato degli inviluppi del filtro
+        uc.mem_map(0x43BD_1000, 0x1_0000)                      # stato degli inviluppi del filtro
         # finto progetto: selettore a +48 con metodo virtuale +40 che restituisce un oggetto con la
         # traccia attiva a +8 (catena letta da 0x4001FF74)
         S, VT, STUB, OBJ = 0x5000_9000, 0x5000_9800, 0x5000_9900, 0x5000_9A00
-        uc.mem_write(0x444E_13F4, struct.pack(">I", S))
+        uc.mem_write(0x444E_23F4, struct.pack(">I", S))
         uc.mem_write(S + 48, struct.pack(">I", VT))
         uc.mem_write(VT + 40, struct.pack(">I", STUB))
         uc.mem_write(STUB, bytes.fromhex("203c") + struct.pack(">I", OBJ) + bytes.fromhex("4e75"))
@@ -75,14 +75,14 @@ class Machine:
         uc.mem_write(RET, b"\x4e\x75")
         # istruzioni EMAC dei tratti di codice originale eseguiti dai test
         self.emac = UnicornEmac(uc, [
-            0x4009_6EAA, 0x4009_6EAE, 0x4009_6EB2, 0x4009_6EB4,                         # reverb
-            0x4009_6606, 0x4009_660A, 0x4009_6610, 0x4009_6614, 0x4009_6618,           # inviluppo filtro
-            0x4009_6626, 0x4009_662A,
-            0x4008_ED70, 0x4008_ED74, 0x4008_ED80, 0x4008_ED84, 0x4008_ED8E,           # guadagno traccia
-            0x4008_ED92, 0x4008_ED98, 0x4008_ED9C, 0x4008_EDA0, 0x4008_EDA4,
-            0x4008_EDA6, 0x4008_EDAA, 0x4008_EDB0, 0x4008_EDB4,
-            0x4008_F48E, 0x4008_F492, 0x4008_F498, 0x4008_F49C,                         # ingresso esterno
-            0x4008_F60E, 0x4008_F612, 0x4008_F61C, 0x4008_F620, 0x4008_F626, 0x4008_F62A,  # FX track
+            0x4009_6F22, 0x4009_6F26, 0x4009_6F2A, 0x4009_6F2C,                         # reverb
+            0x4009_667E, 0x4009_6682, 0x4009_6688, 0x4009_668C, 0x4009_6690,           # inviluppo filtro
+            0x4009_669E, 0x4009_66A2,
+            0x4008_EDE8, 0x4008_EDEC, 0x4008_EDF8, 0x4008_EDFC, 0x4008_EE06,           # guadagno traccia
+            0x4008_EE0A, 0x4008_EE10, 0x4008_EE14, 0x4008_EE18, 0x4008_EE1C,
+            0x4008_EE1E, 0x4008_EE22, 0x4008_EE28, 0x4008_EE2C,
+            0x4008_F506, 0x4008_F50A, 0x4008_F510, 0x4008_F514,                         # ingresso esterno
+            0x4008_F686, 0x4008_F68A, 0x4008_F694, 0x4008_F698, 0x4008_F69E, 0x4008_F6A2,  # FX track
         ])
         self.emac.state.load_macsr(0xA0)
         self.sym = {k: int(v, 16) for k, v in spec["symbols"].items()}
@@ -174,7 +174,7 @@ def test_delay_filters_match_original_coefficients(m):
         for lp in values()[::4]:
             m.word(DLY + 8, hp)
             m.word(DLY + 10, lp)
-            m.run(0x4009_68C4, 0x4009_6928, {UC_M68K_REG_A6: DLY})
+            m.run(0x4009_693C, 0x4009_69A0, {UC_M68K_REG_A6: DLY})
             p_hp, p_lp = m.long(0x8000_D910) / 2**31, m.long(0x8000_D914) / 2**31
             assert close(m.fmt(110, hp), hpf_hz(p_hp)), (hp, m.fmt(110, hp), hpf_hz(p_hp))
             assert close(m.fmt(111, lp), lpf_hz(p_lp)), (hp, lp, m.fmt(111, lp), lpf_hz(p_lp))
@@ -186,7 +186,7 @@ def test_reverb_filters_and_predelay_match_original(m):
             m.word(REV + 0, v)            # PRE
             m.word(REV + 8, hp)           # HPF
             m.word(REV + 10, v)           # LPF
-            m.run(0x4009_6E48, 0x4009_6EE2, {UC_M68K_REG_A0: REV})
+            m.run(0x4009_6EC0, 0x4009_6F5A, {UC_M68K_REG_A0: REV})
             p_hp, p_lp = m.long(0x8000_C530) / 2**31, m.long(0x8000_C534) / 2**31
             pre = m.long(0x8000_C63C)
             assert close(m.fmt(120, hp), hpf_hz(p_hp)), (hp, m.fmt(120, hp))
@@ -203,7 +203,7 @@ def test_mix_levels_match_original_gain(m):
         m.uc.reg_write(UC_M68K_REG_D4, 0)
         m.uc.reg_write(UC_M68K_REG_SR, 0x2700)
         m.uc.reg_write(UC_M68K_REG_A7, STACK)
-        m.uc.emu_start(0x4008_F96A, 0x4008_F996, count=100)
+        m.uc.emu_start(0x4008_F9E2, 0x4008_FA0E, count=100)
         g_dly = -struct.unpack(">i", struct.pack(">I", m.uc.reg_read(UC_M68K_REG_D1) & 0xFFFFFFFF))[0] / 2**31
         g_rev = -struct.unpack(">i", struct.pack(">I", m.uc.reg_read(UC_M68K_REG_D0) & 0xFFFFFFFF))[0] / 2**31
         for pid, g in ((114, g_dly), (123, g_rev)):     # 113 e 122 sono alias di questi
@@ -220,7 +220,7 @@ def test_delay_to_reverb_send_matches_original_gain(m):
         m.uc.reg_write(UC_M68K_REG_A2, SRAM)
         m.uc.reg_write(UC_M68K_REG_SR, 0x2700)
         m.uc.reg_write(UC_M68K_REG_A7, STACK)
-        m.uc.emu_start(0x4008_F85A, 0x4008_F868, count=100)
+        m.uc.emu_start(0x4008_F8D2, 0x4008_F8E0, count=100)
         g = -struct.unpack(">i", struct.pack(">I", m.uc.reg_read(UC_M68K_REG_D0) & 0xFFFFFFFF))[0] / 2**31
         t = m.fmt(112, v)
         assert t == "-inf" if g == 0 else close(t, 20 * math.log10(g), rel=0), (v, t)
@@ -254,14 +254,14 @@ def test_unknown_function_prints_plain_number(m):
 
 
 def test_os_init_copy_installs_our_formatter(m):
-    """La copia dell'inizializzatore (0x401882BE) con rv_proto: gestore ed esecutore nostri."""
+    """La copia dell'inizializzatore (0x40188482) con rv_proto: gestore ed esecutore nostri."""
     dst = OBJS + 84 * 110 + 20
     m.uc.mem_write(dst, b"\xAA" * 16)
     sp = STACK - 12
     m.uc.mem_write(sp, struct.pack(">3I", RET, dst, m.sym["rv_proto"]))
     m.uc.reg_write(UC_M68K_REG_SR, 0x2700)
     m.uc.reg_write(UC_M68K_REG_A7, sp)
-    m.uc.emu_start(0x4018_82BE, RET, count=1000)
+    m.uc.emu_start(0x4018_8482, RET, count=1000)
     mgr, inv = struct.unpack(">II", m.uc.mem_read(dst + 8, 8))
     assert (mgr, inv) == (m.sym["rv_mgr"], m.sym["rv_invoke"])
 
@@ -269,7 +269,7 @@ def test_os_init_copy_installs_our_formatter(m):
 def test_patched_operands_point_to_our_prototype(m):
     ops = [p for p in m.spec["patches"] if not p.get("append") and p["len"] == 4]
     assert len(ops) == len(m.spec["ids"])
-    protos = {0x41B9DFD0, 0x41B9DFB0, 0x41B9DDB0, 0x41B9DDC0, 0x41B9DF30}   # formattatori dell'OS
+    protos = {0x41B9EFD0, 0x41B9EFB0, 0x41B9EDB0, 0x41B9EDC0, 0x41B9EF30}   # formattatori dell'OS
     for p in ops:
         a = int(p["addr"], 16) - LOAD
         assert struct.unpack(">I", m.sec3[a:a + 4])[0] in protos
@@ -277,8 +277,8 @@ def test_patched_operands_point_to_our_prototype(m):
 
 
 # ----------------------------------------------------------------------------- fase 2: inviluppi
-F_STATE, F_VALUE = 0x43BD_C09C, 0x43BD_C0A0       # traccia 0: stato, contatore (+8); valore
-FENV = 0x4009_652C                                 # inviluppo del filtro (CPU #1), 8 tracce
+F_STATE, F_VALUE = 0x43BD_D09C, 0x43BD_D0A0       # traccia 0: stato, contatore (+8); valore
+FENV = 0x4009_65A4                                 # inviluppo del filtro (CPU #1), 8 tracce
 
 
 def time_close(t, samples, slack):
@@ -394,7 +394,7 @@ def test_hold_and_sustain(m):
 def test_amp_tables_are_the_engine_tables(m):
     """Le tabelle d'ampiezza lette dalla CPU #1 sono identiche a quelle del motore (sezione 7)."""
     s7 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[7])[7].read_bytes()
-    for cpu1, cpu2 in ((0x401D_ADDC, 0x4001_4070), (0x401D_A9DC, 0x4001_3C70), (0x401D_ABDC, 0x4001_3E70)):
+    for cpu1, cpu2 in ((0x401D_B07C, 0x4001_4070), (0x401D_AC7C, 0x4001_3C70), (0x401D_AE7C, 0x4001_3E70)):
         assert m.sec3[cpu1 - LOAD:cpu1 - LOAD + 512] == s7[cpu2 - LOAD:cpu2 - LOAD + 512]
 
 
@@ -480,7 +480,7 @@ def s32(x):
 
 def test_track_volume_and_level_match_original_gain(m):
     def gain(lev, vol):
-        return s32(m.call(0x4008_ED48, [lev, 0x7F00, vol, 0])) / 2**31
+        return s32(m.call(0x4008_EDC0, [lev, 0x7F00, vol, 0])) / 2**31
     full = gain(0x7F00, 0x7F00)
     for v in values():
         for pid, g in ((81, gain(0x7F00, v)), (10, gain(v, 0x7F00))):
@@ -495,7 +495,7 @@ def test_track_sends_match_original_gain(m):
         m.word(a3 + 120, v)
         m.uc.mem_write(0x5000_7000 - 508, bytes(4))
         regs = {UC_M68K_REG_A3: a3, UC_M68K_REG_D3: 0, UC_M68K_REG_A6: 0x5000_7000}
-        m.run(0x4008_F37E, 0x4008_F3A0, regs)
+        m.run(0x4008_F3F6, 0x4008_F418, regs)
         g = -struct.unpack(">i", struct.pack(">I", m.uc.reg_read(UC_M68K_REG_D7) & 0xFFFFFFFF))[0] / 2**31
         for pid in (78, 79, 151, 152, 129, 130):
             t = m.fmt(pid, v)
@@ -507,7 +507,7 @@ def test_external_input_level_matches_original_gain(m):
     full = None
     for v in [0x7F00] + values():
         m.word(SRAM + 1802, v)
-        m.run(0x4008_F480, 0x4008_F4A6, {UC_M68K_REG_A2: SRAM})
+        m.run(0x4008_F4F8, 0x4008_F51E, {UC_M68K_REG_A2: SRAM})
         g = s32(m.uc.reg_read(UC_M68K_REG_D2) & 0xFFFFFFFF) / 2**31
         full = full or g
         if v == 0x7F00:
@@ -522,7 +522,7 @@ def test_fx_track_volume_matches_original_gain(m):
     full = None
     for v in [0x7F00] + values():
         m.word(SRAM + 1864, v)
-        m.run(0x4008_F5F6, 0x4008_F62C, {UC_M68K_REG_A2: SRAM, UC_M68K_REG_A6: 0x5000_7000})
+        m.run(0x4008_F66E, 0x4008_F6A4, {UC_M68K_REG_A2: SRAM, UC_M68K_REG_A6: 0x5000_7000})
         g = (s32(m.uc.reg_read(UC_M68K_REG_D2) & 0xFFFFFFFF) / 2**31) ** 2
         full = full or g
         if v == 0x7F00:
@@ -539,9 +539,9 @@ def test_active_track_comes_from_the_os_selector(m):
     assert m.fmt(58, 0x4000) == "577Hz"
     m.track(0, 13)                                 # fuori intervallo: numero
     assert m.fmt(58, 0x4000) == "64"
-    m.uc.mem_write(0x444E_13F4, bytes(4))          # progetto non ancora creato
+    m.uc.mem_write(0x444E_23F4, bytes(4))          # progetto non ancora creato
     assert m.fmt(64, 0x4000) == "64"
-    m.uc.mem_write(0x444E_13F4, struct.pack(">I", 0x5000_9000))
+    m.uc.mem_write(0x444E_23F4, struct.pack(">I", 0x5000_9000))
     m.track(0, 0)
 
 
@@ -554,7 +554,7 @@ class EngineFilter(Engine2):
     def __init__(self):
         super().__init__()
         uc = self.uc
-        uc.mem_map(0x4400_0000, 0x0010_0000)
+        uc.mem_map(0x4400_1000, 0x0010_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
         self.run(0x4000_1860, [])
 
@@ -620,7 +620,7 @@ def test_reverb_shelving_matches_original_coefficients(m):
     for v in values()[::2]:
         m.word(REV + 4, v)                 # FREQ
         m.word(REV + 6, v)                 # GAIN
-        m.run(0x4009_6E48, 0x4009_6EE2, {UC_M68K_REG_A0: REV})
+        m.run(0x4009_6EC0, 0x4009_6F5A, {UC_M68K_REG_A0: REV})
         b0, b1, a1 = (m.long(a) / 2**31 for a in (0x8000_C5FC, 0x8000_C600, 0x8000_C604))
         c = (a1 + 1) / 2
         g = (b0 - c) / (1 - c)

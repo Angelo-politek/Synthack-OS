@@ -4,12 +4,12 @@
 |   rilevatore : bus del mixer analogico PRIMA dei VCA del master, digitalizzato dagli ADC 6/7
 |                (gruppo 0x80003950, canali 6 e 7 = 0x80003C50 / 0x80003CD0, 32 campioni)
 |   attuatore  : tensioni di controllo dei VCA del master (hw+70 / hw+72), ricalcolate dalla
-|                funzione dei guadagni 0x400903CA a ogni blocco audio
+|                funzione dei guadagni 0x40090442 a ogni blocco audio
 | Algoritmo: quello del compressore della Digitakt mk1 (picco, log, soglia/ratio, tenuta con
 | rilascio, attacco, makeup), riscritto in forma compatta: modello in mods/dt-comp/model.py
 | (classe Compact, aritmetica identica a questo file).
 |
-| Chiamata dal trampolino a 0x4009053E (al posto del clamp/scrittura dei CV del master):
+| Chiamata dal trampolino a 0x400905B6 (al posto del clamp/scrittura dei CV del master):
 |   d1 = CV master sinistro, d3 = CV master destro (non ancora limitati), a3 = struttura hw.
 | Scrive hw+70/hw+72; preserva tutti i registri (d1/d3 non servono dopo), MACSR e ACC puliti.
 |
@@ -31,7 +31,7 @@
         .equ    CV_MAX,         65535
         .equ    THR_K,          503316480       | soglia: thr = THR_K*(THR<<16) - THR_K
         .equ    MUP_K,          202017810       | makeup: mk = MUP_K*(MUP<<16) - MUP_K
-        .equ    FX_SLOTS,       0x41B9F950      | pagina "SYN / FX Drive" (oggetto in BSS)
+        .equ    FX_SLOTS,       0x41BA0950      | pagina "SYN / FX Drive" (oggetto in BSS)
         .equ    ID_DRIVE,       150
         .equ    N_PAR,          7               | THR ATK REL MUP RAT + GR (sola lettura) + ON
         .equ    IDX_ON,         6
@@ -40,17 +40,17 @@
         .equ    RAT_STEP,       0xFE0           | RAT: 9 posizioni (0 = OFF) su 0..0x7F00
         .equ    METER_FS,       18              | misuratore GR: barra piena = 18 dB
         .equ    METER_DECAY,    111848          | discesa ~20 dB/s (unita' 2^23/dB per blocco)
-        .equ    OBJS,           0x41B9FA24      | oggetti per-parametro in RAM (84 B, indice = id)
-        .equ    DRIVE_GFX,      0x41B9FA24 + 84*150 + 36   | disegno della manopola di DRIVE
-        .equ    UI_ROOT,        0x444E1334      | oggetto principale dell'interfaccia (singleton)
+        .equ    OBJS,           0x41BA0A24      | oggetti per-parametro in RAM (84 B, indice = id)
+        .equ    DRIVE_GFX,      0x41BA0A24 + 84*150 + 36   | disegno della manopola di DRIVE
+        .equ    UI_ROOT,        0x444E2334      | oggetto principale dell'interfaccia (singleton)
         .equ    UI_DIRTY,       96              | +64 ViewController, +32 "da ridisegnare"
         .equ    REDRAW_BLOCKS,  24              | al massimo un ridisegno ogni 24 blocchi (~16 ms)
         | salvataggio: 2 parole libere del blocco "mixer esterno" del kit del pattern (L2 +82/+84;
         | L1 +40/+42), oppure le stesse del contenitore globale se SYN global (bit 2) e' attivo.
-        .equ    KIT_PTR,        0x800030BC      | kit del pattern attivo (scritto da 0x400A1D18)
+        .equ    KIT_PTR,        0x800030BC      | kit del pattern attivo (scritto da 0x400A1D90)
         .equ    KIT_BLK,        70              | blocco esterno nel kit L2 (+70..+87)
-        .equ    GLOB_BLK,       0x41B9D3B0      | blocco esterno nel contenitore globale
-        .equ    GLOBAL_FLAGS,   0x43BDE444      | bit 2 = SYN global
+        .equ    GLOB_BLK,       0x41B9E3B0      | blocco esterno nel contenitore globale
+        .equ    GLOBAL_FLAGS,   0x43BDF444      | bit 2 = SYN global
 
         .text
         .globl  comp_hook
@@ -445,7 +445,7 @@ changed:
 4:      tst.l   %d1
         rts
 
-| ---- all'avvio, al posto di clr.l 0x41B9F968 (ultima casella vuota della pagina "SYN / FX Drive"):
+| ---- all'avvio, al posto di clr.l 0x41BA0968 (ultima casella vuota della pagina "SYN / FX Drive"):
 |      i 7 id nelle caselle A..G e, a oggetti dei parametri gia' costruiti, grafica e formattatori
         .globl  comp_page_stub
 comp_page_stub:

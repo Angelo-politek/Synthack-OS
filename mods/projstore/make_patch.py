@@ -25,8 +25,8 @@ import projstore_layout as L  # noqa: E402
 LOAD = 0x4000_0400
 CODE_BASE = modarea_layout.RAM + L.OFFSET
 CODE_END = modarea_layout.RAM + next(e for a, e, who, _ in registry.MODAREA if who == "projstore")   # poi kitstore
-HOOKS = [(0x400A_90BC, "4feffff448d70c04", "ps_wr", "impostazioni del progetto -> file: jmp ps_wr ; nop"),
-         (0x400A_8478, "4feffff048d70c0c", "ps_rd", "file -> impostazioni del progetto: jmp ps_rd ; nop")]
+HOOKS = [(0x400A_9134, "4feffff448d70c04", "ps_wr", "impostazioni del progetto -> file: jmp ps_wr ; nop"),
+         (0x400A_84F0, "4feffff048d70c0c", "ps_rd", "file -> impostazioni del progetto: jmp ps_rd ; nop")]
 WSL_BINUTILS = "~/tools/m68k/root"
 
 
@@ -42,7 +42,7 @@ def wsl(cmd: str) -> str:
 
 
 def main() -> None:
-    stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
+    stock = REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     with tempfile.TemporaryDirectory(prefix="projstore-") as tmp:
         tmp = Path(tmp)
@@ -69,7 +69,7 @@ def main() -> None:
         patches.append({"section": 3, "addr": f"{addr:#010X}", "len": 8, "expect_sha256": sha(old),
                         "hex": struct.pack(">HIH", 0x4EF9, syms[sym], 0x4E71).hex(), "what": what})
     spec = {
-        "name": "projstore", "os": "1.41", "requires": ["modarea"],
+        "name": "projstore", "os": "1.42", "requires": ["modarea"],
         "description": f"Memoria delle mod salvata con il progetto: {L.SIZE} byte a ps_data, nell'area riservata "
                        "delle impostazioni del progetto nel file.",
         "generated_by": "mods/projstore/make_patch.py",

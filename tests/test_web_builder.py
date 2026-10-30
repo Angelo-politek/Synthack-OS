@@ -17,7 +17,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 WB = ROOT / "web-builder"
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 sys.path.insert(0, str(ROOT / "tools" / "build"))
 sys.path.insert(0, str(ROOT / "tools" / "unpack"))
 import lz  # noqa: E402

@@ -1,39 +1,39 @@
 {
   "name": "kitstore",
-  "os": "1.41",
+  "os": "1.42",
   "requires": [
     "modarea"
   ],
   "description": "Parole delle mod salvate con il kit: parole 41..43 dei 12 blocchi per traccia (dati MIDI della Digitakt), nei byte riservati +150..+155 del blocco nel file.",
   "generated_by": "mods/kitstore/make_patch.py",
   "symbols": {
-    "ks_wr": "0x444eaad0",
-    "ks_rd": "0x444eab0a"
+    "ks_wr": "0x444ebad0",
+    "ks_rd": "0x444ebb0a"
   },
   "patches": [
     {
       "section": 3,
-      "addr": "0X4034F200",
+      "addr": "0X40350200",
       "len": 116,
       "append": true,
-      "hex": "2f2f00082f2f00086122508f4a00671a206f0004226f000831690052009631690054009831690056009a4e752f0b2f0a246f000c4ef9400a6e762f2f00082f2f00086122508f4a00671a206f0004226f00083169009600523169009800543169009a00564e754feffff448d71c004ef9400a6e0a",
-      "ram": "0x444eaad0",
+      "hex": "2f2f00082f2f00086122508f4a00671a206f0004226f000831690052009631690054009831690056009a4e752f0b2f0a246f000c4ef9400a6eee2f2f00082f2f00086122508f4a00671a206f0004226f00083169009600523169009800543169009a00564e754feffff448d71c004ef9400a6e82",
+      "ram": "0x444ebad0",
       "what": "(area mod) kitstore.S"
     },
     {
       "section": 3,
-      "addr": "0X400A6E6E",
+      "addr": "0X400A6EE6",
       "len": 8,
       "expect_sha256": "8d966ec8e3d2471a8c996291a885823171c35922b5e73817b6590d50f61cfdab",
-      "hex": "4ef9444eaad04e71",
+      "hex": "4ef9444ebad04e71",
       "what": "blocco per traccia del kit -> file: jmp ks_wr ; nop"
     },
     {
       "section": 3,
-      "addr": "0X400A6E02",
+      "addr": "0X400A6E7A",
       "len": 8,
       "expect_sha256": "b68bc7d23c230258939a138565f6ce0857c8519234b2e5f45b2120f58d4b44db",
-      "hex": "4ef9444eab0a4e71",
+      "hex": "4ef9444ebb0a4e71",
       "what": "file -> blocco per traccia del kit: jmp ks_rd ; nop"
     }
   ]

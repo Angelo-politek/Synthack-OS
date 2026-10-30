@@ -1,6 +1,6 @@
 """Mod projstore: i byte delle mod salvati con il progetto, con le funzioni vere dell'OS.
 
-Scrittura (0x400A90BC) e lettura (0x400A8478) delle impostazioni del progetto girano nell'emulatore con e
+Scrittura (0x400A9134) e lettura (0x400A84F0) delle impostazioni del progetto girano nell'emulatore con e
 senza i nostri agganci: il blocco nel file e le impostazioni rilette devono essere identici a quelli
 dell'OS stock, tranne i nostri byte nell'area riservata; i byte delle mod devono tornare uguali.
 """
@@ -21,12 +21,12 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools" / "build"), str(ROOT / "tools" / "unpack")]
 import eft  # noqa: E402
 
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 SPEC_F = ROOT / "mods" / "projstore" / "patch.json"
 pytestmark = pytest.mark.skipif(not (SY.exists() and SPEC_F.exists()), reason="OS o patch assenti")
 
 LOAD, STACK, RET = 0x4000_0400, 0x5000_F000, 0x5000_FF00
-WRITE, READ = 0x400A_90BC, 0x400A_8478
+WRITE, READ = 0x400A_9134, 0x400A_84F0
 SET_A, SET_B, FILE = 0x5001_0000, 0x5002_0000, 0x5003_0000   # impostazioni (RAM), blocco nel file
 RESERVED = (0x227, 0x400)
 
@@ -40,7 +40,7 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x444E_0000, 0x2_0000)
+        uc.mem_map(0x444E_1000, 0x2_0000)
         uc.mem_map(0x5000_0000, 0x4_0000)
         if hooked:
             for p in self.spec["patches"]:

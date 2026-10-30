@@ -54,7 +54,7 @@ def entry(slot: int, pid: int, get: int, put: int, what: str) -> dict:
 
 
 def main() -> None:
-    stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
+    stock = REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     with tempfile.TemporaryDirectory(prefix="vparams-") as tmp:
         tmp = Path(tmp)
@@ -77,7 +77,7 @@ def main() -> None:
         code = struct.pack(">HI", 0x4EF9, syms[sym]) + (b"\x4e\x71" if len(orig) == 16 else b"")
         patches.append({"section": 3, "addr": f"{addr:#010X}", "len": len(code), "expect_sha256": sha(old),
                         "hex": code.hex(), "what": f"aggancio: jmp {sym}" + (" ; nop" if len(orig) == 16 else "")})
-    spec = {"name": "vparams", "os": "1.41", "requires": ["modarea"],
+    spec = {"name": "vparams", "os": "1.42", "requires": ["modarea"],
             "description": "Parametri virtuali delle mod: agganci alle funzioni centrali dei parametri di kit "
                            "e tabella di registrazione in RAM.",
             "generated_by": "mods/vparams/make_patch.py",

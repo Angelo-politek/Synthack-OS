@@ -1,6 +1,6 @@
 /* readable-values: testi con unita' reali per i parametri della Syntakt (OS 1.41).
  *
- * L'OS costruisce all'avvio un oggetto per parametro (0x41B9FA24 + 84*id) e copia nel campo +20
+ * L'OS costruisce all'avvio un oggetto per parametro (0x41BA0A24 + 84*id) e copia nel campo +20
  * un formattatore (std::function) da un prototipo. make_patch.py fa puntare quella copia, per gli
  * id gestiti qui, a rv_proto: l'OS chiama allora rv_invoke(funzione, valore 0..0x7F00, buffer).
  * L'id si ricava dall'indirizzo della funzione; ogni testo e' calcolato dagli stessi dati che usa
@@ -10,13 +10,13 @@
 typedef unsigned int u32;
 typedef int s32;
 
-#define OBJS      0x41B9FA24u           /* oggetti per-parametro (84 B, indice = id logico) */
+#define OBJS      0x41BA0A24u           /* oggetti per-parametro (84 B, indice = id logico) */
 #define OBJ_SIZE  84u
 #define N_IDS     505u
-#define FLT_POLE  ((const s32 *)0x4029BFFCu)            /* polo dei filtri di delay/reverb, Q31 */
+#define FLT_POLE  ((const s32 *)0x4029C34Cu)            /* polo dei filtri di delay/reverb, Q31 */
 #define DLY       ((const volatile short *)0x80002896u) /* delay:  TIME X WID FDBK HPF LPF REV VOL */
 #define REV       ((const volatile short *)0x800028AAu) /* reverb: PRE DEC FREQ GAIN HPF LPF VOL */
-#define SHELF     ((const s32 *)0x4029B7FCu)            /* reverb: shelving bilineare, c = t/(1+t), Q31 */
+#define SHELF     ((const s32 *)0x4029BB4Cu)            /* reverb: shelving bilineare, c = t/(1+t), Q31 */
 #define ONE       (1u << 30)                            /* 1.0 in Q30 */
 #define PI_2      1686629713u                           /* pi/2 in Q30 */
 #define INV_SQRT2 759250125u                            /* 1/sqrt(2) in Q30 */
@@ -27,12 +27,12 @@ typedef int s32;
 
 /* inviluppi: tabelle dell'OS (128 voci, indice = valore >> 8). Il filtro lavora per blocco
  * (32 campioni, CPU #1); l'ampiezza delle tracce digitali per campione (CPU #2, copia identica qui) */
-#define F_DEL     ((const s32 *)0x401DEAC0u)            /* ritardo in campioni */
-#define F_ATK     ((const s32 *)0x401DEEC0u)            /* incremento per blocco (negativo) */
-#define F_DEC     ((const s32 *)0x401DECC0u)            /* coefficiente per blocco (negativo, msac) */
-#define A_ATK     ((const s32 *)0x401DADDCu)            /* incremento per campione */
-#define A_HOLD    ((const s32 *)0x401DA9DCu)            /* durata in campioni */
-#define A_DEC     ((const s32 *)0x401DABDCu)            /* coefficiente per campione */
+#define F_DEL     ((const s32 *)0x401DED60u)            /* ritardo in campioni */
+#define F_ATK     ((const s32 *)0x401DF160u)            /* incremento per blocco (negativo) */
+#define F_DEC     ((const s32 *)0x401DEF60u)            /* coefficiente per blocco (negativo, msac) */
+#define A_ATK     ((const s32 *)0x401DB07Cu)            /* incremento per campione */
+#define A_HOLD    ((const s32 *)0x401DAC7Cu)            /* durata in campioni */
+#define A_DEC     ((const s32 *)0x401DAE7Cu)            /* coefficiente per campione */
 #define ANALOG    8                                     /* tracce 9..12 (indici 8..11): voci analogiche */
 #define TRACKS    ((const volatile short *)0x800021B0u) /* parametri per traccia (142 B) della CPU #1 */
 #define T_BASE    51                                    /* BASE a +102 (parole) */
@@ -46,8 +46,8 @@ typedef int s32;
 #define CA_Q16    95977472u
 
 /* traccia attiva (0..11, 12 = FX track), chiesta all'OS come fanno le pagine dei parametri:
- * 0x4001FF74(selettore), con selettore = singleton 0x4016E804() (*0x444E13F4) + 48 (0x40018458) */
-#define PROJECT   (*(void *const volatile *)0x444E13F4u)
+ * 0x4001FF74(selettore), con selettore = singleton 0x4016E9C8() (*0x444E23F4) + 48 (0x40018458) */
+#define PROJECT   (*(void *const volatile *)0x444E23F4u)
 #define GET_TRACK ((s32 (*)(void *))0x4001FF74u)
 
 static s32 active_track(void)

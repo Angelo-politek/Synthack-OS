@@ -9,10 +9,10 @@ mischa85; qui aggiungiamo solo:
 - il comando ``roundtrip``, che dimostra che la pipeline non altera il firmware.
 
 Uso:
-    python tools/unpack/eft.py info      firmware/Syntakt_OS1.41.syx
-    python tools/unpack/eft.py unpack    firmware/Syntakt_OS1.41.syx [-o unpacked/1.41]
-    python tools/unpack/eft.py repack    firmware/Syntakt_OS1.41.syx -o out.syx [--replace N FILE]
-    python tools/unpack/eft.py roundtrip firmware/Syntakt_OS1.41.syx
+    python tools/unpack/eft.py info      firmware/Syntakt_OS1.42.syx
+    python tools/unpack/eft.py unpack    firmware/Syntakt_OS1.42.syx [-o unpacked/1.41]
+    python tools/unpack/eft.py repack    firmware/Syntakt_OS1.42.syx -o out.syx [--replace N FILE]
+    python tools/unpack/eft.py roundtrip firmware/Syntakt_OS1.42.syx
 """
 
 from __future__ import annotations

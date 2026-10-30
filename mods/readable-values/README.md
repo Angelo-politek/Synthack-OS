@@ -5,7 +5,7 @@ Shows parameters in real units instead of 0–127. Every value comes from the sa
 | Parameter | Text | Source |
 |---|---|---|
 | Filter FREQ (tracks 1–8) | `4.9Hz` … `20.3k` | pole frequency of the engine biquad: 4.918 Hz · e^(0.065542·FREQ), measured in emulation (< 0.1 %) |
-| Filter BASE / WDTH (tracks 1–8) | `5.0Hz` … `24.0k` | one-pole HP/LP, OS table `0x4029BFFC`; WDTH starts at BASE |
+| Filter BASE / WDTH (tracks 1–8) | `5.0Hz` … `24.0k` | one-pole HP/LP, OS table `0x4029C34C`; WDTH starts at BASE |
 | Filter env DEL / ATK / DEC / REL (tracks 1–8) | `0.7ms` … `10.0s`, `INF` | OS tables; ATK = full ramp, DEC/REL = time to −60 dB |
 | Amp ATK / DEC / REL (tracks 1–8), HOLD (all) | `0.1ms` … `30.0s`, `INF` | engine tables (identical copy in CPU #1 memory) |
 | SUS (filter, amp) | `0%` … `100%` | |
@@ -26,6 +26,6 @@ Measurements: `tools/measure/analog.py` on recordings of the main out.
 
 - `rv.c` (C, `m68k-linux-gnu-gcc -mcpu=54418`, no FPU, no libgcc) at offset `+0x2000` in the [mod area](../modarea).
 - At boot the OS copies each parameter's formatter (`std::function`, object `+20`) from a prototype; we patch the prototype operand of each handled id to `rv_proto`. One invoker finds the id from the object address.
-- Track parameters (58–85) are shared by all tracks: the formatter asks the OS for the active track the same way the parameter pages do (`0x4001FF74(project + 48)`, project = `*0x444E13F4`).
+- Track parameters (58–85) are shared by all tracks: the formatter asks the OS for the active track the same way the parameter pages do (`0x4001FF74(project + 48)`, project = `*0x444E23F4`).
 
 Test: `tests/test_readable_values.py` runs the original CPU #1 and CPU #2 code in the emulator and checks every text against it.

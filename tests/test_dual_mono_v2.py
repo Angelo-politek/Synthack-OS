@@ -1,7 +1,7 @@
 """Dual mono v2: IN L e IN R con mandate proprie, eseguiti in Unicorn sulla sezione 3 con le patch.
 
-Il blocco originale delle mandate dell'ingresso (0x4008F478..0x4008F604, legge di bilanciamento
-0x400A171A ed EMAC compresi) gira come nell'OS. Riferimento: lo stesso blocco senza dual-mono, in mono,
+Il blocco originale delle mandate dell'ingresso (0x4008F4F0..0x4008F67C, legge di bilanciamento
+0x400A1792 ed EMAC compresi) gira come nell'OS. Riferimento: lo stesso blocco senza dual-mono, in mono,
 con bilanciamento al centro, una volta con livello e mandate di IN L (canale 12) e una con quelli di IN R
 (canale 13). In stereo il blocco dev'essere identico all'originale.
 """
@@ -26,16 +26,16 @@ import dualmono_layout as DL  # noqa: E402
 import eft  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 pytestmark = pytest.mark.skipif(not SY.exists(), reason="firmware stock assente")
 
-LOAD, START, END = 0x4000_0400, 0x4008_F478, 0x4008_F604     # fino al passo FX R del canale 13 (F600)
+LOAD, START, END = 0x4000_0400, 0x4008_F4F0, 0x4008_F67C     # fino al passo FX R del canale 13 (F600)
 STACK, RET, FRAME, A2 = 0x5000_8000, 0x5000_F000, 0x5000_4000, 0x5000_9000
 FLAG, UI_KIT_PTR, FX_KIT_PTR, UI = 0x8000_3146, 0x8000_30B8, 0x8000_30BC, 0x5000_0C00
 UI_KIT, FX_KIT = 0x5001_0000, 0x5000_6000
-SITES = [0x4008F48E, 0x4008F492, 0x4008F498, 0x4008F49C, 0x4008F4B8, 0x4008F4BC, 0x4008F4C0, 0x4008F4C2,
-         0x4008F4E0, 0x4008F4E4, 0x4008F4E8, 0x4008F4EA, 0x4008F4F8, 0x4008F4FC, 0x4008F500, 0x4008F502,
-         0x400A174E, 0x400A1752, 0x400A16CC, 0x400A16D0, 0x400A16D4, 0x400A16D8]
+SITES = [0x4008F506, 0x4008F50A, 0x4008F510, 0x4008F514, 0x4008F530, 0x4008F534, 0x4008F538, 0x4008F53A,
+         0x4008F558, 0x4008F55C, 0x4008F560, 0x4008F562, 0x4008F570, 0x4008F574, 0x4008F578, 0x4008F57A,
+         0x400A17C6, 0x400A17CA, 0x400A1744, 0x400A1748, 0x400A174C, 0x400A1750]
 CH12 = (-408, -376, -344, -312, -280, -248)    # passi: delay L/R, reverb L/R, FX L/R del canale 12
 CH13 = (-404, -372, -340, -308, -276, -244)
 CURRENT = [0x8000_6250, 0x8000_6254, 0x8000_6270, 0x8000_6274, 0x8000_6290, 0x8000_6294, 0x8000_62B0,
@@ -54,8 +54,8 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x41B9_0000, 0x2_0000)
-        uc.mem_map(0x444E_0000, 0x2_0000)
+        uc.mem_map(0x41B9_1000, 0x2_0000)
+        uc.mem_map(0x444E_1000, 0x2_0000)
         uc.mem_map(0x5000_0000, 0x2_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
         self.sym = {}
@@ -65,7 +65,7 @@ class Machine:
             for p in sp["patches"]:
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
         uc.mem_write(RET, b"\x4e\x75")
-        uc.mem_write(0x444E_1334, struct.pack(">I", UI))
+        uc.mem_write(0x444E_2334, struct.pack(">I", UI))
         uc.mem_write(UI_KIT_PTR, struct.pack(">I", UI_KIT))
         uc.mem_write(FX_KIT_PTR, struct.pack(">I", FX_KIT))
         self.emac = UnicornEmac(uc, SITES)
@@ -254,13 +254,13 @@ def test_fx3_l_page_unchanged(mod):
 
 
 def test_r_page_slots_at_boot(mod):
-    mod.uc.mem_write(0x41B9_F7F8, struct.pack(">I", 269))
-    mod.uc.mem_write(0x41B9_F874, struct.pack(">9I", *range(246, 255)))
+    mod.uc.mem_write(0x41BA_07F8, struct.pack(">I", 269))
+    mod.uc.mem_write(0x41BA_0874, struct.pack(">9I", *range(246, 255)))
     mod.call(mod.sym["dm_page_stub"])
-    assert list(struct.unpack(">9I", mod.uc.mem_read(0x41B9_F874, 36))) == [125, 0, 0, 0, 129, 130, 269, 0, 0]
+    assert list(struct.unpack(">9I", mod.uc.mem_read(0x41BA_0874, 36))) == [125, 0, 0, 0, 129, 130, 269, 0, 0]
 
 
-MIX = 0x41B9_F7F0                                       # External Mixer (pagina 24), caselle A..H
+MIX = 0x41BA_07F0                                       # External Mixer (pagina 24), caselle A..H
 
 
 @pytest.mark.parametrize("fx3", [269, 0])
@@ -291,9 +291,9 @@ def test_header_and_patched_bytes():
     blob = next(p for p in sp["patches"] if p.get("ram") == f"{DL.HDR:#010x}")
     assert bytes.fromhex(blob["hex"])[:4] == DL.MAGIC.to_bytes(4, "big")
     assert int.from_bytes(bytes.fromhex(blob["hex"])[8:12], "big") == sym["dm_page_r"]
-    want = {0x4008_F478: "4a3980003146", 0x4008_F5F2: "7f6a0746736a0018", 0x4003_5914: "4eb940044626",
-            0x400A_3404: "13c080003146", 0x4019_4F1A: "42b941b9f894", 0x4003_58EE: "401c7f9c",
-            0x4019_4E4A: "40251b0c", 0x4019_4EB0: "40251b10", 0x4003_58E8: "7203"}
+    want = {0x4008_F4F0: "4a3980003146", 0x4008_F66A: "7f6a0746736a0018", 0x4003_5914: "4eb940044626",
+            0x400A_347C: "13c080003146", 0x4019_50DE: "42b941ba0894", 0x4003_58EE: "401c823c",
+            0x4019_500E: "40251e2c", 0x4019_5074: "40251e30", 0x4003_58E8: "7203"}
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig

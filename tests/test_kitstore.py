@@ -1,6 +1,6 @@
 """Mod kitstore: parole delle mod salvate con il kit, con le funzioni vere dell'OS.
 
-Scrittura (0x400A6E6E) e lettura (0x400A6E02) di un blocco per traccia del kit girano nell'emulatore con
+Scrittura (0x400A6EE6) e lettura (0x400A6E7A) di un blocco per traccia del kit girano nell'emulatore con
 e senza i nostri agganci: file e blocco riletto identici a quelli dell'OS stock, tranne le parole 41..43
 (RAM +82..+87) che vanno nei byte riservati +150..+155 e tornano indietro.
 """
@@ -22,12 +22,12 @@ sys.path[:0] = [str(ROOT / "tools" / "build"), str(ROOT / "tools" / "unpack")]
 import eft  # noqa: E402
 import kitstore_layout as L  # noqa: E402
 
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 SPEC_F = ROOT / "mods" / "kitstore" / "patch.json"
 pytestmark = pytest.mark.skipif(not (SY.exists() and SPEC_F.exists()), reason="OS o patch assenti")
 
 LOAD, STACK, RET = 0x4000_0400, 0x5000_F000, 0x5000_FF00
-WRITE, READ = 0x400A_6E6E, 0x400A_6E02
+WRITE, READ = 0x400A_6EE6, 0x400A_6E7A
 RAM_A, RAM_B, FILE = 0x5001_0000, 0x5001_1000, 0x5001_2000
 OURS = slice(82, 88)                                      # parole 41..43 del blocco in RAM
 
@@ -39,7 +39,7 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x444E_0000, 0x2_0000)
+        uc.mem_map(0x444E_1000, 0x2_0000)
         uc.mem_map(0x5000_0000, 0x4_0000)
         if hooked:
             for p in spec["patches"]:

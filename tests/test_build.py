@@ -50,19 +50,19 @@ def test_out_of_range_refused():
 
 def test_protected_sections_refused(tmp_path):
     (tmp_path / "patch.json").write_text(json.dumps({
-        "name": "evil", "os": "1.41",
+        "name": "evil", "os": "1.42",
         "patches": [{"section": 2, "addr": "0x40000400", "len": 2, "expect_sha256": "00", "hex": "4e71"}]}))
     with pytest.raises(build.BuildError, match="non modificabile"):
-        build.load_mod(tmp_path, "1.41")
+        build.load_mod(tmp_path, "1.42")
 
 
 def test_mod_for_other_os_refused(tmp_path):
-    (tmp_path / "patch.json").write_text(json.dumps({"name": "x", "os": "1.42", "patches": []}))
-    with pytest.raises(build.BuildError, match="OS 1.42"):
-        build.load_mod(tmp_path, "1.41")
+    (tmp_path / "patch.json").write_text(json.dumps({"name": "x", "os": "1.41", "patches": []}))
+    with pytest.raises(build.BuildError, match="OS 1.41"):
+        build.load_mod(tmp_path, "1.42")
 
 
-STOCK = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+STOCK = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 
 
 @pytest.mark.skipif(not STOCK.exists(), reason="firmware stock assente")
@@ -81,7 +81,7 @@ def test_build_mod_zero(tmp_path):
 def fake(root, name, requires=()):
     d = root / name
     d.mkdir()
-    (d / "patch.json").write_text(json.dumps({"name": name, "os": "1.41", "requires": list(requires), "patches": []}))
+    (d / "patch.json").write_text(json.dumps({"name": name, "os": "1.42", "requires": list(requires), "patches": []}))
     return d
 
 

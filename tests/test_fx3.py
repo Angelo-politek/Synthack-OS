@@ -31,10 +31,10 @@ import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
 MA = modarea_layout.RAM                                    # area mod (mods/modarea)
-MA_PAGE, MA_MAP = 0x444E_0000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E1334)
+MA_PAGE, MA_MAP = 0x444E_1000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E2334)
 assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 MODS = [ROOT / "mods" / m / "patch.json" for m in ("vparams", "fx3")]
 pytestmark = pytest.mark.skipif(not (SY.exists() and all(p.exists() for p in MODS)), reason="OS o patch assenti")
 
@@ -43,7 +43,7 @@ FRAME, TRK = 0x5000_4000, 0x5000_5000
 SRC_DIG, SRC_ANA, OUT_A, OUT_B = 0x8000_3D50, 0x8000_3950, 0x8000_DAD0, 0x8000_DFD0
 GET, SET, KIT = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
 IDS = {"TYPE": 246, "SPD": 247, "DEP": 248, "TIME": 250, "FDBK": 251, "WID": 252, "DSND": 249, "RSND": 253}
-DELAY, REVERB, DLY_IN = 0x4009_6890, 0x4009_6E3C, 0x8000_DBD0
+DELAY, REVERB, DLY_IN = 0x4009_6908, 0x4009_6EB4, 0x8000_DBD0
 
 
 def s32(v):
@@ -64,7 +64,7 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x41B9_0000, 0x2_0000)
+        uc.mem_map(0x41B9_1000, 0x2_0000)
         uc.mem_map(MA_PAGE, MA_MAP)
         uc.mem_map(0x5000_0000, 0x1_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
@@ -72,7 +72,7 @@ class Machine:
             for p in json.loads(f.read_text(encoding="utf-8"))["patches"]:
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
         uc.mem_write(RET, b"\x4e\x75")
-        uc.mem_write(0x444E_1334, struct.pack(">I", UI))
+        uc.mem_write(0x444E_2334, struct.pack(">I", UI))
         self.emac = UnicornEmac(uc, [int(a, 16) for a in self.spec["emac_sites"]])
 
     def call(self, fn, args=(), regs=None):
@@ -368,10 +368,10 @@ def test_mix_hook_replays_pushes(m):
 
 def test_page_slots_and_reverb_tab(m):
     m.call(m.sym["fx3_page_stub"])
-    assert m.longs(0x41B9_F81C, 9) == [246, 247, 248, 250, 251, 252, 249, 253, 0]
+    assert m.longs(0x41BA_081C, 9) == [246, 247, 248, 250, 251, 252, 249, 253, 0]
     m.call(m.sym["fx3_amp_stub"])                               # AMP 1: ... DEL REV SND3 VOL; AMP 2: PAN in E
-    assert m.longs(0x41B9_F624, 1) == [72] and m.longs(0x41B9_F650, 1) == [72]
-    assert m.longs(0x41B9_F674, 1) == [80] and m.longs(0x41B9_F6A0, 1) == [80]
+    assert m.longs(0x41BA_0624, 1) == [72] and m.longs(0x41BA_0650, 1) == [72]
+    assert m.longs(0x41BA_0674, 1) == [80] and m.longs(0x41BA_06A0, 1) == [80]
     assert m.longs(m.sym["fx3_reverb_pages"], 2) == [21, 25]
 
 
@@ -401,10 +401,10 @@ def test_texts(m, fn, v, text):
 
 
 def test_patched_bytes():
-    want = {0x4008_F3A0: "ae000900ae810900", 0x4008_FB04: "486efed848798000e0f0",
-            0x4019_4E2A: "42b941b9f83c", 0x4019_4A50: "42b941b9f6a0", 0x4003_588C: "7201",
-            0x4003_5890: "203c401c7fa8", 0x4019_49EA: "42b941b9f674", 0x4004_2CE0: "4fefffa048d77cfc",
-            0x4008_F828: "4eb940096890", 0x4004_1E84: "605c"}
+    want = {0x4008_F418: "ae000900ae810900", 0x4008_FB7C: "486efed848798000e0f0",
+            0x4019_4FEE: "42b941ba083c", 0x4019_4C14: "42b941ba06a0", 0x4003_588C: "7201",
+            0x4003_5890: "203c401c8248", 0x4019_4BAE: "42b941ba0674", 0x4004_2CE0: "4fefffa048d77cfc",
+            0x4008_F8A0: "4eb940096908", 0x4004_1E84: "605c"}
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig
@@ -427,16 +427,16 @@ def stub_calls(m, addr, nargs, fn, args):
 def test_send_graphics():
     spec = json.loads(MODS[1].read_text(encoding="utf-8"))
     fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
-    assert fixes[0x4018_F356] == "41b9dbd0" and fixes[0x4018_F372] == "41b9d5d0"   # DEL (249): come la mandata DEL
-    assert fixes[0x4018_B37A] == "41b9d730" and fixes[0x4018_B396] == "41b9d5d0"   # SND3 (72): icona MOD + barra
-    assert fixes[0x4018_F49C] == "41b9dba0"                                        # REV (253): come la mandata REV (79)
+    assert fixes[0x4018_F51A] == "41b9ebd0" and fixes[0x4018_F536] == "41b9e5d0"   # DEL (249): come la mandata DEL
+    assert fixes[0x4018_B53E] == "41b9e730" and fixes[0x4018_B55A] == "41b9e5d0"   # SND3 (72): icona MOD + barra
+    assert fixes[0x4018_F660] == "41b9eba0"                                        # REV (253): come la mandata REV (79)
 
 
 def test_type_drawn_as_text(m):
-    calls = stub_calls(m, 0x400F_8C18, 9, m.sym["fx3_type_gfx"], [0, 0, 0x5000_5000, 30, 40])
+    calls = stub_calls(m, 0x400F_8DDC, 9, m.sym["fx3_type_gfx"], [0, 0, 0x5000_5000, 30, 40])
     c = calls[0]
     text = lambda a: bytes(m.uc.mem_read(a, 8)).split(b"\0")[0].decode()
-    assert c[:6] == [0x5000_5000, 0x402A_91C0, 38, 45, 1, 0]
+    assert c[:6] == [0x5000_5000, 0x402A_9510, 38, 45, 1, 0]
     assert (text(c[6]), text(c[7]), text(c[8])) == ("XXXX", "%s", "CHOR")
 
 
@@ -478,11 +478,11 @@ def test_more_texts(m, fn, v, text):
 def test_object_fields_like_del():
     spec = json.loads(MODS[1].read_text(encoding="utf-8"))
     fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
-    for a in (0x4018_F234, 0x4018_F290, 0x4018_F2E2, 0x4018_F476):
+    for a in (0x4018_F3F8, 0x4018_F454, 0x4018_F4A6, 0x4018_F63A):
         assert fixes[a] == "2f03"                              # prototipo d3, come 250 (DEL)
-    for a in (0x4018_F23C, 0x4018_F292, 0x4018_F47E):
+    for a in (0x4018_F400, 0x4018_F456, 0x4018_F642):
         assert fixes[a][2:] == "00"                            # tipo 0
-    assert fixes[0x4018_F2EA] == "42b941ba4b84"
+    assert fixes[0x4018_F4AE] == "42b941ba5b84"
 
 
 def test_send_to_delay_adds_scaled_chorus(m):
@@ -759,15 +759,15 @@ def test_time_jumps_glide_and_reads_stay_in_the_line(m, t):
     assert line and min(line) >= (MA + 0xE000) and max(line) < (MA + 0xF000)
 
 
-LOOK = {0: [(0x41B9_D6B0, 0), (0x41B9_D730, 0), (0x41B9_D7D0, 0), (0x41B9_DCD0, 0x41B9_D5E0), (0x41B9_D740, 0x41B9_D660)],
-        1: [(0x41B9_D6B0, 0), (0x41B9_D7E0, 0), (0x41B9_D7D0, 0), (0x41B9_DC70, 0x41B9_D660), (0x41B9_D740, 0x41B9_D660)],
-        2: [(0x41B9_D6B0, 0), (0x41B9_D7E0, 0), (0x41B9_D760, 0x41B9_D660), (0x41B9_DC70, 0x41B9_D660),
-            (0x41B9_D740, 0x41B9_D660)],
-        3: [(0x41B9_D780, 0x41B9_D660), (0x41B9_D830, 0), (0x41B9_DCB0, 0x41B9_D670), (0, 0), (0, 0)]}
+LOOK = {0: [(0x41B9_E6B0, 0), (0x41B9_E730, 0), (0x41B9_E7D0, 0), (0x41B9_ECD0, 0x41B9_E5E0), (0x41B9_E740, 0x41B9_E660)],
+        1: [(0x41B9_E6B0, 0), (0x41B9_E7E0, 0), (0x41B9_E7D0, 0), (0x41B9_EC70, 0x41B9_E660), (0x41B9_E740, 0x41B9_E660)],
+        2: [(0x41B9_E6B0, 0), (0x41B9_E7E0, 0), (0x41B9_E760, 0x41B9_E660), (0x41B9_EC70, 0x41B9_E660),
+            (0x41B9_E740, 0x41B9_E660)],
+        3: [(0x41B9_E780, 0x41B9_E660), (0x41B9_E830, 0), (0x41B9_ECB0, 0x41B9_E670), (0, 0), (0, 0)]}
 
 
 def obj(i):
-    return 0x41B9_FA24 + 84 * i
+    return 0x41BA_0A24 + 84 * i
 
 
 @pytest.mark.parametrize("t", [0, 1, 2, 3, 0])
@@ -785,7 +785,7 @@ def test_icons_and_slots_follow_the_type(m, t):
         assert m.longs(obj(pid) + 36, 4) == ([0, 0, mgr, g + 3] if g else [0] * 4), (pid, hex(g))
         assert m.longs(obj(pid) + 68, 4) == ([0, 0, mgr, st + 3] if st else [0] * 4), pid
     want = [246, 247, 248, 250, 0, 0, 249, 253] if t == 3 else [246, 247, 248, 250, 251, 252, 249, 253]
-    assert m.longs(0x41B9_F81C, 8) == want                      # il crusher lascia vuote FDBK e WID
+    assert m.longs(0x41BA_081C, 8) == want                      # il crusher lascia vuote FDBK e WID
 
 
 def test_audio_interrupt_never_rewrites_the_ui(m):
@@ -802,11 +802,11 @@ def test_audio_interrupt_never_rewrites_the_ui(m):
     assert text(m, m.sym["fx3_n1_s"]) == "SPD"
     m.call(m.sym["fx3_fmt_spd"], [0, 0, 0x5000_3000])
     assert text(m, m.sym["fx3_n1_s"]) == "SRR"
-    assert m.longs(0x41B9_F81C + 16, 2) == [0, 0]
+    assert m.longs(0x41BA_081C + 16, 2) == [0, 0]
 
 
 # ----------------------------------------------------------------------------- kit nel file (FUNC+YES/NO)
-KSER, KDES = 0x400A_6D96, 0x400A_6D2E          # blocco della FX track: kit -> file, file -> kit
+KSER, KDES = 0x400A_6E0E, 0x400A_6DA6          # blocco della FX track: kit -> file, file -> kit
 FILE, KBLK, KIT2 = 0x5000_6000, 0x5000_6100, 0x5000_6200
 FX3_WORDS = (0, 0x1A, 0x38, 0x46)               # parole del kit usate da fx3
 LFO_DEST = (4, 12)                              # destinazioni degli LFO: indice convertito con la tabella
@@ -891,7 +891,7 @@ def test_input_snd3_through_vparams_in_kit_word_0x37(m):
 
 
 def in_hook(m, gl, gr, rev=0x1357):
-    """Come a 0x4008F4C4: in pila l'argomento della legge di bilanciamento, d1/a0 guadagni L/R."""
+    """Come a 0x4008F53C: in pila l'argomento della legge di bilanciamento, d1/a0 guadagni L/R."""
     m.uc.mem_write(A2 + 1812, struct.pack(">H", rev))
     sp = STACK - 8
     m.uc.mem_write(sp, struct.pack(">II", RET, 0xBA1A))
@@ -945,10 +945,10 @@ def test_bus_includes_the_input(m, on):
 
 
 def test_input_snd3_on_the_external_mixer_page(m):
-    m.uc.mem_write(0x41B9_F7F8, struct.pack(">I", 0))
+    m.uc.mem_write(0x41BA_07F8, struct.pack(">I", 0))
     m.uc.reg_write(UC_M68K_REG_D0, 0x1234)
     m.call(m.sym["fx3_in_page"])
-    assert struct.unpack(">I", m.uc.mem_read(0x41B9_F7F8, 4))[0] == IN_ID
+    assert struct.unpack(">I", m.uc.mem_read(0x41BA_07F8, 4))[0] == IN_ID
     assert m.uc.reg_read(UC_M68K_REG_D0) == 0x1234
 
 
@@ -971,7 +971,7 @@ def test_type_change_resets_the_effect_knobs(m):
 
 
 def test_send_to_reverb_into_its_input_bus(m):
-    """Prima del riverbero (0x4008F952) l'effetto del blocco precedente entra nel suo bus d'ingresso, come
+    """Prima del riverbero (0x4008F9CA) l'effetto del blocco precedente entra nel suo bus d'ingresso, come
     la mandata al delay; il riverbero parte con gli argomenti al loro posto."""
     settle(m, DEP=40, TIME=20, RSND=100)
     impulse(m)
@@ -1006,7 +1006,7 @@ def test_kit_file_from_v081_resets_the_old_vol_byte():
 
 # ----------------------------------------------------------------------------- ROUTING (FUNC+FX), tasto 13
 RT_KIT, RT_VIEW, RT_EVENT = 0x5000_6000, 0x5000_6800, 0x5000_6900
-IS_PRESS, REFRESH, RT_DONE = 0x400F_966C, 0x400F_FC5E, 0x4004_C80A
+IS_PRESS, REFRESH, RT_DONE = 0x400F_9830, 0x400F_FE22, 0x4004_C80A
 
 
 def route_kit(m, word):
@@ -1081,14 +1081,14 @@ def test_routing_other_entries_go_to_the_os(m):
 def test_routing_entry_13_drawn_as_fx3(m):
     """Come le tracce (0x4004C1F4): casella (x-4, base-12, x+8, base) e testo in x+2 sulla riga d7,
     con x = a2, base = d3 dalla riga del ciclo (51, poi 23)."""
-    m.uc.mem_write(0x400F_8A0C, bytes.fromhex("4e75"))
+    m.uc.mem_write(0x400F_8BD0, bytes.fromhex("4e75"))
     for base in (51, 23):
         regs = {UC_M68K_REG_D2: 0xC0, UC_M68K_REG_A2: 70, UC_M68K_REG_D3: base, UC_M68K_REG_D7: base - 8}
         args = [0xC0, 70, base - 6, 74, 1]                       # quello che spinge l'OS (ignorato)
-        box = stub_calls_regs(m, 0x400F_7BD6, 6, m.sym["fx3_rt_draw"], args, regs)
-        txt = stub_calls_regs(m, 0x400F_8A0C, 6, m.sym["fx3_rt_draw"], args, regs)
+        box = stub_calls_regs(m, 0x400F_7D9A, 6, m.sym["fx3_rt_draw"], args, regs)
+        txt = stub_calls_regs(m, 0x400F_8BD0, 6, m.sym["fx3_rt_draw"], args, regs)
         assert box == [[0xC0, 66, base - 12, 78, base, 1]]
-        assert txt[0][:5] == [0xC0, 0x443D_A218, 72, base - 8, 2]
+        assert txt[0][:5] == [0xC0, 0x443D_B218, 72, base - 8, 2]
         assert text(m, txt[0][5]).startswith("FX3")
 
 

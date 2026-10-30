@@ -4,7 +4,7 @@ This file is the canonical list of rules. The step-by-step guide is
 [web-builder/content/modders.md](web-builder/content/modders.md); submitting is described in
 [web-builder/content/create-mod.md](web-builder/content/create-mod.md).
 
-**Supported OS:** Syntakt OS 1.41 today; OS 1.42 from v1.0 (port in progress, new work can target it).
+**Supported OS:** Syntakt OS 1.42. Port a 1.41 mod with `python tools/build/port_source.py 1.42 mods/<name> tests/test_<name>.py` (then rerun `make_patch.py` and the tests); the technical notes in `docs/` use 1.41 addresses, converted by `tools/build/osmap.py`.
 
 ## Setup
 

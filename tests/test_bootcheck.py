@@ -12,22 +12,22 @@ import bootcheck  # noqa: E402
 import build  # noqa: E402
 import eft  # noqa: E402
 
-STOCK = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+STOCK = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 pytestmark = pytest.mark.skipif(not STOCK.exists(), reason="firmware stock assente")
 
 
 def test_stock_margin_and_size(tmp_path):
     size, margin = bootcheck.check(STOCK)
     assert size == len(eft.unpack(STOCK, tmp_path / "u", ids=[3])[3].read_bytes())
-    assert margin == 99938
+    assert margin == 96356                                # OS 1.42 stock (1.41: 99 938)
 
 
 def test_build_refuses_image_that_would_not_boot(tmp_path):
-    """Come la v0.4.93 (provata: resta sul logo): sezione 3 allungata a zeri fino a 0x40350000."""
+    """Come la v0.4.93 (provata: resta sul logo): sezione 3 allungata a zeri fino a 0x40351000."""
     pad = tmp_path / "pad"
     pad.mkdir()
-    (pad / "patch.json").write_text(json.dumps({"name": "pad", "os": "1.41", "patches": [
-        {"section": 3, "addr": "0x4034FFF0", "len": 16, "append": True, "hex": "00" * 16}]}))
+    (pad / "patch.json").write_text(json.dumps({"name": "pad", "os": "1.42", "patches": [
+        {"section": 3, "addr": "0x40350FF0", "len": 16, "append": True, "hex": "00" * 16}]}))
     out = tmp_path / "o.syx"
     with pytest.raises(build.BuildError, match="margine"):
         build.build(STOCK, [pad], out, log=lambda *_: None)

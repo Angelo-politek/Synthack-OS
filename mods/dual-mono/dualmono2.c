@@ -10,7 +10,7 @@
  * Il tab MIXER ha il vettore delle pagine {22, 23, 24, 27}: la sua lunghezza (+0x80 della vista) e' 4 in
  * mono e 3 in stereo, aggiornata alla costruzione della vista e quando cambia l'impostazione.
  *
- * Audio: il blocco originale delle mandate dell'ingresso (0x4008F478..0x4008F5F2) gira due volte, come
+ * Audio: il blocco originale delle mandate dell'ingresso (0x4008F4F0..0x4008F66A) gira due volte, come
  * il blocco dei VCA nella v1: passata 1 con IN L, bilanciamento al centro e DEL/REV di IN L (si tiene
  * il canale 12, ADC 4); passata 2 con IN R, centro e DEL/REV del lato R (si tiene il canale 13, ADC 5).
  * Stessa legge di volume dell'OS per entrambi; in stereo il blocco gira una volta, invariato.
@@ -23,7 +23,7 @@ typedef unsigned short u16;
 #define DATA __attribute__((section(".data")))
 #define MONO()    (*(const volatile unsigned char *)0x80003146u == 0)   /* EXTERNAL IN: 0 = mono */
 #define KIT       (*(char *const volatile *)0x800030B8u)                /* kit attivo */
-#define UI_ROOT   (*(char *const volatile *)0x444E1334u)
+#define UI_ROOT   (*(char *const volatile *)0x444E2334u)
 #define PAGE_R    27
 #define V_BEGIN   0x7C                                                  /* ParameterPageView: pagine */
 #define V_END     0x80
@@ -74,8 +74,8 @@ u32 dm_page_r(void)                                                     /* pagin
 
 /* External Mixer (pagina 24): in mono FX3 in G accanto a DEL e REV (BAL non serve), in stereo in C con
  * BAL in G come prima. dm_fx3 = casella C all'avvio (269 con fx3, 0 senza), letta da dm_page_stub. */
-#define MIX_C     (*(volatile s32 *)0x41B9F7F8u)
-#define MIX_G     (*(volatile s32 *)0x41B9F808u)
+#define MIX_C     (*(volatile s32 *)0x41BA07F8u)
+#define MIX_G     (*(volatile s32 *)0x41BA0808u)
 #define ID_BAL    128
 s32 dm_fx3 DATA = -1;
 
@@ -142,7 +142,7 @@ const char dm_page_l[] = "External In R";
 __asm__(
     "        .text\n"
     "        .balign 2\n"
-    /* ---- 0x4008F478: inizio del blocco delle mandate dell'ingresso (a2 = array del mixer) */
+    /* ---- 0x4008F4F0: inizio del blocco delle mandate dell'ingresso (a2 = array del mixer) */
     "        .globl  dm_pre\n"
     "dm_pre:\n"
     "        tst.b   dm_side\n"
@@ -160,7 +160,7 @@ __asm__(
     "        move.b  %d0,dm_side\n"
     "1:      tst.b   0x80003146\n"              /* istruzione sostituita (seq d6 la segue) */
     "        rts\n"
-    /* ---- 0x4008F5F2: fine del blocco */
+    /* ---- 0x4008F66A: fine del blocco */
     "        .globl  dm_mid\n"
     "dm_mid:\n"
     "        moveq   #0,%d0\n"
@@ -181,7 +181,7 @@ __asm__(
     "        moveq   #2,%d0\n"
     "        move.b  %d0,dm_side\n"
     "        addq.l  #4,%sp\n"                  /* niente ritorno: si rigira il blocco */
-    "        jmp     0x4008F478\n"
+    "        jmp     0x4008F4F0\n"
     "2:      move.l  %a0,-(%sp)\n"              /* passata 2: canale 13 dalla passata, canale 12 */
     "        lea     dm_fp,%a0\n"               /* dalla prima; parametri originali ripristinati */
     "        move.l  (%a0)+,-408(%fp)\n"
@@ -223,7 +223,7 @@ __asm__(
     "        move.l  4(%sp),%d0\n"
     "        move.l  %d0,dm_view\n"
     "        jmp     dm_update\n"
-    /* ---- 0x400A3404: impostazione EXTERNAL IN copiata al motore */
+    /* ---- 0x400A347C: impostazione EXTERNAL IN copiata al motore */
     "        .globl  dm_flag_hook\n"
     "dm_flag_hook:\n"
     "        move.b  %d0,0x80003146\n"          /* istruzione sostituita */
@@ -233,21 +233,21 @@ __asm__(
     "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
     "        lea     16(%sp),%sp\n"
     "        rts\n"
-    /* ---- 0x40194F1A: pagina 27 all'avvio (al posto di clr.l 0x41B9F894) */
+    /* ---- 0x401950DE: pagina 27 all'avvio (al posto di clr.l 0x41BA0894) */
     "        .globl  dm_page_stub\n"
     "dm_page_stub:\n"
     "        moveq   #125,%d0\n"                /* A: IN R (alias 125 = BAL) */
-    "        move.l  %d0,0x41B9F874\n"
-    "        clr.l   0x41B9F878\n"
-    "        clr.l   0x41B9F87C\n"
-    "        clr.l   0x41B9F880\n"
+    "        move.l  %d0,0x41BA0874\n"
+    "        clr.l   0x41BA0878\n"
+    "        clr.l   0x41BA087C\n"
+    "        clr.l   0x41BA0880\n"
     "        move.l  #129,%d0\n"                /* E: DEL, F: REV */
-    "        move.l  %d0,0x41B9F884\n"
+    "        move.l  %d0,0x41BA0884\n"
     "        move.l  #130,%d0\n"
-    "        move.l  %d0,0x41B9F888\n"
-    "        move.l  0x41B9F7F8,%d0\n"          /* G: FX3 accanto al riverbero, come la casella C */
-    "        move.l  %d0,0x41B9F88C\n"          /* della pagina IN L (269 con fx3, altrimenti vuota) */
+    "        move.l  %d0,0x41BA0888\n"
+    "        move.l  0x41BA07F8,%d0\n"          /* G: FX3 accanto al riverbero, come la casella C */
+    "        move.l  %d0,0x41BA088C\n"          /* della pagina IN L (269 con fx3, altrimenti vuota) */
     "        move.l  %d0,dm_fx3\n"
-    "        clr.l   0x41B9F890\n"
-    "        clr.l   0x41B9F894\n"
+    "        clr.l   0x41BA0890\n"
+    "        clr.l   0x41BA0894\n"
     "        rts\n");

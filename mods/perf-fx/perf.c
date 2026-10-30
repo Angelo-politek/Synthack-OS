@@ -4,9 +4,9 @@
  * sul sequencer invece del Mod A dell'OS. Ogni tasto ha il suo effetto, scelto nella pagina di
  * impostazione di Mod A (M1..M4) e salvato dall'OS con il kit, come gli altri modificatori.
  *
- * Il gestore del tick del sequencer (0x4008C924) fa avanzare per ogni traccia t (0..12) l'indice di step
- * 0x43BD73FC + t, con ritorno a capo sulla lunghezza. Alla fine dell'iterazione di ogni traccia
- * (0x4008D152) pf_step_hook chiama pf_step: con un effetto attivo lo step viene riportato nel segmento di
+ * Il gestore del tick del sequencer (0x4008C99C) fa avanzare per ogni traccia t (0..12) l'indice di step
+ * 0x43BD83FC + t, con ritorno a capo sulla lunghezza. Alla fine dell'iterazione di ogni traccia
+ * (0x4008D1CA) pf_step_hook chiama pf_step: con un effetto attivo lo step viene riportato nel segmento di
  * L step allineato alla griglia e si tiene la posizione "reale", ripresa al rilascio (in tempo).
  * Si suonano step (note e p-lock), quindi l'effetto vale su tutte le tracce, anche le analogiche.
  * - RPT: ripete il segmento che contiene lo step appena suonato (1/16 .. 1 battuta);
@@ -20,7 +20,7 @@
  *
  * Retrig quantizzato (QNT, casella D della pagina Retrig; id 47 = DEST di Mod A, che perf-fx non usa):
  * in modo Retrig, a sequencer in moto, la nota con retrig dei tasti (FUN_4002E18C) parte allo step
- * successivo della sua traccia. Il tick (interrupt) manda alla coda dell'interfaccia (0x405D3A7C) un
+ * successivo della sua traccia. Il tick (interrupt) manda alla coda dell'interfaccia (0x405D4A7C) un
  * messaggio 6 (std::function eseguita dal ciclo dell'interfaccia) che chiama FUN_4002E18C; se il tasto
  * e' gia' stato rilasciato, il rilascio e' trattenuto e rimandato (messaggio 0, evento del tasto) allo
  * step dopo: il retrig dura almeno uno step.
@@ -43,8 +43,8 @@ typedef int s32;
 #define VIEW_PROJ 0x94                                      /* KeyboardView: progetto */
 #define MOD_MODE  ((s32 (*)(void *))0x40015AF6u)            /* modificatore attivo */
 #define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...)) \
-                   0x400F8C18u)                             /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
-#define FONT      ((const void *)0x402A91C0u)               /* 4x6 */
+                   0x400F8DDCu)                             /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
+#define FONT      ((const void *)0x402A9510u)               /* 4x6 */
 #define RETRIG    0
 #define QNT_ID    47                                        /* DEST di Mod A: QNT nella pagina Retrig */
 #define MODEL     ((u32 (*)(void *))0x400186E8u)            /* (progetto) -> modello dei parametri del kit */
@@ -53,9 +53,9 @@ typedef int s32;
 #define KB_MODE   ((s32 (*)(void *))0x4002DD86u)            /* tastiera cromatica (byte) */
 #define ACTIVE    ((u32 (*)(void *))0x4001FFA4u)            /* traccia attiva */
 #define VIEW_TRK  0xA0
-#define RUNNING   ((s32 (*)(void))0x4008B7C0u)              /* sequencer in moto */
+#define RUNNING   ((s32 (*)(void))0x4008B838u)              /* sequencer in moto */
 #define POST      ((void (*)(void *, void *))0x40001C0Eu)   /* (coda, messaggio): anche da interrupt */
-#define UI_QUEUE  ((void *)0x405D3A7Cu)
+#define UI_QUEUE  ((void *)0x405D4A7Cu)
 
 #define DATA __attribute__((section(".data")))
 
@@ -315,10 +315,10 @@ s32 pf_ev(void *root, const unsigned char *ev)   /* ogni evento di tasto: rilasc
 }
 
 /* testo del valore; fuori scala (kit da versioni precedenti) il default del tasto, come suona.
- * fn = std::function dentro l'oggetto del parametro (84 B, 0x41B9FA24 + 84 * id) */
+ * fn = std::function dentro l'oggetto del parametro (84 B, 0x41BA0A24 + 84 * id) */
 static const char *text(const void *fn, u32 off, s32 value)
 {
-    u32 k = ((u32)fn - (0x41B9FA24u + 84u * 48u + off)) / 84u;
+    u32 k = ((u32)fn - (0x41BA0A24u + 84u * 48u + off)) / 84u;
 
     value = (value + 0x80) >> 8;
     if (value < 0 || value >= NFX)
@@ -387,7 +387,7 @@ const char pf_name4_l[] = "Perf FX 4";
 /* trampolini */
 __asm__(
     "        .globl  pf_step_hook\n"
-    "pf_step_hook:\n"                           /* fine dell'iterazione di una traccia (0x4008D152) */
+    "pf_step_hook:\n"                           /* fine dell'iterazione di una traccia (0x4008D1CA) */
     "        lea     -16(%sp),%sp\n"
     "        movem.l %d0-%d1/%a0-%a1,(%sp)\n"
     "        move.l  %a3,-(%sp)\n"              /* dati della traccia */
@@ -445,17 +445,17 @@ __asm__(
     "        moveq   #11,%d0\n"
     "        jmp     0x4002E192\n"
     "        .globl  qr_page_stub\n"
-    "qr_page_stub:\n"                           /* al posto di clr.l 0x41B9F988 (pagina Retrig): */
+    "qr_page_stub:\n"                           /* al posto di clr.l 0x41BA0988 (pagina Retrig): */
     "        moveq   #47,%d0\n"                      /* casella D = QNT, oggetto 47 di tipo 0 */
-    "        move.l  %d0,0x41B9F988\n"
-    "        clr.l   0x41BA0990\n"
+    "        move.l  %d0,0x41BA0988\n"
+    "        clr.l   0x41BA1990\n"
     "        rts\n"
     "        .globl  pf_page_stub\n"
-    "pf_page_stub:\n"                           /* al posto di clr.l 0x41B9F9DC (pagina Mod A, all'avvio): */
-    "        clr.l   0x41B9F9DC\n"              /* casella D (DEST) vuota, restano M1..M4; oggetti 48..51 */
-    "        clr.l   0x41B9F9E0\n"              /* con tipo 0 (valore discreto, come LFO MODE) */
-    "        clr.l   0x41BA09E4\n"
-    "        clr.l   0x41BA0A38\n"
-    "        clr.l   0x41BA0A8C\n"
-    "        clr.l   0x41BA0AE0\n"
+    "pf_page_stub:\n"                           /* al posto di clr.l 0x41BA09DC (pagina Mod A, all'avvio): */
+    "        clr.l   0x41BA09DC\n"              /* casella D (DEST) vuota, restano M1..M4; oggetti 48..51 */
+    "        clr.l   0x41BA09E0\n"              /* con tipo 0 (valore discreto, come LFO MODE) */
+    "        clr.l   0x41BA19E4\n"
+    "        clr.l   0x41BA1A38\n"
+    "        clr.l   0x41BA1A8C\n"
+    "        clr.l   0x41BA1AE0\n"
     "        rts\n");

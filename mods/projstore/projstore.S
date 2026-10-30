@@ -1,7 +1,7 @@
 | projstore — memoria delle mod salvata con il progetto (Syntakt OS 1.41)
 |
-| Le impostazioni del progetto passano nel file da 0x400A90BC (scrittura: RAM -> blocco di 1024 byte) e
-| 0x400A8478 (lettura, solo blocchi di versione 4). La scrittura azzera i byte +0x227..+0x3FF del blocco e
+| Le impostazioni del progetto passano nel file da 0x400A9134 (scrittura: RAM -> blocco di 1024 byte) e
+| 0x400A84F0 (lettura, solo blocchi di versione 4). La scrittura azzera i byte +0x227..+0x3FF del blocco e
 | la lettura non li guarda: qui ci vanno PS_SIZE byte delle mod, dopo il marcatore "SH" e la versione.
 | In RAM stanno a ps_data (area mod): ogni mod usa la sua parte (tools/build/projstore_layout.py).
 | Progetto senza marcatore (OS stock o versioni precedenti): ps_data a zero = valori di default.
@@ -10,12 +10,12 @@
 
         .equ    OFF,            0x228           | primo byte pari dell'area riservata
         .equ    VER,            1
-        .equ    WR_BACK,        0x400A90C4      | dopo le istruzioni sostituite
-        .equ    RD_BACK,        0x400A8480
+        .equ    WR_BACK,        0x400A913C      | dopo le istruzioni sostituite
+        .equ    RD_BACK,        0x400A84F8
 
         .text
         .globl  ps_wr
-ps_wr:                                          | al posto di 0x400A90BC (file, impostazioni, x)
+ps_wr:                                          | al posto di 0x400A9134 (file, impostazioni, x)
         move.l  12(%sp),-(%sp)
         move.l  12(%sp),-(%sp)
         move.l  12(%sp),-(%sp)
@@ -45,7 +45,7 @@ ps_wr:                                          | al posto di 0x400A90BC (file, 
         jmp     WR_BACK
 
         .globl  ps_rd
-ps_rd:                                          | al posto di 0x400A8478 (impostazioni, file)
+ps_rd:                                          | al posto di 0x400A84F0 (impostazioni, file)
         move.l  8(%sp),-(%sp)
         move.l  8(%sp),-(%sp)
         bsr.s   1f

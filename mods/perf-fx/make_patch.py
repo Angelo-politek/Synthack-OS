@@ -1,7 +1,7 @@
 """Mod perf-fx: costruisce patch.json da perf.c.
 
 - compila perf.c per ColdFire e lo collega nell'area mod a +0x4000;
-- aggancia l'avanzamento degli step del sequencer (0x4008D152), i tasti 13-16 di KeyboardView
+- aggancia l'avanzamento degli step del sequencer (0x4008D1CA), i tasti 13-16 di KeyboardView
   (0x4002EA92) e il dispatcher degli eventi (0x4000B420);
 - pagina di impostazione di Mod A: M1..M4 (id 48..51) scelgono l'effetto di ogni tasto (testo, valore
   discreto); TRIG e DEST tolti dalla pagina; nomi "Perf FX".
@@ -34,24 +34,24 @@ MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
 CODE_BASE, CODE_END = MODAREA_RAM + 0x4000, MODAREA_RAM + 0x5000
 TOOLS = "~/tools/m68k/root"
 CFLAGS = "-mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
-DESC = 0x4022_D59C                      # descrittori dei parametri: 52 B, indice = id
-STEP_HOOK, STEP_ORIG = 0x4008_D152, "5283528e528d"      # addq d3 ; addq a6 ; addq a5
+DESC = 0x4022_D83C                      # descrittori dei parametri: 52 B, indice = id
+STEP_HOOK, STEP_ORIG = 0x4008_D1CA, "5283528e528d"      # addq d3 ; addq a6 ; addq a5
 KBD_HOOK, KBD_ORIG = 0x4002_EA92, "7223b2806c00010e"    # moveq #35,d1 ; cmp.l d0,d1 ; bge.w 0x4002EBA6
 EV_HOOK, EV_ORIG = 0x4000_B420, "4eb94000839e"          # jsr 0x4000839e (dispatcher degli eventi)
-PAGE_HOOK, PAGE_ORIG = 0x4019_5294, "42b941b9f9dc"      # clr.l 0x41B9F9DC (pagina Mod A)
+PAGE_HOOK, PAGE_ORIG = 0x4019_5458, "42b941ba09dc"      # clr.l 0x41BA09DC (pagina Mod A)
 QR_HOOK, QR_ORIG = 0x4002_E18C, "4e56ff68700b"            # link.w fp,#-152 ; moveq #11,d0
-QR_PAGE, QR_PAGE_ORIG = 0x4019_51C0, "42b941b9f988"      # clr.l 0x41B9F988 (pagina Retrig, casella D)
+QR_PAGE, QR_PAGE_ORIG = 0x4019_5384, "42b941ba0988"      # clr.l 0x41BA0988 (pagina Retrig, casella D)
 QNT_ID = 47
 DEST_MENU = (0x4004_7D7A, "722f", "72fe")              # moveq #47,d1: id sotto l'encoder = DEST di Mod A -> menu
-QNT_OBJ = (0x4018_AB96, 0x4018_ABB6, 0x4018_ABC8)          # push del prototipo, +20, +36 dell'oggetto 47
-NAMES = [(0x4019_5202, "4024f87b", "pf_page_s", "pagina Mod A: nome breve 'PERF'"),
-         (0x4019_5236, "40251b59", "pf_page_l", "pagina Mod A: nome lungo 'Perf FX'"),
-         (0x4004_0B68, "4024e83b", "pf_on", "FUNC+15: messaggio 'Perf FX ON'")]
+QNT_OBJ = (0x4018_AD5A, 0x4018_AD7A, 0x4018_AD8C)          # push del prototipo, +20, +36 dell'oggetto 47
+NAMES = [(0x4019_53C6, "4024fb9b", "pf_page_s", "pagina Mod A: nome breve 'PERF'"),
+         (0x4019_53FA, "40251e79", "pf_page_l", "pagina Mod A: nome lungo 'Perf FX'"),
+         (0x4004_0B68, "4024eb5b", "pf_on", "FUNC+15: messaggio 'Perf FX ON'")]
 NFX, DEFAULTS = 12, (1, 2, 8, 11)       # effetti (perf.c); M1..M4 di default: 1/16 1/8 R1/4 HALF
 # oggetti dei parametri 48..51 (M1..M4 di Mod A) nell'inizializzatore: (push del prototipo +4,
 # operando della std::function +20, operando della grafica +36)
-OBJ_SITES = {48: (0x4018_ABD8, 0x4018_ABF8, 0x4018_AC06), 49: (0x4018_AC1A, 0x4018_AC3A, 0x4018_AC48),
-             50: (0x4018_AC58, 0x4018_AC7C, 0x4018_AC8A), 51: (0x4018_AC9A, 0x4018_ACBA, 0x4018_ACCC)}
+OBJ_SITES = {48: (0x4018_AD9C, 0x4018_ADBC, 0x4018_ADCA), 49: (0x4018_ADDE, 0x4018_ADFE, 0x4018_AE0C),
+             50: (0x4018_AE1C, 0x4018_AE40, 0x4018_AE4E), 51: (0x4018_AE5E, 0x4018_AE7E, 0x4018_AE90)}
 
 
 def sha(b: bytes) -> str:
@@ -95,7 +95,7 @@ def build_blob() -> tuple[bytes, dict[str, int], str]:
 
 
 def main() -> None:
-    stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
+    stock = REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     blob, syms, dis = build_blob()
     if CODE_BASE + len(blob) > CODE_END:
@@ -128,8 +128,8 @@ def main() -> None:
         fixed(DEST_MENU[0], bytes.fromhex(DEST_MENU[2]),
               "encoder sull'id 47: niente menu delle destinazioni (moveq #-2), Mod B (53) invariato", DEST_MENU[1]),
         fixed(QNT_OBJ[0], bytes.fromhex("2f03"), "id 47 +4: prototipo discreto (come 48..51)", "2f04"),
-        fixed(QNT_OBJ[1], long(syms["qr_proto"]), "id 47 +20: testo OFF/ON", "41b9dfd0"),
-        fixed(QNT_OBJ[2], long(syms["qr_gfx_proto"]), "id 47 +36: casella a testo", "41b9daa0"),
+        fixed(QNT_OBJ[1], long(syms["qr_proto"]), "id 47 +20: testo OFF/ON", "41b9efd0"),
+        fixed(QNT_OBJ[2], long(syms["qr_gfx_proto"]), "id 47 +36: casella a testo", "41b9eaa0"),
         fixed(DESC + 52 * QNT_ID + 8, struct.pack(">III", 0, 1 << 8, 0), "id 47 -> QNT: min 0, max 1, default 0"),
         fixed(DESC + 52 * QNT_ID + 40, long(syms["qr_name_l"]), "id 47: nome lungo 'Quantize'"),
         fixed(DESC + 52 * QNT_ID + 48, long(syms["qr_name_s"]), "id 47: nome breve 'QNT'"),
@@ -140,14 +140,14 @@ def main() -> None:
         r = DESC + 52 * pid
         patches += [
             fixed(proto, bytes.fromhex("2f03"), f"id {pid} +4: prototipo discreto (come 93)", "2f02"),
-            fixed(g20, long(syms["pf_proto"]), f"id {pid} +20: testo dell'effetto", "41b9dfd0"),
-            fixed(g36, long(syms["pf_gfx_proto"]), f"id {pid} +36: casella a testo", "41b9dcd0"),
+            fixed(g20, long(syms["pf_proto"]), f"id {pid} +20: testo dell'effetto", "41b9efd0"),
+            fixed(g36, long(syms["pf_gfx_proto"]), f"id {pid} +36: casella a testo", "41b9ecd0"),
             fixed(r + 8, struct.pack(">III", 0, (NFX - 1) << 8, DEFAULTS[n] << 8),
                   f"id {pid}: min 0, max {NFX - 1}, default {DEFAULTS[n]}"),
             fixed(r + 40, long(syms[f"pf_name{n + 1}_l"]), f"id {pid}: nome lungo 'Perf FX {n + 1}'"),
         ]
     spec = {
-        "name": "perf-fx", "os": "1.41", "requires": ["modarea"],
+        "name": "perf-fx", "os": "1.42", "requires": ["modarea"],
         "description": "Effetti di performance sul sequencer: con il modificatore Mod A (FUNC+15) i tasti 13-16 "
                        "suonano ripetizione, ripetizione all'indietro o mezza velocita' su tutte le tracce, a "
                        "tempo; l'effetto di ogni tasto si sceglie in M1..M4 della pagina Mod A (salvati con il kit). "

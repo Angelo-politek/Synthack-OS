@@ -24,8 +24,8 @@ LOAD = 0x4000_0400
 OFFSET = 0x7200                         # nell'area mod, dopo projstore
 CODE_BASE = modarea_layout.RAM + OFFSET
 CODE_END = modarea_layout.RAM + 0x7400
-HOOKS = [(0x400A_6E6E, "2f0b2f0a246f000c", "ks_wr", "blocco per traccia del kit -> file: jmp ks_wr ; nop"),
-         (0x400A_6E02, "4feffff448d71c00", "ks_rd", "file -> blocco per traccia del kit: jmp ks_rd ; nop")]
+HOOKS = [(0x400A_6EE6, "2f0b2f0a246f000c", "ks_wr", "blocco per traccia del kit -> file: jmp ks_wr ; nop"),
+         (0x400A_6E7A, "4feffff448d71c00", "ks_rd", "file -> blocco per traccia del kit: jmp ks_rd ; nop")]
 WSL_BINUTILS = "~/tools/m68k/root"
 
 
@@ -41,7 +41,7 @@ def wsl(cmd: str) -> str:
 
 
 def main() -> None:
-    stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
+    stock = REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     with tempfile.TemporaryDirectory(prefix="kitstore-") as tmp:
         tmp = Path(tmp)
@@ -68,7 +68,7 @@ def main() -> None:
         patches.append({"section": 3, "addr": f"{addr:#010X}", "len": 8, "expect_sha256": sha(old),
                         "hex": struct.pack(">HIH", 0x4EF9, syms[sym], 0x4E71).hex(), "what": what})
     spec = {
-        "name": "kitstore", "os": "1.41", "requires": ["modarea"],
+        "name": "kitstore", "os": "1.42", "requires": ["modarea"],
         "description": "Parole delle mod salvate con il kit: parole 41..43 dei 12 blocchi per traccia (dati MIDI "
                        "della Digitakt), nei byte riservati +150..+155 del blocco nel file.",
         "generated_by": "mods/kitstore/make_patch.py",

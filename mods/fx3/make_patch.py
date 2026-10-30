@@ -1,8 +1,8 @@
 """Mod fx3: costruisce patch.json da fx3.c (terza mandata effetti: chorus, flanger, phaser, crusher).
 
 - compila fx3.c per ColdFire e lo collega nell'area mod a +0xA000 (tabelle generate qui);
-- aggancia la funzione di mix a blocchi: ciclo per traccia (0x4008F3A0), delay (0x4008F828: mandata
-  del chorus verso il delay), somme del master (0x4008FB04: bus 3, chorus a 24 kHz e ritorno);
+- aggancia la funzione di mix a blocchi: ciclo per traccia (0x4008F418), delay (0x4008F8A0: mandata
+  del chorus verso il delay), somme del master (0x4008FB7C: bus 3, chorus a 24 kHz e ritorno);
 - SND3 = id 72 (nascosto, salvato per traccia) nella pagina AMP 1 accanto a DEL e REV (PAN in pagina 2);
 - pagina FX3 = pagina 25 dell'OS ("OB8", inutilizzata) come seconda pagina del tab REVERB, con gli id
   nascosti delle tracce MIDI 246..253 tramite vparams; valori salvati nel kit del pattern.
@@ -39,70 +39,70 @@ CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # retroazione
 TOOLS = "~/tools/m68k/root"
 CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x}u -DDM_HDR={DL.HDR:#x}u -DKS_FX3_R={DL.FX3_R:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
 FS = 24000                              # il chorus lavora a 24 kHz
-DESC = 0x4022_D59C
-P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_DFD0, 0x41B9_DCD0, 0x41B9_DBD0, 0x41B9_D5D0
-G_REV = 0x41B9_DBA0                     # icona della mandata al riverbero delle tracce (id 79)
+DESC = 0x4022_D83C
+P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_EFD0, 0x41B9_ECD0, 0x41B9_EBD0, 0x41B9_E5D0
+G_REV = 0x41B9_EBA0                     # icona della mandata al riverbero delle tracce (id 79)
 VP_SLOT = 9                             # posti 9..15 della tabella di vparams
 
 HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
-    (0x4008_F3A0, "ae000900ae810900", "fx3_trk_hook", "ciclo per traccia: jsr fx3_trk_hook ; nop"),
-    (0x4008_F828, "4eb940096890", "fx3_del_hook", "delay: jsr fx3_del_hook (mandata del chorus al delay)"),
-    (0x4008_F952, "4eb940096e3c", "fx3_rev_hook", "riverbero: jsr fx3_rev_hook (mandata dell'effetto al riverbero)"),
-    (0x4008_FB04, "486efed848798000e0f0", "fx3_mix_hook",
+    (0x4008_F418, "ae000900ae810900", "fx3_trk_hook", "ciclo per traccia: jsr fx3_trk_hook ; nop"),
+    (0x4008_F8A0, "4eb940096908", "fx3_del_hook", "delay: jsr fx3_del_hook (mandata del chorus al delay)"),
+    (0x4008_F9CA, "4eb940096eb4", "fx3_rev_hook", "riverbero: jsr fx3_rev_hook (mandata dell'effetto al riverbero)"),
+    (0x4008_FB7C, "486efed848798000e0f0", "fx3_mix_hook",
      "somme del master: jsr fx3_mix_hook (bus 3, chorus, ritorno) ; nop ; nop"),
-    (0x4019_4E2A, "42b941b9f83c", "fx3_page_stub", "pagina 25 (FX3): caselle all'avvio"),
-    (0x4019_4A50, "42b941b9f6a0", "fx3_amp_stub", "pagine AMP: SND3 (72) in G della pagina 1, PAN (80) in E della pagina 2"),
-    (0x4008_F4C4, "588f342a0714", "fx3_in_hook", "mandate dell'ingresso: jsr fx3_in_hook (SND3 dell'ingresso)"),
-    (0x4019_4DC4, "42b941b9f7f8", "fx3_in_page", "pagina External Mixer: SND3 dell'ingresso (269) nella casella C"),
+    (0x4019_4FEE, "42b941ba083c", "fx3_page_stub", "pagina 25 (FX3): caselle all'avvio"),
+    (0x4019_4C14, "42b941ba06a0", "fx3_amp_stub", "pagine AMP: SND3 (72) in G della pagina 1, PAN (80) in E della pagina 2"),
+    (0x4008_F53C, "588f342a0714", "fx3_in_hook", "mandate dell'ingresso: jsr fx3_in_hook (SND3 dell'ingresso)"),
+    (0x4019_4F88, "42b941ba07f8", "fx3_in_page", "pagina External Mixer: SND3 dell'ingresso (269) nella casella C"),
 ]
 # tab REVERB: vettore delle pagine {21} -> {21, 25}; nomi della pagina 25
 REVERB_COUNT, REVERB_ARRAY = 0x4003_588C, 0x4003_5892
-PAGE_NAMES = [(0x4019_4D96, "4024e947", "fx3_page_s", "pagina 25: nome breve"),
-              (0x4019_4DDC, "40251b03", "fx3_page_l", "pagina 25: nome lungo")]
-NO_STYLE = 0x41B9_FA68                 # +68 dell'id 0: std::function vuota (nessuno stile, come LFO MODE)
+PAGE_NAMES = [(0x4019_4F5A, "4024ec67", "fx3_page_s", "pagina 25: nome breve"),
+              (0x4019_4FA0, "40251e23", "fx3_page_l", "pagina 25: nome lungo")]
+NO_STYLE = 0x41BA_0A68                 # +68 dell'id 0: std::function vuota (nessuno stile, come LFO MODE)
 DRAW_HOOK, DRAW_ORIG = 0x4004_2CE0, "4fefffa048d77cfc"  # disegno dei tab DELAY/REVERB (caselle 5-6 = filtro)
 # blocco della FX track del kit nel file: scrittura e lettura (le parole 0, 0x1A e 0x46 si perdevano)
-KIT_HOOKS = [(0x400A_6D96, "2f0b2f0a246f000c", "fx3_kser_hook", "kit -> file (FX track): jmp fx3_kser_hook ; nop"),
-             (0x400A_6D2E, "4feffff448d71c00", "fx3_kdes_hook", "file -> kit (FX track): jmp fx3_kdes_hook ; nop")]
+KIT_HOOKS = [(0x400A_6E0E, "2f0b2f0a246f000c", "fx3_kser_hook", "kit -> file (FX track): jmp fx3_kser_hook ; nop"),
+             (0x400A_6DA6, "4feffff448d71c00", "fx3_kdes_hook", "file -> kit (FX track): jmp fx3_kdes_hook ; nop")]
 # classe del tab AMP: gli id sotto 73 (diversi da 73-74) erano trattati come parti dell'inviluppo, senza
 # grafica propria; con bra -> "casella normale" SND3 (72) disegna la sua icona
 AMP_FIX = (0x4004_1E84, "605c", "6058")
 # schermata ROUTING (FUNC+FX): la voce 13, vuota nell'OS, instrada il ritorno di FX3 nella FX track
 ROUTE_JMP = [(0x4004_C5E2, "7224b28067000222", "fx3_rt_key", "ROUTING: tasto 13 -> jmp fx3_rt_key ; nop"),
              (0x4004_BF86, "4feffff048d7041c", "fx3_rt_get", "ROUTING: stato della voce -> jmp fx3_rt_get ; nop")]
-ROUTE_DRAW = (0x4004_C242, "4eb9400f72a4", "fx3_rt_draw", "ROUTING: voce 13 disegnata come 'FX3'")
+ROUTE_DRAW = (0x4004_C242, "4eb9400f7468", "fx3_rt_draw", "ROUTING: voce 13 disegnata come 'FX3'")
 ROUTE_LED = (0x4004_C480, "6716", "6712", "ROUTING: LED del tasto 13 acceso come le voci 14-16")
 # parametri della pagina: id, nomi, massimo, default; prototipi dell'oggetto {offset: (operando, atteso,
 # nuovo)}; correzioni ai campi +0/+4 per comportarsi come DEL (250): tipo 0, prototipo d3
 PARAMS = [
     (246, "TYPE", "FX3 Type", 3, 0,
-     {20: (0x4018_F252, 0x41B9_DF60, "fx3_proto_type"), 36: (0x4018_F260, 0x41B9_DCC0, "fx3_proto_type_gfx"),
-      68: (0x4018_F27C, 0x41B9_D670, NO_STYLE)},
-     [(0x4018_F234, "2f05", "2f03"), (0x4018_F23C, "7005", "7000")]),
+     {20: (0x4018_F416, 0x41B9_EF60, "fx3_proto_type"), 36: (0x4018_F424, 0x41B9_ECC0, "fx3_proto_type_gfx"),
+      68: (0x4018_F440, 0x41B9_E670, NO_STYLE)},
+     [(0x4018_F3F8, "2f05", "2f03"), (0x4018_F400, "7005", "7000")]),
     (247, "SPD", "Chorus Speed", 127, 60,
-     {20: (0x4018_F2A4, 0x41B9_DF60, "fx3_proto_spd"), 36: (0x4018_F2B2, 0x41B9_DCC0, G_KNOB)},
-     [(0x4018_F290, "2f05", "2f03"), (0x4018_F292, "7204", "7200")]),
+     {20: (0x4018_F468, 0x41B9_EF60, "fx3_proto_spd"), 36: (0x4018_F476, 0x41B9_ECC0, G_KNOB)},
+     [(0x4018_F454, "2f05", "2f03"), (0x4018_F456, "7204", "7200")]),
     (248, "DEP", "Chorus Depth", 127, 64,
-     {20: (0x4018_F2F4, 0x41B9_DF60, "fx3_proto_dep"), 36: (0x4018_F302, 0x41B9_DCC0, G_KNOB)},
-     [(0x4018_F2E2, "2f05", "2f03"), (0x4018_F2EA, "23c241ba4b84", "42b941ba4b84")]),
-    (250, "TIME", "Chorus Delay", 127, 64, {20: (0x4018_F398, 0x41B9_DFD0, "fx3_proto_del")}, []),
-    (251, "FDBK", "Chorus Feedback", 127, 0, {20: (0x4018_F3E8, 0x41B9_DFD0, "fx3_proto_fdbk")}, []),
-    (252, "WID", "Chorus Width", 127, 64, {20: (0x4018_F438, 0x41B9_DFD0, "fx3_proto_wid")}, []),
+     {20: (0x4018_F4B8, 0x41B9_EF60, "fx3_proto_dep"), 36: (0x4018_F4C6, 0x41B9_ECC0, G_KNOB)},
+     [(0x4018_F4A6, "2f05", "2f03"), (0x4018_F4AE, "23c241ba5b84", "42b941ba5b84")]),
+    (250, "TIME", "Chorus Delay", 127, 64, {20: (0x4018_F55C, 0x41B9_EFD0, "fx3_proto_del")}, []),
+    (251, "FDBK", "Chorus Feedback", 127, 0, {20: (0x4018_F5AC, 0x41B9_EFD0, "fx3_proto_fdbk")}, []),
+    (252, "WID", "Chorus Width", 127, 64, {20: (0x4018_F5FC, 0x41B9_EFD0, "fx3_proto_wid")}, []),
     (249, "DEL", "FX3 to Delay", 127, 0,
-     {20: (0x4018_F344, 0x41B9_DF40, "fx3_proto_vol"), 36: (0x4018_F356, 0x41B9_DC40, G_SEND),
-      68: (0x4018_F372, 0x41B9_D670, S_BAR)},
-     [(0x4018_F332, "2f04", "2f03")]),
+     {20: (0x4018_F508, 0x41B9_EF40, "fx3_proto_vol"), 36: (0x4018_F51A, 0x41B9_EC40, G_SEND),
+      68: (0x4018_F536, 0x41B9_E670, S_BAR)},
+     [(0x4018_F4F6, "2f04", "2f03")]),
     (253, "REV", "FX3 to Reverb", 127, 0,
-     {20: (0x4018_F48A, 0x41B9_DF60, "fx3_proto_vol"), 36: (0x4018_F49C, 0x41B9_DCC0, G_REV),
-      68: (0x4018_F4B8, 0x41B9_D670, S_BAR)},
-     [(0x4018_F476, "2f05", "2f03"), (0x4018_F47E, "7004", "7000")]),
+     {20: (0x4018_F64E, 0x41B9_EF60, "fx3_proto_vol"), 36: (0x4018_F660, 0x41B9_ECC0, G_REV),
+      68: (0x4018_F67C, 0x41B9_E670, S_BAR)},
+     [(0x4018_F63A, "2f05", "2f03"), (0x4018_F642, "7004", "7000")]),
 ]
-G_MOD = 0x41B9_D730                     # icona MOD delle macchine (id 176)
+G_MOD = 0x41B9_E730                     # icona MOD delle macchine (id 176)
 # SND3 dell'ingresso: id 269 (vparams), oggetto come DEL di fx3 (249): {offset: (operando, atteso, nuovo)}
-SND_IN = {"id": 269, "slot": 7, "objs": {20: (0x4018_F9AA, 0x41B9_DFD0, "fx3_proto_vol"),
-                                         36: (0x4018_F9BC, 0x41B9_D8B0, G_SEND), 68: (0x4018_F9D8, 0x41B9_D670, S_BAR)},
-          "fix": [(0x4018_F996, "2f05", "2f03"), (0x4018_F99E, "7201", "7200")]}
-SND3 = {"id": 72, "g36": (0x4018_B37A, G_KNOB, G_MOD), "s68": (0x4018_B396, 0x41B9_D670, S_BAR)}
+SND_IN = {"id": 269, "slot": 7, "objs": {20: (0x4018_FB6E, 0x41B9_EFD0, "fx3_proto_vol"),
+                                         36: (0x4018_FB80, 0x41B9_E8B0, G_SEND), 68: (0x4018_FB9C, 0x41B9_E670, S_BAR)},
+          "fix": [(0x4018_FB5A, "2f05", "2f03"), (0x4018_FB62, "7201", "7200")]}
+SND3 = {"id": 72, "g36": (0x4018_B53E, G_KNOB, G_MOD), "s68": (0x4018_B55A, 0x41B9_E670, S_BAR)}
 
 
 def sha(b: bytes) -> str:
@@ -189,7 +189,7 @@ def build_blob() -> tuple[bytes, dict[str, int], str]:
 
 
 def main() -> None:
-    stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
+    stock = REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     blob, syms, dis = build_blob()
     if CODE_BASE + len(blob) > CODE_END:
@@ -216,7 +216,7 @@ def main() -> None:
         code += b"\x4e\x71" * ((len(orig) // 2 - len(code)) // 2)
         patches.append(fixed(addr, code, what, orig))
     patches.append(fixed(REVERB_COUNT, bytes.fromhex("7202"), "tab REVERB: 2 pagine", "7201"))
-    patches.append(fixed(REVERB_ARRAY, long(syms["fx3_reverb_pages"]), "tab REVERB: pagine {21, 25}", "401c7fa8"))
+    patches.append(fixed(REVERB_ARRAY, long(syms["fx3_reverb_pages"]), "tab REVERB: pagine {21, 25}", "401c8248"))
     for addr, orig, sym, what in PAGE_NAMES:
         patches.append(fixed(addr, long(syms[sym]), what, orig))
     for addr, orig, sym, what in KIT_HOOKS:
@@ -262,7 +262,7 @@ def main() -> None:
         for addr, orig, new in extra:
             patches.append(fixed(addr, bytes.fromhex(new), f"id {pid}: campo dell'oggetto come DEL (250)", orig))
     spec = {
-        "name": "fx3", "os": "1.41", "requires": ["modarea", "vparams"],
+        "name": "fx3", "os": "1.42", "requires": ["modarea", "vparams"],
         "description": "Terza mandata effetti: SND3 per traccia (pagina AMP 2) verso un chorus stereo; "
                        "regolazioni e livello di ritorno sulla pagina 2 del tab REVERB.",
         "generated_by": "mods/fx3/make_patch.py",

@@ -21,29 +21,29 @@ sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack")]
 import eft  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
-STOCK = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+STOCK = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 pytestmark = pytest.mark.skipif(not STOCK.exists(), reason="firmware stock assente")
 
 SPEC = json.loads((ROOT / "mods" / "dual-mono" / "patch.json").read_text(encoding="utf-8"))
 LOAD = 0x4000_0400
-BLOCK = 0x4009_0872
-AFTER = 0x4009_0902          # dopo l'istruzione all'uscita del blocco (sostituita da jsr post_hook)
-PANLAW = 0x400A_171A
+BLOCK = 0x4009_08EA
+AFTER = 0x4009_097A          # dopo l'istruzione all'uscita del blocco (sostituita da jsr post_hook)
+PANLAW = 0x400A_1792
 FLAG = 0x8000_3146
 PARAMS, HW, STACK = 0x5000_0000, 0x5000_2000, 0x5001_0000
-MIX3 = 0x41B9_F7F0
+MIX3 = 0x41BA_07F0
 STEREO_LAYOUT = [126, 0, 0, 0, 129, 130, 128, 132]
 MONO_LAYOUT = [126, 0, 0, 0, 129, 130, 128, 132]     # B: IN R nella sua pagina; C e G (FX3) li sposta dualmono2.c
-DESC = 0x4022D59C                                       # descrittori: record da 52 B, indice = id logico
+DESC = 0x4022D83C                                       # descrittori: record da 52 B, indice = id logico
 NAMES = {i: DESC + 52 * i + 48 for i in (125, 126, 127, 128)}
-ORIG_NAMES = {125: 0x4024F8A7, 126: 0x40253B6E, 127: 0x40266015, 128: 0x40265CC9}
+ORIG_NAMES = {125: 0x4024FBC7, 126: 0x40253E8E, 127: 0x40266369, 128: 0x4026601D}
 LONG = {i: DESC + 52 * i + 40 for i in (125, 126)}
-ORIG_LONG = {125: 0x40253B4D, 126: 0x40253B60}          # "Input Level", "In Left/Right"
+ORIG_LONG = {125: 0x40253E6D, 126: 0x40253E80}          # "Input Level", "In Left/Right"
 SWITCHES = (0x4000C8B0, 0x4000C9A4)                     # get/set del valore per id logico 125..132
 # istruzioni EMAC del codice originale eseguito (blocco, legge di bilanciamento, seno): da GNU objdump
-ORIG_EMAC = [0x40090880, 0x40090884, 0x40090892, 0x40090896, 0x400908AA, 0x400908AE, 0x400908B8,
-             0x400908BC, 0x400908CA, 0x400908CE, 0x400908D2, 0x400908D4,
-             0x400A174E, 0x400A1752, 0x400A16CC, 0x400A16D0, 0x400A16D4, 0x400A16D8]
+ORIG_EMAC = [0x400908F8, 0x400908FC, 0x4009090A, 0x4009090E, 0x40090922, 0x40090926, 0x40090930,
+             0x40090934, 0x40090942, 0x40090946, 0x4009094A, 0x4009094C,
+             0x400A17C6, 0x400A17CA, 0x400A1744, 0x400A1748, 0x400A174C, 0x400A1750]
 
 
 @pytest.fixture(scope="module")
@@ -56,7 +56,7 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x41B9_F000, 0x1000)                       # pagina MIX3 (BSS)
+        uc.mem_map(0x41BA_0000, 0x1000)                       # pagina MIX3 (BSS)
         uc.mem_write(MIX3, struct.pack(">8i", *STEREO_LAYOUT))
         uc.mem_map(0x8000_0000, 0x1_0000)                     # SRAM (flag dual mono)
         uc.mem_map(0x5000_0000, 0x2_0000)                     # parametri, hw, stack

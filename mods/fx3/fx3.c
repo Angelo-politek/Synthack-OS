@@ -1,15 +1,15 @@
 /* fx3: terza mandata effetti (Syntakt OS 1.41): chorus, flanger, phaser, crusher.
  *
- * Audio (funzione di mix a blocchi 0x4008F1CA, 32 campioni a 48 kHz):
- * - nel ciclo per traccia (0x4008F3A0) fx3_trk_hook prende i guadagni sinistro/destro della traccia
+ * Audio (funzione di mix a blocchi 0x4008F242, 32 campioni a 48 kHz):
+ * - nel ciclo per traccia (0x4008F418) fx3_trk_hook prende i guadagni sinistro/destro della traccia
  *   (livello e pan) e il valore di SND3 (parola +106 del motore = id 72, salvato per traccia) e ne
  *   ricava il bersaglio mono della mandata (a meta': si sommano coppie di campioni), come l'OS fa per
  *   DEL e REV, e segnala quando un bersaglio cambia (fx3_moving): a regime la rampa non gira;
- * - dopo le somme del master (0x4008FB04) fx3_run somma le tracce nel bus 3 a 24 kHz (coppie di campioni
+ * - dopo le somme del master (0x4008FB7C) fx3_run somma le tracce nel bus 3 a 24 kHz (coppie di campioni
  *   mediate, EMAC: un passaggio per traccia se mandano una o due tracce, se no uno solo per tutte), lo
  *   passa all'effetto (a 24 kHz) e aggiunge il ritorno, scalato da VOL e riportato a 48 kHz per
  *   interpolazione lineare, al bus diretto (0x8000DAD0), con la convenzione di segno dell'OS;
- * - prima del delay del blocco seguente (0x4008F828) fx3_dsnd aggiunge l'uscita dell'effetto, scalata
+ * - prima del delay del blocco seguente (0x4008F8A0) fx3_dsnd aggiunge l'uscita dell'effetto, scalata
  *   dalla mandata DEL, al bus d'ingresso del delay (0x8000DBD0): un blocco di ritardo (0,67 ms).
  * Il carico conta: l'OS usa gia' quasi tutta la CPU e l'interfaccia vive del resto. Senza mandate, con
  * VOL e DEL a zero o con gli ingressi muti (sequencer fermo) e la coda esaurita resta solo la somma o
@@ -50,9 +50,9 @@ typedef unsigned short u16;
 #define KIT       (*(char *const volatile *)0x800030BCu)   /* kit del pattern attivo */
 #define W_IN      (2 * 0x37)                               /* parola del kit: SND3 dell'ingresso (basso), routing (bit 8) */
 #define LOUD      (10 << 16)                               /* ingresso udibile: oltre 10/32768 (-70 dB) */
-#define UI_ROOT   (*(char *const volatile *)0x444E1334u)
-#define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...))                    0x400F8C18u)                            /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
-#define FONT      ((const void *)0x402A91C0u)              /* 4x6 */
+#define UI_ROOT   (*(char *const volatile *)0x444E2334u)
+#define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...))                    0x400F8DDCu)                            /* (ctx, font, x, y, centrato, 0, sagoma, fmt, ...) */
+#define FONT      ((const void *)0x402A9510u)              /* 4x6 */
 
 enum { P_TYPE, P_SPD, P_DEP, P_TIME, P_FDBK, P_WID, P_DSND, P_RSND, NP };
 enum { CHOR, FLNG, PHSR, CRSH, NT };
@@ -116,12 +116,12 @@ static u32 named DATA = 0xFF;                             /* tipo di nomi, icone
  * simile. Dei prototipi (std::function costruite all'avvio) si prende solo l'invoker (+12): nessuno di
  * quelli scelti usa i dati del functor; il gestore e' fx3_mgr (nessuna copia o distruzione sullo heap
  * condiviso col prototipo). 0 = vuoto. */
-#define OBJ(id)   ((u32 *)(0x41B9FA24u + 84u * (id)))     /* oggetto del parametro */
-#define SLOTS     ((u32 *)0x41B9F81Cu)                     /* caselle della pagina 25 */
+#define OBJ(id)   ((u32 *)(0x41BA0A24u + 84u * (id)))     /* oggetto del parametro */
+#define SLOTS     ((u32 *)0x41BA081Cu)                     /* caselle della pagina 25 */
 enum {
-    G_DEF = 0x41B9DCD0, G_LFO = 0x41B9DC70, G_SPD = 0x41B9D6B0, G_MOD = 0x41B9D730, G_STIM = 0x41B9D7D0,
-    G_SDEP = 0x41B9D7E0, G_BAL = 0x41B9D740, G_TONE = 0x41B9D760, G_NCOL = 0x41B9D780, G_TICK = 0x41B9D830,
-    G_OVER = 0x41B9DCB0, S_KNOB = 0x41B9D670, S_660 = 0x41B9D660, S_FDBK = 0x41B9D5E0
+    G_DEF = 0x41B9ECD0, G_LFO = 0x41B9EC70, G_SPD = 0x41B9E6B0, G_MOD = 0x41B9E730, G_STIM = 0x41B9E7D0,
+    G_SDEP = 0x41B9E7E0, G_BAL = 0x41B9E740, G_TONE = 0x41B9E760, G_NCOL = 0x41B9E780, G_TICK = 0x41B9E830,
+    G_OVER = 0x41B9ECB0, S_KNOB = 0x41B9E670, S_660 = 0x41B9E660, S_FDBK = 0x41B9E5E0
 };
 static const u32 look[NT][5][2] = {
     {{G_SPD, 0}, {G_MOD, 0}, {G_STIM, 0}, {G_DEF, S_FDBK}, {G_BAL, S_660}},     /* SPD 467, MOD 176, STIM 274, FDBK 109, BAL 216 */
@@ -484,7 +484,7 @@ s32 fx3_set(void *obj, s32 id, s32 value)
 }
 
 /* ---- SND3 dell'ingresso esterno: id 269 (vparams), byte basso della parola 0x37 del kit della FX track.
- * Bersagli come le mandate DEL/REV dell'ingresso (0x4008F480..): guadagni L/R da livello e bilanciamento,
+ * Bersagli come le mandate DEL/REV dell'ingresso (0x4008F4F8..): guadagni L/R da livello e bilanciamento,
  * per (v/32768)^2; ogni lato pesa meta' nel bus mono, come una traccia al centro. */
 
 /* Dual mono v2 (mods/dual-mono): intestazione a DM_HDR (tools/build/dualmono_layout.py). In mono il
@@ -559,9 +559,9 @@ void fx3_in(s32 gl, s32 gr)                               /* dal ciclo delle man
 
 /* ---- ROUTING (FUNC+FX), tasto 13: il ritorno di FX3 nella FX track (bit 8 della parola 0x37 del kit), come
  * il routing di delay e riverbero sui tasti 14 e 15 */
-#define DRAW_BOX  ((void (*)(void *, s32, s32, s32, s32, s32))0x400F7BD6u)
-#define DRAW_STR  ((void (*)(void *, const void *, s32, s32, s32, const char *, ...))0x400F8A0Cu)
-#define FONT_RT   ((const void *)0x443DA218u)
+#define DRAW_BOX  ((void (*)(void *, s32, s32, s32, s32, s32))0x400F7D9Au)
+#define DRAW_STR  ((void (*)(void *, const void *, s32, s32, s32, const char *, ...))0x400F8BD0u)
+#define FONT_RT   ((const void *)0x443DB218u)
 
 u32 fx3_route(void)
 {
@@ -1173,7 +1173,7 @@ __asm__(
 /* trampolini */
 __asm__(
     "        .globl  fx3_trk_hook\n"
-    "fx3_trk_hook:\n"                           /* ciclo per traccia (0x4008F3A0): d0/d1 guadagni, */
+    "fx3_trk_hook:\n"                           /* ciclo per traccia (0x4008F418): d0/d1 guadagni, */
     "        .word   0xae00, 0x0900\n"          /* d3 traccia, a3 struttura; istruzioni sostituite: */
     "        .word   0xae81, 0x0900\n"          /* msac.l d0,d7,acc0 ; msac.l d1,d7,acc1 */
     "        tst.w   106(%a3)\n"                /* SND3 (id 72) spenta e bersaglio gia' 0: niente */
@@ -1215,7 +1215,7 @@ __asm__(
     "        lea     16(%sp),%sp\n"
     "        rts\n"
     "        .globl  fx3_del_hook\n"
-    "fx3_del_hook:\n"                           /* al posto di jsr 0x40096890 (delay), 0x4008F828 */
+    "fx3_del_hook:\n"                           /* al posto di jsr 0x40096908 (delay), 0x4008F8A0 */
     "        tst.l   fx3_idle\n"
     "        bne.s   1f\n"
     "        lea     -16(%sp),%sp\n"
@@ -1223,9 +1223,9 @@ __asm__(
     "        jsr     fx3_dsnd\n"                /* chorus del blocco precedente nel bus del delay */
     "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
     "        lea     16(%sp),%sp\n"
-    "1:      jmp     0x40096890\n"              /* il delay, con gli argomenti al loro posto */
+    "1:      jmp     0x40096908\n"              /* il delay, con gli argomenti al loro posto */
     "        .globl  fx3_rev_hook\n"
-    "fx3_rev_hook:\n"                           /* al posto di jsr 0x40096E3C (riverbero), 0x4008F952 */
+    "fx3_rev_hook:\n"                           /* al posto di jsr 0x40096EB4 (riverbero), 0x4008F9CA */
     "        tst.l   fx3_idle\n"
     "        bne.s   1f\n"
     "        lea     -16(%sp),%sp\n"
@@ -1233,20 +1233,20 @@ __asm__(
     "        jsr     fx3_rsnd\n"                /* effetto del blocco precedente nel bus del riverbero */
     "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
     "        lea     16(%sp),%sp\n"
-    "1:      jmp     0x40096E3C\n"              /* il riverbero, con gli argomenti al loro posto */
+    "1:      jmp     0x40096EB4\n"              /* il riverbero, con gli argomenti al loro posto */
     "        .globl  fx3_rt_key\n"
     "fx3_rt_key:\n"                             /* 0x4004C5E2 (ROUTING, tasti): d0 = codice, d2 = evento, */
     "        moveq   #36,%d1\n"                         /* a2 = vista. Tasto 13: commuta FX3 */
     "        cmp.l   %d0,%d1\n"
     "        bne.s   1f\n"
     "        move.l  %d2,-(%sp)\n"
-    "        jsr     0x400F966C\n"                    /* pressione? */
+    "        jsr     0x400F9830\n"                    /* pressione? */
     "        addq.l  #4,%sp\n"
     "        tst.b   %d0\n"
     "        beq.s   2f\n"
     "        jsr     fx3_route_toggle\n"
     "        move.l  %a2,-(%sp)\n"
-    "        jsr     0x400FFC5E\n"                    /* aggiorna la vista (come i tasti 14-16) */
+    "        jsr     0x400FFE22\n"                    /* aggiorna la vista (come i tasti 14-16) */
     "        addq.l  #4,%sp\n"
     "2:      jmp     0x4004C80A\n"                    /* gestito */
     "1:      bgt.s   3f\n"                            /* istruzioni sostituite: tracce sotto, 14-16 sopra */
@@ -1271,7 +1271,7 @@ __asm__(
     "        lea     16(%sp),%sp\n"
     "        rts\n"
     "        .globl  fx3_mix_hook\n"
-    "fx3_mix_hook:\n"                           /* 0x4008FB04: al posto di pea -296(fp) ; pea 0x8000E0F0 */
+    "fx3_mix_hook:\n"                           /* 0x4008FB7C: al posto di pea -296(fp) ; pea 0x8000E0F0 */
     "        lea     -16(%sp),%sp\n"
     "        movem.l %d0-%d1/%a0-%a1,(%sp)\n"
     "        .globl  fx3_macsr\n"
@@ -1297,12 +1297,12 @@ __asm__(
     "1:      lea     -96(%sp),%sp\n"            /* istruzioni sostituite */
     "        movem.l %d2-%d7/%a2-%a6,(%sp)\n"
     "        jmp     0x40042CE8\n"
-    /* Kit nel file (salvataggio, FUNC+YES/NO, progetto): il blocco della FX track passa da 0x400A6D96
-     * (scrittura) e 0x400A6D2E (lettura) con una tabella di posizioni che perde le parole degli id
+    /* Kit nel file (salvataggio, FUNC+YES/NO, progetto): il blocco della FX track passa da 0x400A6E0E
+     * (scrittura) e 0x400A6DA6 (lettura) con una tabella di posizioni che perde le parole degli id
      * interni 0x1A e 0x46 e rilegge nella 0 il valore della 0x1A. Le tre parole di fx3 vanno nei byte
      * +148..+155 del blocco nel file, che l'OS azzera e non legge: marcatore "SH" e le tre parole. */
     "        .globl  fx3_in_hook\n"
-    "fx3_in_hook:\n"                           /* mandate dell'ingresso (0x4008F4C4): d1/a0 = guadagni L/R; */
+    "fx3_in_hook:\n"                           /* mandate dell'ingresso (0x4008F53C): d1/a0 = guadagni L/R; */
     "        move.l  (%sp),4(%sp)\n"            /* istruzioni sostituite: addq.l #4,sp (argomento della */
     "        addq.l  #4,%sp\n"                  /* legge di bilanciamento), move.w 1812(a2),d2 (REV) */
     "        move.w  1812(%a2),%d2\n"
@@ -1318,14 +1318,14 @@ __asm__(
     "        lea     16(%sp),%sp\n"
     "        rts\n"
     "        .globl  fx3_in_page\n"
-    "fx3_in_page:\n"                          /* al posto di clr.l 0x41B9F7F8 (External Mixer, casella C) */
+    "fx3_in_page:\n"                          /* al posto di clr.l 0x41BA07F8 (External Mixer, casella C) */
     "        move.l  %d0,-(%sp)\n"
     "        move.l  #269,%d0\n"
-    "        move.l  %d0,0x41B9F7F8\n"
+    "        move.l  %d0,0x41BA07F8\n"
     "        move.l  (%sp)+,%d0\n"
     "        rts\n"
     "        .globl  fx3_kser_hook\n"
-    "fx3_kser_hook:\n"                         /* al posto di 0x400A6D96 (file, kit) */
+    "fx3_kser_hook:\n"                         /* al posto di 0x400A6E0E (file, kit) */
     "        move.l  8(%sp),-(%sp)\n"
     "        move.l  8(%sp),-(%sp)\n"
     "        bsr.s   1f\n"
@@ -1343,9 +1343,9 @@ __asm__(
     "1:      move.l  %a3,-(%sp)\n"             /* istruzioni sostituite */
     "        move.l  %a2,-(%sp)\n"
     "        movea.l 12(%sp),%a2\n"
-    "        jmp     0x400A6D9E\n"
+    "        jmp     0x400A6E16\n"
     "        .globl  fx3_kdes_hook\n"
-    "fx3_kdes_hook:\n"                         /* al posto di 0x400A6D2E (kit, file) */
+    "fx3_kdes_hook:\n"                         /* al posto di 0x400A6DA6 (kit, file) */
     "        move.l  8(%sp),-(%sp)\n"
     "        move.l  8(%sp),-(%sp)\n"
     "        bsr.s   1f\n"
@@ -1373,12 +1373,12 @@ __asm__(
     "3:      rts\n"
     "1:      lea     -12(%sp),%sp\n"           /* istruzioni sostituite */
     "        movem.l %a2-%a4,(%sp)\n"
-    "        jmp     0x400A6D36\n"
+    "        jmp     0x400A6DAE\n"
     "        .globl  fx3_page_stub\n"
-    "fx3_page_stub:\n"                          /* al posto di clr.l 0x41B9F83C: caselle della pagina 25 */
+    "fx3_page_stub:\n"                          /* al posto di clr.l 0x41BA083C: caselle della pagina 25 */
     "        move.l  %a0,-(%sp)\n"
     "        move.l  %d0,-(%sp)\n"
-    "        lea     0x41B9F81C,%a0\n"
+    "        lea     0x41BA081C,%a0\n"
     "        move.l  #246,%d0\n"
     "        move.l  %d0,(%a0)+\n"
     "        move.l  #247,%d0\n"
@@ -1400,13 +1400,13 @@ __asm__(
     "        move.l  (%sp)+,%a0\n"
     "        rts\n"
     "        .globl  fx3_amp_stub\n"
-    "fx3_amp_stub:\n"                           /* al posto di clr.l 0x41B9F6A0 (fine delle pagine AMP): */
+    "fx3_amp_stub:\n"                           /* al posto di clr.l 0x41BA06A0 (fine delle pagine AMP): */
     "        move.l  %d0,-(%sp)\n"              /* SND3 (72) in G della pagina 1, accanto a DEL e REV, */
     "        moveq   #72,%d0\n"                 /* PAN (80) in E della pagina 2; due varianti per pagina */
-    "        move.l  %d0,0x41B9F624\n"          /* (inviluppo AHD / ADSR) */
-    "        move.l  %d0,0x41B9F650\n"
+    "        move.l  %d0,0x41BA0624\n"          /* (inviluppo AHD / ADSR) */
+    "        move.l  %d0,0x41BA0650\n"
     "        moveq   #80,%d0\n"
-    "        move.l  %d0,0x41B9F674\n"
-    "        move.l  %d0,0x41B9F6A0\n"
+    "        move.l  %d0,0x41BA0674\n"
+    "        move.l  %d0,0x41BA06A0\n"
     "        move.l  (%sp)+,%d0\n"
     "        rts\n");

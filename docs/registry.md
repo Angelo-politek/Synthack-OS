@@ -2,7 +2,7 @@
 
 Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `tests/test_registry.py` checks every `patch.json` against it. **A new mod claims its space there first.**
 
-## Mod area (RAM `0x444e38d0`, offsets)
+## Mod area (RAM `0x444e48d0`, offsets)
 
 | From | To | Mod | Use |
 |---|---|---|---|
@@ -20,19 +20,19 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0xdff0` | `0xf000` | fx3 | feedback (+0xDFFC) and delay line (+0xE000, 4 KB) |
 | `0xf000` | `0xfff0` | **free** |  |
 
-## Section 3 free fill (`0x40338740–0x40339000`)
+## Section 3 free fill (`0x40339740–0x4033a000`)
 
 | From | To | Mod | Use |
 |---|---|---|---|
-| `0x40338740` | `0x40338be0` | splash | code, logo, animation entries |
-| `0x40338be0` | `0x40338d80` | dual-mono | dualmono.S (input VCAs, names) |
-| `0x40338d80` | `0x40339000` | modarea | mod-area loader |
+| `0x40339740` | `0x40339be0` | splash | code, logo, animation entries |
+| `0x40339be0` | `0x40339d80` | dual-mono | dualmono.S (input VCAs, names) |
+| `0x40339d80` | `0x4033a000` | modarea | mod-area loader |
 
 ## Zero in stock but read by the OS — not free
 
 | From | To | Why |
 |---|---|---|
-| `0x402ab8ec` | `0x402cb8ec` | two 128x128 tables of longs read by 0x400AD408 (conversion of loaded sounds/kits); rows are zero but read |
+| `0x402abc3c` | `0x402cbc3c` | two 128x128 tables of longs read by 0x400AD480 (conversion of loaded sounds/kits); rows are zero but read |
 
 Zero bytes are not free space: check that no code reads them (pointers, tables indexed from a nearby base) before using them, and register them here.
 

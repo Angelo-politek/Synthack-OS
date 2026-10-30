@@ -8,7 +8,7 @@ import pytest
 
 import eft
 
-SYX = Path(os.environ.get("SYNTAKT_SYX", eft.REPO / "firmware" / "Syntakt_OS1.41.syx"))
+SYX = Path(os.environ.get("SYNTAKT_SYX", eft.REPO / "firmware" / "Syntakt_OS1.42.syx"))
 
 pytestmark = [
     pytest.mark.skipif(not SYX.exists(), reason=f"firmware stock assente: {SYX}"),

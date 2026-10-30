@@ -59,7 +59,7 @@ def machine_to_engine() -> list[int]:
 def machine_names() -> list[str]:
     """Nomi delle machine per ID, letti dalla tabella di puntatori della sezione 3."""
     import memmap
-    syx = memmap.REPO / "firmware" / "Syntakt_OS1.41.syx"
+    syx = memmap.REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = memmap.eft.unpack(syx, memmap.REPO / "unpacked" / syx.stem, ids=[3])[3].read_bytes()
     base = memmap.LOAD_ADDR                                  # anche la sezione 3 parte da 0x40000400
 

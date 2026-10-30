@@ -3,7 +3,7 @@
 Come funziona (dettagli in docs/):
 - il task dell'intro sceglie a caso una di 5 voci {segmenti...} con 5 istruzioni `pea <voce>`;
 - creiamo 5 voci nuove = {animazione originale, splash_draw x N fotogrammi, fine} nello
-  spazio libero 0x40338740..0x40339000 e facciamo puntare le 5 `pea` alle voci nuove;
+  spazio libero 0x40339740..0x4033A000 e facciamo puntare le 5 `pea` alle voci nuove;
 - splash_draw (splash.S) copia il logo (1024 B, formato a colonne) nel framebuffer.
 
     python mods/splash/make_patch.py            # richiede binutils m68k in WSL (vedi CONTRIBUTING.md)
@@ -27,10 +27,10 @@ import eft  # noqa: E402
 import render  # noqa: E402
 
 LOAD = 0x4000_0400
-FREE_START, FREE_END = 0x4033_8740, 0x4033_9000     # riempimento del linker, vedi docs/memory-map.md
+FREE_START, FREE_END = 0x4033_9740, 0x4033_A000     # riempimento del linker, vedi docs/memory-map.md
 # (indirizzo dell'istruzione `pea`, voce originale a cui punta)
-PEA_SITES = [(0x4008_7E90, 0x4029_A7C4), (0x4008_7EA4, 0x4029_A7B4), (0x4008_7EBA, 0x4029_A7A4),
-             (0x4008_7ECC, 0x4029_A794), (0x4008_7ED4, 0x4029_A784)]
+PEA_SITES = [(0x4008_7F08, 0x4029_AB14), (0x4008_7F1C, 0x4029_AB04), (0x4008_7F32, 0x4029_AAF4),
+             (0x4008_7F44, 0x4029_AAE4), (0x4008_7F4C, 0x4029_AAD4)]
 # L'intro gira a ~28 fotogrammi/s (PIT 3: prescaler 512, PMR 8593, bus ~125 MHz; vedi docs/memory-map.md).
 # v0.1 AGGIUNGEVA 120 fotogrammi (~4,2 s) e la macchina si e' bloccata su "PREPARING SAMPLES":
 # ora la durata totale resta quella originale, l'animazione ufficiale cede gli ultimi N fotogrammi.
@@ -61,7 +61,7 @@ def assemble(src: Path, logo: bytes) -> bytes:
 
 
 def main() -> None:
-    stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
+    stock = REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     u32 = lambda a: struct.unpack_from(">I", sec3, a - LOAD)[0]          # noqa: E731
 
@@ -110,7 +110,7 @@ def main() -> None:
                         "what": f"pea {entry:#x} -> pea {new:#x}"})
     art = render.figlet("SyntHack", FIGLET_FONT)
     logo_at = bytes(blob).index(logo)
-    spec = {"name": "splash", "os": "1.41",
+    spec = {"name": "splash", "os": "1.42",
             "description": f"Splash 'SyntHack {VERSION}' (figlet {FIGLET_FONT}) negli ultimi {SPLASH_FRAMES} "
                            f"fotogrammi dell'animazione d'avvio (durata totale invariata; flip={FLIP}).",
             "generated_by": "mods/splash/make_patch.py",

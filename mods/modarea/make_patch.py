@@ -25,12 +25,12 @@ import eft  # noqa: E402
 import modarea_layout as L  # noqa: E402
 
 LOAD = 0x4000_0400
-CODE_BASE = 0x4033_8D80                 # spazio libero dell'immagine (dopo dual-mono, con margine)
-FREE_END = 0x4033_9000
+CODE_BASE = 0x4033_9D80                 # spazio libero dell'immagine (dopo dual-mono, con margine)
+FREE_END = 0x4033_A000
 HOOKS = [  # (indirizzo, byte originali, simbolo, codice operativo, descrizione)
     (0x4000_04B2, "4feffff048d700f0", "modarea_load", 0x4EF9,
      "azzeramento del BSS: jmp modarea_load ; nop (decompressione, BSS a zero tranne l'area)"),
-    (0x4010_358E, "700123c0402d4fd4", "modarea_reserve", 0x4EB9,
+    (0x4010_3752, "700123c0402d5324", "modarea_reserve", 0x4EB9,
      "fine dell'inizializzazione dell'heap: jsr modarea_reserve ; nop (prima allocazione = area mod)"),
 ]
 IMG, RAM, SIZE = L.IMG, L.RAM, L.SIZE
@@ -49,7 +49,7 @@ def wsl(cmd: str) -> str:
 
 
 def main() -> None:
-    stock = REPO / "firmware" / "Syntakt_OS1.41.syx"
+    stock = REPO / "firmware" / "Syntakt_OS1.42.syx"
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     if LOAD + len(sec3) > IMG:
         raise SystemExit("l'immagine stock arriva oltre IMG")
@@ -72,7 +72,7 @@ def main() -> None:
     end = CODE_BASE + len(blob)
     if end > FREE_END or any(sec3[CODE_BASE - LOAD:end - LOAD]):
         raise SystemExit("spazio libero insufficiente o non a zero")
-    if (RAM - 0x4033_9000) % 16 or (0x4556_5490 - RAM - SIZE) % 16:
+    if (RAM - 0x4033_A000) % 16 or (0x4556_6490 - RAM - SIZE) % 16:
         raise SystemExit("l'area deve dividere il BSS in tratti multipli di 16 byte")
     patches = [{"section": 3, "addr": f"{CODE_BASE:#010X}", "len": len(blob),
                 "expect_sha256": sha(sec3[CODE_BASE - LOAD:end - LOAD]), "hex": blob.hex(),
@@ -85,7 +85,7 @@ def main() -> None:
         patches.append({"section": 3, "addr": f"{addr:#010X}", "len": 8, "expect_sha256": sha(old),
                         "hex": new.hex(), "what": what})
     spec = {
-        "name": "modarea", "os": "1.41",
+        "name": "modarea", "os": "1.42",
         "description": f"Area mod: all'avvio decomprime (SHLZ) le mod accodate alla sezione 3 ({IMG:#x}) "
                        f"nel primo blocco dell'heap dell'OS ({RAM:#x}, {SIZE} B, resto azzerato), "
                        "che prenota alla prima allocazione.",

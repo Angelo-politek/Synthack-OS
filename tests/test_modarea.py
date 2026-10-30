@@ -2,7 +2,7 @@
 
 Costruisce il .syx con tutte le mod che usano l'area, lo rispacchetta, carica la sezione 3 risultante come
 farebbe il bootloader ed esegue l'azzeramento del BSS (0x400004B2) fino al ritorno al chiamante. Poi usa
-l'allocatore vero dell'OS (0x4010350C, free 0x40103712): la prima chiamata prenota l'area (indice 0), e
+l'allocatore vero dell'OS (0x401036D0, free 0x401038D6): la prima chiamata prenota l'area (indice 0), e
 nessuna allocazione successiva ci finisce dentro o la tocca (issue #4: la RAM sopra il BSS, usata fino
 alla v0.8.1, l'OS la usa a runtime).
 """
@@ -28,7 +28,7 @@ import eft  # noqa: E402
 import lz  # noqa: E402
 import modarea_layout as L  # noqa: E402
 
-STOCK = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+STOCK = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 MODS = [ROOT / "mods" / m for m in ("modarea", "vparams", "master-comp", "readable-values", "perf-fx", "fx3")]
 pytestmark = pytest.mark.skipif(not STOCK.exists() or not all((m / "patch.json").exists() for m in MODS),
                                 reason="firmware stock o patch assenti")
@@ -37,9 +37,9 @@ SPEC = json.loads((ROOT / "mods" / "modarea" / "patch.json").read_text(encoding=
 LAYOUT = SPEC["layout"]
 IMG, RAM, SIZE = (int(LAYOUT[k], 16) for k in ("img", "ram", "size"))
 BLOCK = int(LAYOUT["heap_block"], 16)
-BSS_LO, BSS_HI = 0x4033_9000, 0x4556_5490
-ALLOC, FREE = 0x4010_350C, 0x4010_3712
-HEAP_LO, HEAP_HI = 0x444E_38C0, 0x454E_38C0
+BSS_LO, BSS_HI = 0x4033_A000, 0x4556_6490
+ALLOC, FREE = 0x4010_36D0, 0x4010_38D6
+HEAP_LO, HEAP_HI = 0x444E_48C0, 0x454E_48C0
 STACK, RET = 0x47FF_8000, 0x47FF_F000
 
 

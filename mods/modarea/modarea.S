@@ -1,11 +1,11 @@
 | modarea — "area mod" in RAM per le mod piu' grandi dello spazio libero dell'immagine
 |
 | Perche': l'immagine della sezione 3 ha solo ~2 KB liberi; tutto cio' che sta oltre la sua fine
-| (0x40347B90) viene azzerato all'avvio (BSS fino a 0x45565490). Le mod grandi vengono quindi
+| (0x40348B90) viene azzerato all'avvio (BSS fino a 0x45566490). Le mod grandi vengono quindi
 | ACCODATE alla sezione 3 a IMG, compresse (SHLZ, tools/build/lz.py), e decompresse qui in RAM.
 |
-| Dove (v0.8.2): RAM = primo blocco da 64 KB dell'heap dell'OS (allocatore buddy 0x4010350C, pool di
-| 16 MB nel BSS a 0x444E38C0), + 0x10. La RAM sopra il BSS, usata fino alla v0.8.1, l'OS la usa a
+| Dove (v0.8.2): RAM = primo blocco da 64 KB dell'heap dell'OS (allocatore buddy 0x401036D0, pool di
+| 16 MB nel BSS a 0x444E48C0), + 0x10. La RAM sopra il BSS, usata fino alla v0.8.1, l'OS la usa a
 | runtime (caricamento dei campioni: issue #4). L'heap invece assegna un blocco a un solo chiamante:
 | modarea_reserve chiede 64 KB all'allocatore alla fine della sua inizializzazione, prima di qualunque
 | altra richiesta, e riceve sempre l'indice 0. Il lock dell'heap e' ricorsivo.
@@ -14,8 +14,8 @@
 | - jmp al posto dell'inizio di 0x400004B2 (azzeramento del BSS, chiamato una sola volta all'avvio, cache
 |   spente): modarea_load decomprime IMG -> RAM, azzera il resto dell'area e poi il BSS SALTANDO l'area
 |   (che ora sta nel BSS), poi rts al chiamante. I 16 byte prima di RAM vengono azzerati come il resto.
-| - jsr al posto di "moveq #1,d0 ; move.l d0,0x402D4FD4" (fine dell'inizializzazione dell'heap,
-|   0x4010358E): modarea_reserve.
+| - jsr al posto di "moveq #1,d0 ; move.l d0,0x402D5324" (fine dell'inizializzazione dell'heap,
+|   0x40103752): modarea_reserve.
 |
 | SHLZ: "SHLZ", lunghezza decompressa, lunghezza del flusso, poi gettoni
 |   0xxxxxxx         -> x+1 byte letterali
@@ -24,10 +24,10 @@
 | Costanti da make_patch.py (--defsym): IMG, RAM, SIZE, HEAP_BLOCK_SIZE.
 
         .equ    MAGIC,          0x53484C5A      | "SHLZ"
-        .equ    BSS_LO,         0x40339000      | BSS dell'OS (come 0x400004B2)
-        .equ    BSS_HI,         0x45565490
-        .equ    HEAP_INIT,      0x402D4FD4      | 1 = heap inizializzato
-        .equ    HEAP_ALLOC,     0x4010350C      | allocatore (dimensione) -> indirizzo
+        .equ    BSS_LO,         0x4033A000      | BSS dell'OS (come 0x400004B2)
+        .equ    BSS_HI,         0x45566490
+        .equ    HEAP_INIT,      0x402D5324      | 1 = heap inizializzato
+        .equ    HEAP_ALLOC,     0x401036D0      | allocatore (dimensione) -> indirizzo
 
         .text
         .globl  modarea_load

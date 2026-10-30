@@ -18,9 +18,9 @@ import kitstore_layout as KS  # noqa: E402
 import modarea_layout as MA  # noqa: E402
 import registry as R  # noqa: E402
 
-LOAD, DESC, N_IDS = 0x4000_0400, 0x4022_D59C, 505
+LOAD, DESC, N_IDS = 0x4000_0400, 0x4022_D83C, 505
 VP_TABLE, VP_N = MA.RAM + 0x8000, 32
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 
 
 def specs():

@@ -18,10 +18,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools" / "unpack")]
 import eft  # noqa: E402
 
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 pytestmark = pytest.mark.skipif(not SY.exists(), reason="OS Syntakt assente")
 
-LOAD, DESC, N = 0x4000_0400, 0x4022_D59C, 505
+LOAD, DESC, N = 0x4000_0400, 0x4022_D83C, 505
 NONE = 0xFFFF_FFFF
 # id nativi riusati per quello che sono (salvati per traccia dall'OS): fx3 SND3 = "Delay Time" dell'amp
 NATIVE = {"fx3": {72}}

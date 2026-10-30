@@ -19,7 +19,7 @@ from unicorn import UC_HOOK_CODE  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
-SY = ROOT.parent / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT.parent / "firmware" / "Syntakt_OS1.42.syx"
 pytestmark = pytest.mark.skipif(not SY.exists(), reason="OS stock assente")
 
 # tetti (istruzioni per blocco): valori misurati il 2026-10-27, da abbassare con le ottimizzazioni

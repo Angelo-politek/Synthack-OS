@@ -2,18 +2,18 @@
 |
 | Il kit ha 12 blocchi per traccia da 148 byte (kit + 0xE5C + 148 * t): sono i dati delle tracce MIDI della
 | Digitakt, 71 parole. L'OS salva le parole 0..40 (id interni 17..40 dei gruppi MIDI 56..58) con
-| 0x400A6E6E e le rilegge con 0x400A6E02; le parole 41..70 non sono salvate, rilette ne' usate (solo
-| copiate in 0x444B4B48), e nel blocco del file i byte +150..+155 sono azzerati e mai letti.
+| 0x400A6EE6 e le rilegge con 0x400A6E7A; le parole 41..70 non sono salvate, rilette ne' usate (solo
+| copiate in 0x444B5B48), e nel blocco del file i byte +150..+155 sono azzerati e mai letti.
 | Qui: le parole 41..43 di ogni blocco (RAM, byte +82..+87) vanno nei byte +150..+155 del file e
 | tornano indietro alla lettura. 36 parole per kit; un kit salvato senza (OS stock o versioni
 | precedenti) le carica a zero, come un kit nuovo: zero deve voler dire "valore di default".
 
-        .equ    WR_BACK,        0x400A6E76      | dopo le istruzioni sostituite
-        .equ    RD_BACK,        0x400A6E0A
+        .equ    WR_BACK,        0x400A6EEE      | dopo le istruzioni sostituite
+        .equ    RD_BACK,        0x400A6E82
 
         .text
         .globl  ks_wr
-ks_wr:                                          | al posto di 0x400A6E6E (file, blocco in RAM)
+ks_wr:                                          | al posto di 0x400A6EE6 (file, blocco in RAM)
         move.l  8(%sp),-(%sp)
         move.l  8(%sp),-(%sp)
         bsr.s   1f
@@ -32,7 +32,7 @@ ks_wr:                                          | al posto di 0x400A6E6E (file, 
         jmp     WR_BACK
 
         .globl  ks_rd
-ks_rd:                                          | al posto di 0x400A6E02 (blocco in RAM, file)
+ks_rd:                                          | al posto di 0x400A6E7A (blocco in RAM, file)
         move.l  8(%sp),-(%sp)
         move.l  8(%sp),-(%sp)
         bsr.s   1f

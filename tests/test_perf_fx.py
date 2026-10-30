@@ -1,7 +1,7 @@
 """Mod perf-fx: effetti di performance sul sequencer, eseguiti nell'emulatore.
 
 Il tick originale fa avanzare lo step di ogni traccia (step + 1, a capo sulla lunghezza) e poi, alla fine
-dell'iterazione, chiama il nostro trampolino (0x4008D152). Qui si simula quell'avanzamento e si esegue il
+dell'iterazione, chiama il nostro trampolino (0x4008D1CA). Qui si simula quell'avanzamento e si esegue il
 codice vero della mod. I tasti 13-16 entrano nel nostro trampolino come dal ramo dei tasti 13-16 di
 KeyboardView; il modificatore attivo (0x40015AF6) e le impostazioni del progetto (0x40019000) sono
 sostituiti da due funzioni minime che leggono un byte di prova. Gli effetti dei tasti sono i valori
@@ -28,10 +28,10 @@ import eft  # noqa: E402
 import modarea_layout  # noqa: E402
 
 MA = modarea_layout.RAM                                    # area mod (mods/modarea)
-MA_PAGE, MA_MAP = 0x444E_0000, 0x2_0000
+MA_PAGE, MA_MAP = 0x444E_1000, 0x2_0000
 assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 SPEC_F = ROOT / "mods" / "perf-fx" / "patch.json"
 pytestmark = pytest.mark.skipif(not (SY.exists() and SPEC_F.exists()), reason="OS o patch assenti")
 
@@ -40,16 +40,16 @@ PAT, STEPS, EV = 0x5000_1000, 0x5000_0800, 0x5000_2400       # pattern finto, st
 VIEW, PROJ_OBJ, KIT = 0x5000_2000, 0x5000_2600, 0x5000_4000  # vista finta, progetto finto, kit
 MODE = PROJ_OBJ + 0x100 + 44                               # pattern corrente (stub) + 44: modificatore
 HANDLED, NATIVE, LOWER = 0x4002_E954, 0x4002_EA9A, 0x4002_EBA6  # uscite del ramo dei tasti 13-16
-DISPATCH, PROJ, MOD_MODE, DRAW = 0x4000_839E, 0x4001_9000, 0x4001_5AF6, 0x400F_8C18
+DISPATCH, PROJ, MOD_MODE, DRAW = 0x4000_839E, 0x4001_9000, 0x4001_5AF6, 0x400F_8DDC
 KIT_PTR, KIT_MODA = 0x8000_30B8, 0x15B6
 FX = {"--": 0, "1/16": 1, "1/8": 2, "3/16": 3, "1/4": 4, "1/2": 5, "1BAR": 6,
       "R1/8": 7, "R1/4": 8, "R1/2": 9, "RBAR": 10, "HALF": 11}
 MOD_A, RETRIG = 2, 0
-OBJ = lambda pid: 0x41B9_FA24 + 84 * pid                  # oggetto del parametro
+OBJ = lambda pid: 0x41BA_0A24 + 84 * pid                  # oggetto del parametro
 KB_MODE, KBV = 0x4002_DD86, 0x5000_2700                   # modo keyboard (byte di prova)
-RUNNING, RUNV = 0x4008_B7C0, 0x5000_2704                  # sequencer in moto
+RUNNING, RUNV = 0x4008_B838, 0x5000_2704                  # sequencer in moto
 MODEL, MODEL_OBJ, MODEL_VT, MODEL_GET, QNTV = 0x4001_86E8, 0x5000_2710, 0x5000_2720, 0x5000_2780, 0x5000_2708
-ACTIVE, POST, QUEUE = 0x4001_FFA4, 0x4000_1C0E, 0x405D_3A7C
+ACTIVE, POST, QUEUE = 0x4001_FFA4, 0x4000_1C0E, 0x405D_4A7C
 TRIG, TRIG_BODY = 0x4002_E18C, 0x4002_E192                 # FUN_4002E18C, corpo dopo le istruzioni sostituite
 
 
@@ -66,7 +66,7 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x41B9_0000, 0x2_0000)
+        uc.mem_map(0x41B9_1000, 0x2_0000)
         uc.mem_map(MA_PAGE, MA_MAP)
         uc.mem_map(0x5000_0000, 0x4_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
@@ -176,7 +176,7 @@ class Machine:
         return self.uc.mem_read(self.sym["pf_held"], 1)[0]
 
     def hook(self, t):
-        """Fine dell'iterazione della traccia t nel tick, come a 0x4008D152 (d2 gia' incrementato)."""
+        """Fine dell'iterazione della traccia t nel tick, come a 0x4008D1CA (d2 gia' incrementato)."""
         uc = self.uc
         regs = {UC_M68K_REG_D2: t + 1, UC_M68K_REG_A2: PAT, UC_M68K_REG_A3: PAT + 1177 * t,
                 UC_M68K_REG_A4: STEPS + t, UC_M68K_REG_D3: 100, UC_M68K_REG_A6: 200, UC_M68K_REG_A5: 300,
@@ -354,7 +354,7 @@ def test_slot_graphic_draws_the_effect(m):
     h = m.uc.hook_add(UC_HOOK_CODE, at, begin=DRAW, end=DRAW)
     m.call(m.sym["pf_gfx"], [OBJ(49) + 36, 0x800, 0x5000_5000, 30, 40])
     m.uc.hook_del(h)
-    assert got == [(0x5000_5000, 0x402A_91C0, 38, 45, 1, 0, "XXXX", "%s", "R1/4")]
+    assert got == [(0x5000_5000, 0x402A_9510, 38, 45, 1, 0, "XXXX", "%s", "R1/4")]
 
 
 def test_texts(m):
@@ -372,19 +372,19 @@ def test_texts(m):
 
 
 def test_mod_a_page_and_objects_at_boot(m):
-    page = 0x41B9_F9DC
+    page = 0x41BA_09DC
     m.uc.mem_write(page, struct.pack(">7I", 9, 47, 48, 49, 50, 51, 46))
     for pid in range(48, 52):
-        m.uc.mem_write(0x41B9_FA24 + 84 * pid, struct.pack(">I", 1))
+        m.uc.mem_write(0x41BA_0A24 + 84 * pid, struct.pack(">I", 1))
     m.call(m.sym["pf_page_stub"], [])
     assert struct.unpack(">7I", m.uc.mem_read(page, 28)) == (0, 0, 48, 49, 50, 51, 46)  # +40 (TRIG) resta
     for pid in range(48, 52):
-        assert struct.unpack(">I", m.uc.mem_read(0x41B9_FA24 + 84 * pid, 4))[0] == 0
+        assert struct.unpack(">I", m.uc.mem_read(0x41BA_0A24 + 84 * pid, 4))[0] == 0
 
 
 def test_descriptors_of_m1_to_m4(m):
     for n, pid in enumerate(range(48, 52)):
-        d = 0x4022_D59C + 52 * pid
+        d = 0x4022_D83C + 52 * pid
         mn, mx, df = struct.unpack(">3i", m.uc.mem_read(d + 8, 12))
         assert (mn, mx, df) == (0, 11 << 8, (1, 2, 8, 11)[n] << 8)
         name = struct.unpack(">I", m.uc.mem_read(d + 40, 4))[0]
@@ -392,9 +392,9 @@ def test_descriptors_of_m1_to_m4(m):
 
 
 def test_patched_bytes(m):
-    want = {0x4008_D152: "5283528e528d", 0x4002_EA92: "7223b2806c00010e", 0x4000_B420: "4eb94000839e",
-            0x4019_5294: "42b941b9f9dc", 0x4019_5202: "4024f87b", 0x4019_5236: "40251b59",
-            0x4004_0B68: "4024e83b"}
+    want = {0x4008_D1CA: "5283528e528d", 0x4002_EA92: "7223b2806c00010e", 0x4000_B420: "4eb94000839e",
+            0x4019_5458: "42b941ba09dc", 0x4019_53C6: "4024fb9b", 0x4019_53FA: "40251e79",
+            0x4004_0B68: "4024eb5b"}
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig
@@ -622,12 +622,12 @@ def dispatched(m):
 
 
 def test_retrig_page_and_qnt_parameter(m):
-    m.uc.mem_write(0x41B9_F988, struct.pack(">I", 9))
+    m.uc.mem_write(0x41BA_0988, struct.pack(">I", 9))
     m.uc.mem_write(OBJ(47), struct.pack(">I", 1))
     m.call(m.sym["qr_page_stub"], [])
-    assert struct.unpack(">I", m.uc.mem_read(0x41B9_F988, 4))[0] == 47
+    assert struct.unpack(">I", m.uc.mem_read(0x41BA_0988, 4))[0] == 47
     assert struct.unpack(">I", m.uc.mem_read(OBJ(47), 4))[0] == 0
-    d = 0x4022_D59C + 52 * 47
+    d = 0x4022_D83C + 52 * 47
     assert struct.unpack(">3i", m.uc.mem_read(d + 8, 12)) == (0, 0x100, 0)
     cstr = lambda a: bytes(m.uc.mem_read(a, 12)).split(b"\0")[0].decode()
     assert cstr(struct.unpack(">I", m.uc.mem_read(d + 40, 4))[0]) == "Quantize"
@@ -639,8 +639,8 @@ def test_retrig_page_and_qnt_parameter(m):
 
 
 def test_qnt_patched_bytes():
-    want = {0x4002_E18C: "4e56ff68700b", 0x4019_51C0: "42b941b9f988", 0x4018_AB96: "2f04", 0x4004_7D7A: "722fb2806764",
-            0x4018_ABB6: "41b9dfd0", 0x4018_ABC8: "41b9daa0"}
+    want = {0x4002_E18C: "4e56ff68700b", 0x4019_5384: "42b941ba0988", 0x4018_AD5A: "2f04", 0x4004_7D7A: "722fb2806764",
+            0x4018_AD7A: "41b9efd0", 0x4018_AD8C: "41b9eaa0"}
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig

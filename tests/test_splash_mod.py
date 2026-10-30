@@ -60,14 +60,14 @@ def test_new_animation_entries_keep_original_and_add_splash():
     for e in entries:
         o = e - BASE
         func, frames, sfunc, sframes, end0, end1 = struct.unpack_from(">IIIIII", DATA, o)
-        assert 0x4000_0400 <= func < 0x4033_9000 and frames > 0      # animazione originale (accorciata)
+        assert 0x4000_0400 <= func < 0x4033_A000 and frames > 0      # animazione originale (accorciata)
         assert (sfunc, sframes) == (BASE, make_patch.SPLASH_FRAMES) # poi il nostro splash
         assert (end0, end1) == (0, 0)                               # fine elenco
 
 
 def test_total_intro_duration_is_unchanged():
     # durate originali delle 5 animazioni (OS 1.41): 0x83, 0xD2, 0xB4, 0xB4, 0xB4 fotogrammi
-    original = {0x4008715A: 0x83, 0x4008777E: 0xD2, 0x400867B4: 0xB4, 0x40086C8C: 0xB4, 0x40086BCE: 0xB4}
+    original = {0x400871D2: 0x83, 0x400877F6: 0xD2, 0x4008682C: 0xB4, 0x40086D04: 0xB4, 0x40086C46: 0xB4}
     for p in SPEC["patches"][1:]:
         o = int(p["hex"], 16) - BASE
         func, frames, _, sframes = struct.unpack_from(">IIII", DATA, o)
@@ -82,4 +82,4 @@ def test_flipped_helper():
 
 
 def test_fits_in_the_free_region():
-    assert 0x4033_8740 <= BASE and BASE + len(DATA) <= 0x4033_9000
+    assert 0x4033_9740 <= BASE and BASE + len(DATA) <= 0x4033_A000

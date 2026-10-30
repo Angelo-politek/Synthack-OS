@@ -1,6 +1,6 @@
 """Mod master-comp: routine ColdFire vs modello (dsp.py), interfaccia, salvataggio.
 
-Esegue sull'OS Syntakt patchato il tratto 0x4009053E..0x40090562 (trampolino + comp_hook) a ogni
+Esegue sull'OS Syntakt patchato il tratto 0x400905B6..0x400905DA (trampolino + comp_hook) a ogni
 "blocco", con segnali finti sugli ADC 6/7, e le funzioni centrali dei parametri agganciate.
 Serve l'OS Syntakt 1.41 (saltato se manca).
 """
@@ -27,26 +27,26 @@ import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
 MA = modarea_layout.RAM                                    # area mod (mods/modarea)
-MA_PAGE, MA_MAP = 0x444E_0000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E1334)
+MA_PAGE, MA_MAP = 0x444E_1000, 0x2_0000                     # area mod e radice dell'interfaccia (0x444E2334)
 assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
-SY = ROOT / "firmware" / "Syntakt_OS1.41.syx"
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
 SPEC_F = ROOT / "mods" / "master-comp" / "patch.json"
 pytestmark = pytest.mark.skipif(not (SY.exists() and SPEC_F.exists()), reason="OS Syntakt o patch assenti")
 
 LOAD = 0x4000_0400
-HOOK, AFTER = 0x4009_053E, 0x4009_0562
+HOOK, AFTER = 0x4009_05B6, 0x4009_05DA
 ADC_L, ADC_R = 0x8000_3C50, 0x8000_3CD0
 HW, STACK, RET = 0x5000_2000, 0x5001_0000, 0x5000_8000
-FX_SLOTS = 0x41B9_F950
+FX_SLOTS = 0x41BA_0950
 KIT_PTR, KIT, KIT_BLK = 0x8000_30BC, 0x5000_4000, 70
-GLOB_BLK, GLOBAL_FLAGS = 0x41B9_D3B0, 0x43BD_E444
+GLOB_BLK, GLOBAL_FLAGS = 0x41B9_E3B0, 0x43BD_F444
 WOFF = {"THR": 12, "ATK": 14, "REL": 2, "MUP": 8}      # parole nel blocco esterno
-UI_ROOT, UI = 0x444E_1334, 0x5000_A000
+UI_ROOT, UI = 0x444E_2334, 0x5000_A000
 IDS = {"THR": 262, "ATK": 263, "REL": 264, "MUP": 265, "RAT": 266, "GR": 267, "COMP": 268}
 OLD_IDS = (144, 122, 91, 101, 127, 59, 115)               # alias dell'OS usati fino alla v0.8
 RAT_STEP = 0xFE0
-OBJS = 0x41B9_FA24
+OBJS = 0x41BA_0A24
 GET, SET, KIT_FN = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
 REGS = [getattr(__import__("unicorn.m68k_const", fromlist=["x"]), f"UC_M68K_REG_{r}")
         for r in ("D0", "D2", "D4", "D5", "D6", "D7", "A0", "A1", "A2", "A4", "A5")]
@@ -71,8 +71,8 @@ class Machine:
             uc.mem_write(dst, bytes.fromhex(p["hex"]))
         uc.mem_map(0x8000_0000, 0x1_0000)
         uc.mem_map(0x5000_0000, 0x2_0000)
-        uc.mem_map(0x41B9_D000, 0xA000)                     # globale, pagine, oggetti (BSS, fino a id 268)
-        uc.mem_map(0x43BD_E000, 0x1000)                     # bit global
+        uc.mem_map(0x41B9_E000, 0xA000)                     # globale, pagine, oggetti (BSS, fino a id 268)
+        uc.mem_map(0x43BD_F000, 0x1000)                     # bit global
         uc.mem_write(FX_SLOTS, struct.pack(">8i", 0, 0, 0, 0, 0, 0, 0, 150))
         uc.mem_write(KIT_PTR, struct.pack(">I", KIT if kit else 0))
         uc.mem_write(RET, b"\x4e\x75")
@@ -302,7 +302,7 @@ def test_page_stub_sets_the_knobs_at_boot(setup):
     assert list(struct.unpack(">8i", m.uc.mem_read(FX_SLOTS, 32))) == [*IDS.values(), 150]
     assert m.uc.reg_read(UC_M68K_REG_D0) == 0x1234
     sec = {int(p["addr"], 16): p for p in spec["patches"] if not p.get("append")}
-    assert 0x4019_5156 in sec                                   # al posto dell'ultimo clr.l delle caselle
+    assert 0x4019_531A in sec                                   # al posto dell'ultimo clr.l delle caselle
 
 
 def test_audio_block_leaves_the_page_alone(setup):
@@ -518,7 +518,7 @@ def test_old_alias_ids_are_left_to_the_os(setup):
     table = [p for p in spec["patches"] if p.get("append") and "vparams[" in p.get("what", "")]
     ids = {struct.unpack(">H", bytes.fromhex(p["hex"])[:2])[0] for p in table}
     assert ids == set(IDS.values())
-    desc = 0x4022_D59C
+    desc = 0x4022_D83C
     for i in OLD_IDS:
         lo, hi = desc + 52 * i, desc + 52 * i + 52
         assert not any(lo < int(p["addr"], 16) + p["len"] and int(p["addr"], 16) < hi

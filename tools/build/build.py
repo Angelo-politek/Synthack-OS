@@ -1,6 +1,6 @@
 """Costruisce un .syx Syntakt+ applicando le mod all'OS stock dell'utente.
 
-    python tools/build/build.py --stock firmware/Syntakt_OS1.41.syx mods/mod-zero -o out/build/syntakt_plus.syx
+    python tools/build/build.py --stock firmware/Syntakt_OS1.42.syx mods/mod-zero -o out/build/syntakt_plus.syx
 
 Il repo non contiene byte Elektron: una patch dice DOVE scrivere, l'IMPRONTA (SHA-256) dei
 byte originali che si aspetta di trovare li', e i byte NUOVI (nostri). Il build si ferma se
@@ -10,9 +10,9 @@ Formato di mods/<nome>/patch.json:
     {
       "name": "mod-zero",
       "description": "...",
-      "os": "1.41",
+      "os": "1.42",
       "patches": [
-        {"section": 3, "addr": "0x4024F897", "len": 11,
+        {"section": 3, "addr": "0x4024FBB7", "len": 11,
          "expect_sha256": "<impronta dei byte originali>",
          "ascii": "SYNTHACK IN"}            # oppure "hex": "4e71..."
       ]
@@ -57,7 +57,7 @@ import render  # noqa: E402
 LOAD_ADDR = 0x4000_0400                 # sezioni 3 e 7 si caricano qui (vedi docs/)
 PATCHABLE = {3, 7}
 APPENDABLE = {3}                        # sezione 7: limite del caricatore della CPU #2 da trovare (modarea7)
-STOCK_SHA256 = {"1.41": "8e2488f462c4a5656396a895f113bcd415e9900fa8709340dccf45d4cb9ed19e"}
+STOCK_SHA256 = {"1.42": "ded3c59fdb909eb9e2c3307b30a486452c8fa6947b12c14e0ce35a187b7f37c1"}
 
 
 class BuildError(RuntimeError):

@@ -2,11 +2,11 @@
 
 Gives mods **64 KB of RAM**, loaded compressed, in a block of the OS heap that nobody else can get.
 
-The OS image has only ~2 KB of free space, and everything after it is zeroed at boot. So larger mods are appended to section 3 (patch entries with `"append": true`, at `0x40348000 + offset`). The build compresses that area (SHLZ, `tools/build/lz.py`).
+The OS image has only ~2 KB of free space, and everything after it is zeroed at boot. So larger mods are appended to section 3 (patch entries with `"append": true`, at `0x40349000 + offset`). The build compresses that area (SHLZ, `tools/build/lz.py`).
 
-- **Where:** the first 64 KB block of the OS heap (buddy allocator `0x4010350C`, 16 MB pool at `0x444E38C0`), from `+0x10` (the heap initialization writes 12 bytes at its start). Addresses in `tools/build/modarea_layout.py`.
+- **Where:** the first 64 KB block of the OS heap (buddy allocator `0x401036D0`, 16 MB pool at `0x444E48C0`), from `+0x10` (the heap initialization writes 12 bytes at its start). Addresses in `tools/build/modarea_layout.py`.
 - **Boot:** `jmp` at the start of `0x400004B2` (BSS clear, called once): the loader unpacks the area, zeroes the rest of it, then zeroes the BSS **around** it and returns.
-- **Reservation:** `jsr` at the end of the heap initialization (`0x4010358E`): before any other request the loader asks the allocator for 64 KB and always gets index 0. The heap lock is recursive. From then on the OS never hands that block out.
+- **Reservation:** `jsr` at the end of the heap initialization (`0x40103752`): before any other request the loader asks the allocator for 64 KB and always gets index 0. The heap lock is recursive. From then on the OS never hands that block out.
 - **Why not above the BSS** (v0.8.1 and earlier, `0x46000000`): that RAM has no code or data reference, but the OS writes all over it at runtime when it loads samples ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)).
 - Cost: 64 KB of the 16 MB heap; boot time unchanged.
 - Mods using it declare `"requires": ["modarea"]` and link their code at `modarea_layout.RAM + offset`.

@@ -81,8 +81,8 @@ def load_section7(path: Path) -> bytes:
 
 
 def default_section7() -> Path:
-    raw = REPO / "unpacked" / "Syntakt_OS1.41" / "section_7_blob.raw"
-    return raw if raw.exists() else REPO / "firmware" / "Syntakt_OS1.41.syx"
+    raw = REPO / "unpacked" / "Syntakt_OS1.42" / "section_7_blob.raw"
+    return raw if raw.exists() else REPO / "firmware" / "Syntakt_OS1.42.syx"
 
 
 def new_cpu(section7: bytes) -> Uc:

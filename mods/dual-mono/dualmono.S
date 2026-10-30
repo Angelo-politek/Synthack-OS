@@ -1,9 +1,9 @@
 | Dual mono — INPUT L e INPUT R come due ingressi separati (sezione 3, Syntakt OS 1.41)
 |
-| Il blocco originale che calcola i guadagni dell'ingresso esterno (0x40090872..0x400908FC, nella
-| funzione dei guadagni 0x400903CA) resta al suo posto: due agganci minimi lo circondano.
-|   ingresso 0x40090872: jsr pre_hook ; nop     (al posto di due move.w, rieseguite qui)
-|   uscita   0x400908FC: jsr post_hook          (al posto di move.l #32639,d1, rieseguita qui)
+| Il blocco originale che calcola i guadagni dell'ingresso esterno (0x400908EA..0x40090974, nella
+| funzione dei guadagni 0x40090442) resta al suo posto: due agganci minimi lo circondano.
+|   ingresso 0x400908EA: jsr pre_hook ; nop     (al posto di due move.w, rieseguite qui)
+|   uscita   0x40090974: jsr post_hook          (al posto di move.l #32639,d1, rieseguita qui)
 | a2 = parametri del mixer (array del motore), a3 = struttura hw (CV), d4 = legge di bilanciamento.
 |
 | STEREO (flag EXTERNAL IN != 0): il blocco gira una volta, identico all'originale.
@@ -20,26 +20,26 @@
         .equ    P_PAN,          0x70E           | a2: BAL
         .equ    PAN_CENTER,     0x4000
         .equ    HW_EXTIN_L,     0x08            | a3 + 8:  CV extin_left
-        .equ    BLOCK,          0x40090872      | inizio del blocco originale
+        .equ    BLOCK,          0x400908EA      | inizio del blocco originale
 
         | pagina "MIX3 / External Mixer" (oggetto statico in RAM), 8 manopole da +8
-        .equ    MIX3_SLOTS,     0x41B9F7F0
+        .equ    MIX3_SLOTS,     0x41BA07F0
         .equ    ID_INLR,        126
         .equ    ID_BAL,         128
         .equ    ID_INR,         125             | alias "Input Level" (barra), id interno reso 0x25 = BAL
         .equ    ID_DEL,         129
         .equ    ID_REV,         130
         .equ    ID_FXROUT,      132
-        | nomi brevi nella tabella dei parametri (0x4022E164 + 52*indice + 48)
-        .equ    NAME_INLR,      0x4022E164 + 52*68 + 48
-        .equ    ORIG_INLR,      0x40253B6E      | "IN LR"
-        .equ    NAME_INR,       0x4022E164 + 52*67 + 48 | alias 125
-        .equ    ORIG_IN,        0x4024F8A7      | "IN"
-        | nomi lunghi (titolo in alto mentre si gira la manopola): 0x4022D59C + 52*id + 40
-        .equ    LONG_INLR,      0x4022D59C + 52*126 + 40
-        .equ    LONG_INR,       0x4022D59C + 52*125 + 40
-        .equ    ORIG_LONG_INLR, 0x40253B60      | "In Left/Right"
-        .equ    ORIG_LONG_INR,  0x40253B4D      | "Input Level"
+        | nomi brevi nella tabella dei parametri (0x4022E404 + 52*indice + 48)
+        .equ    NAME_INLR,      0x4022E404 + 52*68 + 48
+        .equ    ORIG_INLR,      0x40253E8E      | "IN LR"
+        .equ    NAME_INR,       0x4022E404 + 52*67 + 48 | alias 125
+        .equ    ORIG_IN,        0x4024FBC7      | "IN"
+        | nomi lunghi (titolo in alto mentre si gira la manopola): 0x4022D83C + 52*id + 40
+        .equ    LONG_INLR,      0x4022D83C + 52*126 + 40
+        .equ    LONG_INR,       0x4022D83C + 52*125 + 40
+        .equ    ORIG_LONG_INLR, 0x40253E80      | "In Left/Right"
+        .equ    ORIG_LONG_INR,  0x40253E6D      | "Input Level"
 
         .text
         .globl  pre_hook, post_hook

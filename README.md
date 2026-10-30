@@ -1,6 +1,6 @@
 # SyntHack OS
 
-Unofficial, modular firmware mods for the **Elektron Syntakt** (OS 1.41).
+Unofficial, modular firmware mods for the **Elektron Syntakt** (OS 1.42).
 Each mod is a small patch applied to the stock OS you download from elektron.se — no firmware is distributed here.
 
 > **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
@@ -60,12 +60,12 @@ Technical findings: [docs/](docs). Writing your own mod: [docs/modding-guide.md]
 
 ## Build your OS
 
-Requires Python 3, WSL/Linux and your own `Syntakt_OS1.41.syx` (see [firmware/README.md](firmware/README.md)).
+Requires Python 3, WSL/Linux and your own `Syntakt_OS1.42.syx` (see [firmware/README.md](firmware/README.md)).
 
 ```sh
 bash tools/unpack/setup_eft.sh                 # once (WSL/Linux)
 git config core.hooksPath tools/hooks          # once: blocks firmware files from commits
-python tools/build/build.py --stock firmware/Syntakt_OS1.41.syx \
+python tools/build/build.py --stock firmware/Syntakt_OS1.42.syx \
     mods/splash mods/dual-mono mods/master-comp mods/readable-values mods/perf-fx mods/fx3 -o out/synthack.syx
 ```
 
