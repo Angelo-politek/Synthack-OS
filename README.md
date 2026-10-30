@@ -51,6 +51,13 @@ flowchart LR
 
 Technical findings: [docs/](docs). Writing your own mod: [docs/modding-guide.md](docs/modding-guide.md).
 
+## Documentation
+
+- **Musicians:** [users guide](web-builder/content/users.md) — build, flash, go back, how to use each mod, FAQ.
+- **Modders:** [modders guide](web-builder/content/modders.md) — architecture, workflow, rules, CPU budget;
+  [create your mod](web-builder/content/create-mod.md) — try it in the builder and submit it.
+- [RECOVERY.md](RECOVERY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [LEGAL.md](LEGAL.md)
+
 ## Build your OS
 
 Requires Python 3, WSL/Linux and your own `Syntakt_OS1.41.syx` (see [firmware/README.md](firmware/README.md)).

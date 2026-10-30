@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Device doesn't boot
+    url: https://github.com/Angelo-politek/Synthack-OS/blob/main/RECOVERY.md
+    about: Recovery procedure. Flash the stock OS over MIDI DIN first, then report the bug.
+  - name: Writing a mod
+    url: https://github.com/Angelo-politek/Synthack-OS/blob/dev/web-builder/content/modders.md
+    about: Architecture, workflow, rules and pitfalls for modders.
