@@ -1,4 +1,4 @@
-**Supported OS:** Syntakt OS 1.41 today; OS 1.42 from v1.0. New work can already target 1.42.
+**Supported OS:** Syntakt OS 1.42. A mod written for 1.41 can be ported with `tools/build/port_source.py`.
 
 Have an idea for the Syntakt, or a hack that already works on your device? Bring it here as a mod. Every mod merged
 into SyntHack is checked against all the others and reaches every user of this site, who can combine it with
@@ -39,7 +39,7 @@ fields as `mod.json`):
 ```json
 {
   "name": "my-mod",
-  "os": "1.41",
+  "os": "1.42",
   "requires": ["modarea"],
   "card": {
     "title": "My mod",

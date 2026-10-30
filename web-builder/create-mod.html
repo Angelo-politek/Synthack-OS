@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Create your mod · SyntHack OS</title>
+  <meta name="description" content="Write a SyntHack OS mod for the Elektron Syntakt, try it in the browser builder and submit it as a pull request.">
+  <meta name="theme-color" content="#07090b">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+<body>
+<!-- @header -->
+<main id="main">
+  <section class="page-hero wrap">
+    <p class="kicker">// contribute</p>
+    <h1>Create your mod</h1>
+    <p class="lead">Build a mod with the guide below, or with an AI coding agent and our prompt. Try it in the builder, then send it as a pull request so every user can pick it.</p>
+    <ol class="jump">
+      <li><a href="#before-you-start">Read the guide</a></li>
+      <li><a href="#prompt">Copy the agent prompt</a></li>
+      <li><a href="#load">Load your mod</a></li>
+      <li><a href="#submit-it">Open a pull request</a></li>
+    </ol>
+  </section>
+  <div class="wrap doc-layout">
+    <nav class="toc" aria-label="On this page"><p class="toc-title">On this page</p><ol id="toc"></ol></nav>
+    <div class="doc-main" id="doc-main">
+      <article class="prose"><!-- @md:create-mod.md --></article>
+
+      <section id="prompt" class="panel" aria-labelledby="prompt-h">
+        <h2 id="prompt-h">Prompt for an AI coding agent</h2>
+        <p>Paste it into your coding agent, in your clone of the repository, on a new branch from <code>dev</code>.
+          It makes the agent read the rules first, work only in your mod's folder, test in the emulator and prepare the pull request description for you to review.</p>
+        <div class="code-box">
+          <div class="code-bar"><span>agent-prompt.md</span><button id="copy" class="btn small" type="button">Copy prompt</button></div>
+          <pre><code id="prompt-text"><!-- @text:agent-prompt.md --></code></pre>
+        </div>
+        <p id="copy-status" class="status" aria-live="polite"></p>
+      </section>
+
+      <section id="load" class="panel" aria-labelledby="load-h">
+        <h2 id="load-h">Load your mod (.json)</h2>
+        <p>Choose your mod's <code>patch.json</code>. It is checked here and stored <strong>only in this browser</strong>:
+          it then appears in <a href="./index.html#step-mods">Create your OS</a>, marked as local, until it is merged and the site is updated.</p>
+        <label class="drop" id="mod-drop">
+          <input type="file" id="mod-file" accept=".json,application/json">
+          <span class="drop-mark" aria-hidden="true">[ .json ]</span>
+          <span>Choose patch.json, or drop it here</span>
+        </label>
+        <div id="mod-status" class="status" aria-live="polite"></div>
+        <h3 class="list-title">Your local mods</h3>
+        <ul id="local-list" class="local-list"></ul>
+        <p id="local-problems" class="status bad" hidden></p>
+      </section>
+    </div>
+  </div>
+</main>
+<!-- @footer -->
+<script type="module" src="./src/create-mod.ts"></script>
+</body>
+</html>

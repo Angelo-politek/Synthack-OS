@@ -9,8 +9,9 @@ name stays on it: the mod's README credits its authors, and third-party code kee
 
 ## Architecture
 
-**Supported OS:** Syntakt OS 1.41 today; OS 1.42 from v1.0 (the 1.42 port is in progress, and new work can already
-target it). Addresses on this page and in the linked docs are for the supported OS.
+**Supported OS:** Syntakt OS 1.42. Mod sources, tests and `patch.json` use 1.42 addresses. The technical notes in
+`docs/` were written on 1.41: `tools/build/osmap.py` converts any 1.41 address, and `tools/build/port_source.py`
+ports a whole 1.41 mod (sources and tests) to 1.42.
 
 ```
 stock .syx (user's own)          mods/<name>/patch.json (ours)

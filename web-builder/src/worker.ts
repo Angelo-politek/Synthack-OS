@@ -7,6 +7,7 @@ export interface Request {
   mods: string[];
   specs: Record<string, ModSpec>;
   outName: string;
+  splashName?: string;
 }
 
 export type Reply =
@@ -17,14 +18,14 @@ export type Reply =
 const post = (r: Reply, transfer: Transferable[] = []): void => self.postMessage(r, { transfer });
 
 self.onmessage = (e: MessageEvent<Request>) => {
-  const { stock, mods, specs, outName } = e.data;
+  const { stock, mods, specs, outName, splashName } = e.data;
   let last = -1;
   try {
     const r = build(new Uint8Array(stock), mods, specs, outName, (p) => {
       const pct = p.total ? Math.floor((100 * p.done!) / p.total) : -1;
       if (p.stage !== "compress" || pct !== last) post({ kind: "progress", progress: p });
       last = pct;
-    });
+    }, { splashName });
     post({ kind: "done", syx: r.syx, manifest: r.manifest, log: r.log }, [r.syx.buffer]);
   } catch (err) {
     post({ kind: "error", message: err instanceof Error ? err.message : String(err) });

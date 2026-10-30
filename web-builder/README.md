@@ -1,6 +1,6 @@
 # Web builder
 
-Build a SyntHack OS `.syx` in the browser from your own stock `Syntakt_OS1.41.syx`. Nothing is uploaded: the page
+Build a SyntHack OS `.syx` in the browser from your own stock `Syntakt_OS1.42.syx`. Nothing is uploaded: the page
 reads the file, applies the mods and runs every check locally, in a Web Worker.
 
 It is a TypeScript port of the command-line chain and gives **the same bytes** as `tools/build/build.py` for the same
@@ -30,7 +30,7 @@ npm ci
 npm run dev                  # page at http://localhost:5173
 npm test                     # unit tests, no firmware needed
 npm run build                # static page in dist/
-node scripts/build-cli.ts --stock ../firmware/Syntakt_OS1.41.syx splash fx3 -o ../out/web.syx   # no WSL needed
+node scripts/build-cli.ts --stock ../firmware/Syntakt_OS1.42.syx splash fx3 -o ../out/web.syx   # no WSL needed
 ```
 
-A full build takes about 30 s (recompressing the 3.4 MB OS section).
+A full build takes 30 to 60 s (recompressing the 3.4 MB OS section).

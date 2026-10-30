@@ -10,8 +10,8 @@ your browser: nothing is uploaded, and no firmware is distributed. To undo it, f
 
 ## What you need
 
-**Supported OS:** Syntakt OS 1.41 today; OS 1.42 from v1.0. Everything on this page about "the stock OS" means
-this version.
+**Supported OS:** Syntakt OS 1.42 (the current release on elektron.se). Everything on this page about "the stock OS"
+means this version.
 
 - An Elektron Syntakt and a USB cable.
 - The stock OS file from [elektron.se](https://www.elektron.se/support-downloads/syntakt), unmodified.
@@ -22,13 +22,13 @@ this version.
 ## Build your OS
 
 1. Download the stock OS from elektron.se.
-2. On the **Build** page, choose the `.syx` file (or drop it on the page). The page checks its SHA-256 fingerprint
+2. In **Create your OS** on the home page, choose the `.syx` file (or drop it on the page). The page checks its SHA-256 fingerprint
    and refuses any other file, including an already modified one.
 3. Pick your mods. Mods that others need (mod area, virtual parameters, kit storage) are added automatically.
    The boot splash is part of every build.
 4. Optional: type your name to show it on the boot splash (letters, digits, `.` and `-`, up to 20 characters,
    shown in capitals).
-5. Click **Build my OS**. A build takes about 30 seconds.
+5. Click **Build my OS**. A build takes 30 to 60 seconds.
 6. Download `synthack.syx` and the **build report** (`.json`). Keep the report: it lists the stock OS, the mods and
    the fingerprint of your file, and it helps if you report a bug.
 
@@ -181,7 +181,7 @@ support for help with a modded OS; flash the stock OS first.
 
 ### Which OS version do I need?
 
-The one named under [What you need](#what-you-need), downloaded from elektron.se and unmodified. The Build page checks its
+The one named under [What you need](#what-you-need), downloaded from elektron.se and unmodified. The builder checks its
 fingerprint and refuses any other file.
 
 ### Can I share my built file?
