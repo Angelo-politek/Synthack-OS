@@ -22,9 +22,9 @@ sys.path.insert(0, str(ROOT))
 SY = ROOT.parent / "firmware" / "Syntakt_OS1.42.syx"
 pytestmark = pytest.mark.skipif(not SY.exists(), reason="OS stock assente")
 
-# tetti (istruzioni per blocco): valori misurati il 2026-10-27, da abbassare con le ottimizzazioni
-CEILING = {"fx3": 3600, "master-comp": 650, "dual-mono v2": 340, "dual-mono v1": 140}
-TOTAL = 4700
+# tetti (istruzioni per blocco): misurati il 2026-10-30 su OS 1.42 dopo le ottimizzazioni di fx3 (prima: fx3 3555, totale 4590)
+CEILING = {"fx3": 3250, "master-comp": 650, "dual-mono v2": 340, "dual-mono v1": 140}
+TOTAL = 4300
 
 
 def counted(uc, fn):

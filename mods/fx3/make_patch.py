@@ -198,7 +198,7 @@ def main() -> None:
             if re.match(r"^(mac[lw]|msac[lw]|movclrl)$", m[2]) or re.search(r"%(acc|macsr|mask)", m[3])]
     sums = [x for x in emac if syms["fx3_sum"] <= x < syms["fx3_sum_end"]]      # somme del bus
     allowed = sorted([syms["fx3_trk_hook"], syms["fx3_trk_hook"] + 4, syms["fx3_macsr"]] + sums)
-    if emac != allowed or len(sums) != (16 + 1) + (8 + 1) + (24 + 1) + 7:
+    if emac != allowed or len(sums) != (16 + 1) + (8 + 1) + (24 + 1) + 7 + 11:
         raise SystemExit(f"EMAC fuori dai trampolini e dalle somme: {[hex(a) for a in emac]}")
 
     def fixed(addr: int, new: bytes, what: str, expect: str | None = None) -> dict:
