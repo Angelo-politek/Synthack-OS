@@ -51,6 +51,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bootcheck  # noqa: E402
 import lz  # noqa: E402
 
+sys.path.insert(0, str(REPO / "tools" / "splash"))
+import render  # noqa: E402
+
 LOAD_ADDR = 0x4000_0400                 # sezioni 3 e 7 si caricano qui (vedi docs/)
 PATCHABLE = {3, 7}
 APPENDABLE = {3}                        # sezione 7: limite del caricatore della CPU #2 da trovare (modarea7)
@@ -128,9 +131,23 @@ def resolve(moddirs: list[Path], search: tuple[Path, ...] = (REPO / "mods",)) ->
     return order, added
 
 
-def load_mod(moddir: Path, os_version: str) -> list[Patch]:
+def named_splash(spec: dict, name: str) -> dict:
+    """La splash con un nome in piccolo sotto la versione: ridisegna il logo dentro la prima patch
+    (posizione e orientamento dichiarati nel layout di mods/splash/patch.json)."""
+    lay, first = spec["layout"], spec["patches"][0]
+    data = bytearray.fromhex(first["hex"])
+    a, n = lay["logo_offset"], lay["logo_len"]
+    bm = render.Bitmap.from_bytes_syntakt(bytes(data[a:a + n])).flipped(lay["flip"])
+    render.draw_name(bm, name, lay["name_y"])
+    data[a:a + n] = bm.flipped(lay["flip"]).to_bytes_syntakt()
+    return {**spec, "patches": [{**first, "hex": data.hex()}, *spec["patches"][1:]]}
+
+
+def load_mod(moddir: Path, os_version: str, splash_name: str = "") -> list[Patch]:
     spec = read_spec(moddir)
     name = spec["name"]
+    if name == "splash" and render.clean_name(splash_name):
+        spec = named_splash(spec, splash_name)
     if spec.get("os") != os_version:
         raise BuildError(f"{name}: scritta per OS {spec.get('os')}, non per {os_version}")
     patches = []
@@ -207,7 +224,7 @@ def apply_patches(sections: dict[int, bytearray], patches: list[Patch]) -> None:
         sec[p.offset:p.end] = p.data
 
 
-def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
+def build(stock: Path, moddirs: list[Path], out: Path, log=print, splash_name: str = "") -> dict:
     info = eft.info(stock)
     if "Syntakt" not in info.device or not info.checksums_ok:
         raise BuildError(f"{stock}: non e' un OS Syntakt valido")
@@ -217,7 +234,7 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
     moddirs, added = resolve(moddirs)
     if added:
         log(f"  dipendenze aggiunte: {', '.join(added)}")
-    patches = [p for d in moddirs for p in load_mod(d, version)]
+    patches = [p for d in moddirs for p in load_mod(d, version, splash_name)]
     needed = sorted({p.section for p in patches})
 
     with tempfile.TemporaryDirectory(prefix="syntakt-build-") as tmp:
@@ -289,6 +306,8 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print) -> dict:
         "output_sha256": sha256(out.read_bytes()),
         "boot_margin": margin,
     }
+    if render.clean_name(splash_name):
+        manifest["splash_name"] = render.clean_name(splash_name)
     out.with_suffix(".json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest
 
@@ -298,9 +317,10 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--stock", type=Path, required=True, help="OS stock scaricato da elektron.se")
     ap.add_argument("mods", type=Path, nargs="+", help="cartelle mods/<nome>")
     ap.add_argument("-o", "--out", type=Path, required=True)
+    ap.add_argument("--name", default="", help="nome sulla splash d'avvio, sotto la versione (A-Z 0-9 . -)")
     a = ap.parse_args(argv)
     try:
-        m = build(a.stock, a.mods, a.out)
+        m = build(a.stock, a.mods, a.out, splash_name=a.name)
     except (BuildError, eft.EftError) as e:
         print(f"BUILD FALLITO: {e}", file=sys.stderr)
         return 1

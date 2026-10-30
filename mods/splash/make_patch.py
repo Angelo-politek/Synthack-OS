@@ -108,10 +108,15 @@ def main() -> None:
                         "expect_sha256": sha(sec3[op - LOAD:op + 4 - LOAD]),
                         "hex": struct.pack(">I", new).hex(),
                         "what": f"pea {entry:#x} -> pea {new:#x}"})
+    art = render.figlet("SyntHack", FIGLET_FONT)
+    logo_at = bytes(blob).index(logo)
     spec = {"name": "splash", "os": "1.41",
             "description": f"Splash 'SyntHack {VERSION}' (figlet {FIGLET_FONT}) negli ultimi {SPLASH_FRAMES} "
                            f"fotogrammi dell'animazione d'avvio (durata totale invariata; flip={FLIP}).",
-            "generated_by": "mods/splash/make_patch.py", "patches": patches}
+            "generated_by": "mods/splash/make_patch.py",
+            # dove sta il logo nella prima patch: il build puo' aggiungere un nome (render.draw_name)
+            "layout": {"logo_offset": logo_at, "logo_len": len(logo), "name_y": render.name_y(art, 6), "flip": FLIP},
+            "patches": patches}
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
     print(f"patch.json: codice+logo+voci = {len(blob)} B a {FREE_START:#x}..{end:#x}; "
           f"5 pea reindirizzate; anteprima out/splash/splash_final.png")

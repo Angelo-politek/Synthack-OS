@@ -3,6 +3,12 @@
   "os": "1.41",
   "description": "Splash 'SyntHack v0.9.0' (figlet smslant) negli ultimi 57 fotogrammi dell'animazione d'avvio (durata totale invariata; flip=v).",
   "generated_by": "mods/splash/make_patch.py",
+  "layout": {
+    "logo_offset": 28,
+    "logo_len": 1024,
+    "name_y": 57,
+    "flip": "v"
+  },
   "patches": [
     {
       "section": 3,

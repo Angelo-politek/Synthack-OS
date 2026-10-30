@@ -11,6 +11,7 @@ identica, pixel per pixel, a quello che apparira' sullo schermo.
 from __future__ import annotations
 
 import argparse
+import json
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -38,16 +39,14 @@ GLYPHS: dict[str, list[tuple[tuple[float, float], tuple[float, float]]]] = {
     "#": [((0, y / 4), (1, y / 4)) for y in range(5)],
 }
 
-# Font bitmap 3x5 per il testo normale (versione)
-TEXT_FONT = {
-    "v": ["...", "...", "#.#", "#.#", ".#."], ".": ["...", "...", "...", "...", ".#."],
-    "0": ["###", "#.#", "#.#", "#.#", "###"], "1": [".#.", "##.", ".#.", ".#.", "###"],
-    "2": ["##.", "..#", ".#.", "#..", "###"], "3": ["##.", "..#", ".#.", "..#", "##."],
-    "4": ["#.#", "#.#", "###", "..#", "..#"], "5": ["###", "#..", "##.", "..#", "##."],
-    "6": [".##", "#..", "###", "#.#", "###"], "7": ["###", "..#", ".#.", ".#.", ".#."],
-    "8": ["###", "#.#", "###", "#.#", "###"], "9": ["###", "#.#", "###", "..#", "##."],
-    " ": ["...", "...", "...", "...", "..."],
-}
+# Font bitmap 3x5 per il testo normale (versione, nome), condiviso con il web builder
+TEXT_FONT: dict[str, list[str]] = json.loads((Path(__file__).with_name("font3x5.json")).read_text(encoding="utf-8"))
+NAME_MAX = 20                           # caratteri del nome sotto la versione (4 px ciascuno a scala 1)
+
+
+def clean_name(s: str) -> str:
+    """Nome per la splash: maiuscole, solo i caratteri del font, al massimo NAME_MAX."""
+    return "".join(c for c in s.upper() if c in TEXT_FONT and c != "v")[:NAME_MAX].strip()
 
 
 @dataclass
@@ -146,8 +145,20 @@ def draw_text(bm: Bitmap, text: str, x0: int, y0: int, scale: int = 1) -> None:
                             bm.set(x0 + (i * 4 + c) * scale + sx, y0 + r * scale + sy)
 
 
-def compose(art: list[str], cw: int, ch: int, version: str = "v0.1") -> Bitmap:
-    """Logo centrato in alto, versione centrata sotto."""
+def name_y(art: list[str], ch: int) -> int:
+    """Riga del nome: sotto la versione, a 2 px (logo e versione restano dove sono)."""
+    ah = len(art) * ch
+    return max(0, (H - (ah + 6 + 10)) // 2) + ah + 6 + 10 + 2
+
+
+def draw_name(bm: Bitmap, name: str, y: int) -> None:
+    name = clean_name(name)
+    if name:
+        draw_text(bm, name, (W - (len(name) * 4 - 1)) // 2, y)
+
+
+def compose(art: list[str], cw: int, ch: int, version: str = "v0.1", name: str = "") -> Bitmap:
+    """Logo centrato in alto, versione centrata sotto, nome (facoltativo) in piccolo in fondo."""
     bm = Bitmap.blank()
     aw, ah = max(len(l) for l in art) * cw, len(art) * ch
     vh = 5 * 2
@@ -156,6 +167,7 @@ def compose(art: list[str], cw: int, ch: int, version: str = "v0.1") -> Bitmap:
     draw_art(bm, art, cw, ch, (W - aw) // 2, top)
     vw = (len(version) * 4 - 1) * 2
     draw_text(bm, version, (W - vw) // 2, top + ah + gap, scale=2)
+    draw_name(bm, name, name_y(art, ch))
     return bm
 
 

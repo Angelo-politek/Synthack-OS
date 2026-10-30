@@ -24,7 +24,7 @@ import lz  # noqa: E402
 
 NODE = shutil.which("node")
 needs_node = pytest.mark.skipif(not NODE, reason="Node.js assente")
-KINDS = {"feature", "infra", "test"}
+KINDS = {"base", "feature", "machine", "infra", "test"}
 
 
 def test_every_mod_has_a_card():
@@ -62,20 +62,31 @@ def test_shlz_same_stream_as_python(tmp_path):
         assert dst.read_bytes() == lz.compress(data), k
 
 
+@needs_node
+@pytest.mark.parametrize("name", ["", "Angelo Tedesco", "a-very-long-name 1234567890", "!!!"])
+def test_named_splash_same_bytes_as_python(name):
+    import build
+    spec = json.loads((ROOT / "mods" / "splash" / "patch.json").read_text(encoding="utf-8"))
+    want = build.named_splash(spec, name)["patches"][0]["hex"] if build.render.clean_name(name) else spec["patches"][0]["hex"]
+    got = node(WB / "scripts" / "codec-cli.ts", "splash", ROOT / "mods" / "splash" / "patch.json", name).stdout
+    assert got == want
+
+
 MODS = ["splash", "dual-mono", "master-comp", "readable-values", "perf-fx", "fx3"]
 
 
 @needs_node
 @pytest.mark.skipif(not SY.exists(), reason="OS stock assente")
-def test_full_build_identical_to_build_py(tmp_path):
+@pytest.mark.parametrize("mods,name", [(MODS, ""), (["splash"], "Angelo Tedesco")])
+def test_full_build_identical_to_build_py(tmp_path, mods, name):
     import build
     import eft
     try:
         eft._find_bin()
     except eft.EftError:
         pytest.skip("elektron-firmware-tool assente")
-    ref = build.build(SY, [ROOT / "mods" / m for m in MODS], tmp_path / "ref.syx", log=lambda *_: None)
-    node(WB / "scripts" / "build-cli.ts", "--stock", SY, *MODS, "-o", tmp_path / "web.syx")
+    ref = build.build(SY, [ROOT / "mods" / m for m in mods], tmp_path / "ref.syx", log=lambda *_: None, splash_name=name)
+    node(WB / "scripts" / "build-cli.ts", "--stock", SY, *mods, "-o", tmp_path / "web.syx", "--name", name)
     assert (tmp_path / "web.syx").read_bytes() == (tmp_path / "ref.syx").read_bytes()
     web = json.loads((tmp_path / "web.json").read_text(encoding="utf-8"))
     assert {**web, "output": "ref.syx"} == ref

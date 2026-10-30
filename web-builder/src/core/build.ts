@@ -6,6 +6,7 @@ import { depackMargin } from "./aplib.ts";
 import { Firmware, SYNTAKT } from "./firmware.ts";
 import { sha256hex } from "./sha256.ts";
 import * as shlz from "./shlz.ts";
+import { cleanName, namedSplash } from "./splash.ts";
 
 const LOAD_ADDR = 0x4000_0400;            // sezioni 3 e 7 si caricano qui
 const PATCHABLE = new Set([3, 7]);
@@ -54,7 +55,14 @@ export interface Manifest {
   output: string;
   output_sha256: string;
   boot_margin: number;
+  splash_name?: string;
 }
+
+export interface Options {
+  splashName?: string;     // nome sulla splash d'avvio (vuoto: la splash standard)
+}
+
+export const BASE_MODS = ["splash"];       // in ogni build del sito
 
 export interface Progress {
   stage: "check" | "patch" | "compress" | "verify";
@@ -159,9 +167,10 @@ export interface BuildResult {
   log: string[];
 }
 
-/** stock: il .syx scaricato da elektron.se; mods: le mod scelte (le dipendenze si aggiungono da sole). */
+/** stock: il .syx scaricato da elektron.se; mods: le mod scelte (le dipendenze si aggiungono da sole; la
+ * splash c'e' sempre, prima delle altre, come in build.py quando la si indica per prima). */
 export function build(stock: Uint8Array, mods: string[], specs: Record<string, ModSpec>, outName: string,
-                      onProgress: (p: Progress) => void = () => {}): BuildResult {
+                      onProgress: (p: Progress) => void = () => {}, opts: Options = {}): BuildResult {
   const log: string[] = [];
   onProgress({ stage: "check" });
   const fw = new Firmware(stock);
@@ -169,9 +178,10 @@ export function build(stock: Uint8Array, mods: string[], specs: Record<string, M
   if (fw.device !== SYNTAKT || !fw.verify().ok) throw new BuildError("this is not a valid Syntakt OS file");
   const stockSha = sha256hex(stock);
   if (STOCK_SHA256[version] !== stockSha) throw new BuildError(`this is not the expected stock OS ${version} (different fingerprint)`);
-  const { order, added } = resolve(mods, specs);
+  const { order, added } = resolve([...BASE_MODS.filter((b) => specs[b] && !mods.includes(b)), ...mods], specs);
   if (added.length) log.push(`dependencies added: ${added.join(", ")}`);
-  const modSpecs = order.map((n) => specs[n]);
+  const name = cleanName(opts.splashName ?? "");
+  const modSpecs = order.map((n) => (n === "splash" ? namedSplash(specs[n], name) : specs[n]));
   const patches = modSpecs.flatMap((s) => loadMod(s, version));
   const needed = [...new Set(patches.map((p) => p.section))].sort((a, b) => a - b);
 
@@ -240,5 +250,6 @@ export function build(stock: Uint8Array, mods: string[], specs: Record<string, M
     output_sha256: sha256hex(syx),
     boot_margin: margin,
   };
+  if (name) manifest.splash_name = name;
   return { syx, manifest, log };
 }

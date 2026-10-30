@@ -21,22 +21,23 @@ export function loadSpecs(dir = MODS): Record<string, ModSpec> {
 }
 
 function main(argv: string[]): number {
-  let stock = "", out = "";
+  let stock = "", out = "", name = "";
   const mods: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--stock") stock = argv[++i];
     else if (argv[i] === "-o") out = argv[++i];
+    else if (argv[i] === "--name") name = argv[++i];
     else mods.push(basename(argv[i].replace(/[\\/]+$/, "")));   // accetta anche mods/<nome>
   }
   if (!stock || !out || !mods.length) {
-    console.error("usage: build-cli.ts --stock <Syntakt_OS1.41.syx> <mod>... -o <out.syx>");
+    console.error("usage: build-cli.ts --stock <Syntakt_OS1.41.syx> <mod>... -o <out.syx> [--name NAME]");
     return 2;
   }
   try {
     const t0 = Date.now();
     const r = build(new Uint8Array(readFileSync(stock)), mods, loadSpecs(), basename(out), (p) => {
       if (p.stage === "compress" && p.total) process.stderr.write(`\r  compress ${Math.round(100 * p.done! / p.total)}%`);
-    });
+    }, { splashName: name });
     process.stderr.write("\n");
     for (const l of r.log) console.log("  " + l);
     mkdirSync(dirname(resolve(out)), { recursive: true });
