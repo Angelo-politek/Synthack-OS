@@ -204,6 +204,7 @@ input[type="text"]:focus { border-color: var(--accent); outline: none; box-shado
 .oled-frame figcaption { color: var(--muted); font-size: .8rem; margin-top: .7rem; }
 
 /* schermi OLED */
+.prose .screen-shot { max-width: 420px; margin: 1.4rem 0; }
 .oled { width: 100%; line-height: 0; display: flex; justify-content: center; }
 .oled canvas { display: block; image-rendering: pixelated; filter: drop-shadow(0 0 2px rgba(205, 240, 255, .45)); }
 

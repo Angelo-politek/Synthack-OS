@@ -104,8 +104,11 @@ function tile(e: Entry, i: number): HTMLElement {
     foot.append(a);
   }
   art.append(screen, body, foot);
-  queueMicrotask(() => screens.push(mount(box, previewFor(e.name, e.card.title, e.card.kind === "machine" ? "MACHINE" : "MOD"),
-    `Illustration of the ${e.card.title} screen`)));
+  queueMicrotask(() => {
+    const s = mount(box, previewFor(e.name, e.card.title, e.card.kind === "machine" ? "MACHINE" : "MOD", () => s.redraw()),
+      `${e.card.title}: the Syntakt screen with this mod`);
+    screens.push(s);
+  });
   return art;
 }
 

@@ -1,0 +1,14 @@
+{
+ "readable-values/filter": "FILTER page with times and frequencies",
+ "readable-values/amp": "AMP page with times and levels",
+ "readable-values/delay": "DELAY page in Hz and dB",
+ "master-comp/page": "Compressor on the FX track SYN page",
+ "master-comp/meter": "Gain-reduction meter following the hits",
+ "fx3/page": "FX3 page cycling through the four types",
+ "fx3/amp": "SND3 send on the AMP page",
+ "fx3/routing": "ROUTING screen, key 13 is FX3",
+ "perf-fx/moda": "Mod A page: one effect per key",
+ "perf-fx/retrig": "Retrig page with QNT",
+ "dual-mono/inr": "IN L and the new IN R page",
+ "splash/boot": "Boot animation and the SyntHack logo"
+}

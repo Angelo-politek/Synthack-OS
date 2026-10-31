@@ -1,3 +1,4 @@
+import "./shots.ts";
 import { spy } from "./toc.ts";
 
 const toc = document.querySelector<HTMLElement>(".toc");

@@ -1,26 +1,14 @@
 // Anteprime delle mod: draw(fb, t) disegna lo schermo 128x64 (0/1) al tempo t in secondi.
-// Sono illustrazioni delle pagine vere, disegnate con forme e font nostri. Un'anteprima si puo'
-// sostituire con fotogrammi catturati dall'emulatore: registry["mod"] = fromFrames(frames, fps).
+// Le mod con schermate catturate (frames/, tools/emu/screens.py) mostrano lo schermo vero, disegnato
+// dal codice dell'OS nell'emulatore, tutte le scene in fila; le altre il titolo.
 
 import { fill, measure, text, W, type Fb } from "../oled.ts";
-import * as dualMono from "./dual-mono.ts";
-import * as fx3 from "./fx3.ts";
-import * as masterComp from "./master-comp.ts";
-import * as perfFx from "./perf-fx.ts";
-import * as readableValues from "./readable-values.ts";
+import { load } from "./frames.ts";
 
 export type Draw = (fb: Fb, t: number) => void;
 
-export const registry: Record<string, Draw> = {
-  "readable-values": readableValues.draw,
-  "master-comp": masterComp.draw,
-  "fx3": fx3.draw,
-  "perf-fx": perfFx.draw,
-  "dual-mono": dualMono.draw,
-};
-
-/** Fotogrammi grezzi (128*64 byte 0/1 ciascuno), ripetuti in ciclo. */
-export function fromFrames(frames: Uint8Array[], fps: number): Draw {
+/** Fotogrammi (128*64 byte 0/1 ciascuno), ripetuti in ciclo. */
+export function fromFrames(frames: Fb[], fps: number): Draw {
   return (f, t) => f.set(frames[Math.floor(t * fps) % frames.length]);
 }
 
@@ -49,4 +37,13 @@ export function titleCard(title: string, tag = "MOD"): Draw {
   };
 }
 
-export const previewFor = (name: string, title: string, tag?: string): Draw => registry[name] ?? titleCard(title, tag);
+/** Il titolo subito, poi le schermate della mod quando arrivano (ready: per ridisegnare). */
+export function previewFor(name: string, title: string, tag?: string, ready?: () => void): Draw {
+  let draw = titleCard(title, tag);
+  void load(name).then((clip) => {
+    if (!clip) return;
+    draw = fromFrames(Object.values(clip.scenes).flat(), clip.fps);
+    ready?.();
+  });
+  return (f, t) => draw(f, t);
+}

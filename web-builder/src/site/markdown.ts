@@ -27,8 +27,23 @@ function href(h: string): string {
   return new URL(h, REPO).href;
 }
 
+/** <!-- @screen:<mod>/<scena> --> su una riga: figura con l'OLED animato (src/shots.ts) e la didascalia.
+ *  screens: id -> didascalia (src/previews/frames/index.json); id sconosciuto: niente, e un avviso. */
+export function screenMarkers(src: string, screens: Record<string, string>, warn = console.warn): string {
+  return src.replace(/^[ \t]*<!--\s*@screen:([\w.-]+\/[\w.-]+)\s*-->[ \t]*$/gm, (_, id: string) => {
+    const caption = screens[id];
+    if (caption === undefined) {
+      warn(`[synthack-site] unknown screen "${id}" (see src/previews/frames/index.json)`);
+      return "";
+    }
+    return `\n<figure class="oled-frame screen-shot" data-screen="${escapeHtml(id)}"><div class="oled"></div>`
+      + `<figcaption>${escapeHtml(caption)}</figcaption></figure>\n`;
+  });
+}
+
 /** aliases: id in piu' su un titolo (es. "machines" -> "machine" per create-mod.html#machine). */
-export function renderMarkdown(src: string, aliases: Record<string, string> = {}): Rendered {
+export function renderMarkdown(src: string, aliases: Record<string, string> = {}, screens: Record<string, string> = {}): Rendered {
+  src = screenMarkers(src, screens);
   const toc: Rendered["toc"] = [];
   const seen = new Map<string, number>();
   const md = new Marked({

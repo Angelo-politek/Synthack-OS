@@ -12,6 +12,9 @@ function read(file: string): string | null {
   return existsSync(file) ? readFileSync(file, "utf8") : null;
 }
 
+// schermate delle mod (tools/emu/screens.py): id -> didascalia, per i marcatori <!-- @screen:mod/scena -->
+const SCREENS: Record<string, string> = JSON.parse(read(resolve(ROOT, "src/previews/frames/index.json")) ?? "{}");
+
 const MISSING = '<p class="note">This page is being written. Meanwhile, see the '
   + '<a href="https://github.com/Angelo-politek/Synthack-OS">repository on GitHub</a>.</p>';
 
@@ -20,6 +23,7 @@ const MISSING = '<p class="note">This page is being written. Meanwhile, see the 
 //   <!-- @doc:users.md -->      indice + articolo
 //   <!-- @md:create-mod.md -->  solo articolo (l'indice va in <!-- @toc:create-mod.md -->)
 //   <!-- @text:agent-prompt.md -->  testo grezzo, per un <pre>
+// Nel Markdown, su una riga: <!-- @screen:fx3/page --> = schermata animata con didascalia (src/shots.ts).
 function site(): Plugin {
   return {
     name: "synthack-site",
@@ -35,7 +39,7 @@ function site(): Plugin {
         .replace(`data-page="${page}"`, `data-page="${page}" aria-current="page"`);
       const md = (f: string) => {
         const src = read(resolve(CONTENT, f));
-        return src === null ? null : renderMarkdown(src, { machines: "machine" });
+        return src === null ? null : renderMarkdown(src, { machines: "machine" }, SCREENS);
       };
       return html
         .replace("<!-- @header -->", header)

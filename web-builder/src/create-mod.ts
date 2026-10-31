@@ -1,6 +1,7 @@
 import { addLocal, localMods, removeLocal } from "./local.ts";
 import { specs as repoSpecs } from "./mods.ts";
 import { spy } from "./toc.ts";
+import "./shots.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const KIND_NOTE: Record<string, string> = {

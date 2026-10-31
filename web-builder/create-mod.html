@@ -15,7 +15,7 @@
   <section class="page-hero wrap">
     <p class="kicker">// contribute</p>
     <h1>Create your mod</h1>
-    <p class="lead">Build a mod with the guide below, or with an AI coding agent and our prompt. Try it in the builder, then send it as a pull request so every user can pick it.</p>
+    <p class="lead">Write a mod with the guide or with an AI coding agent. Try it in the builder. Send it as a pull request.</p>
     <ol class="jump">
       <li><a href="#before-you-start">Read the guide</a></li>
       <li><a href="#prompt">Copy the agent prompt</a></li>
@@ -30,8 +30,8 @@
 
       <section id="prompt" class="panel" aria-labelledby="prompt-h">
         <h2 id="prompt-h">Prompt for an AI coding agent</h2>
-        <p>Paste it into your coding agent, in your clone of the repository, on a new branch from <code>dev</code>.
-          It makes the agent read the rules first, work only in your mod's folder, test in the emulator and prepare the pull request description for you to review.</p>
+        <p>Paste it into your coding agent, in your clone, on a new branch from <code>dev</code>.
+          The agent reads the rules, works only in your mod's folder, tests in the emulator and drafts the pull request description for your review.</p>
         <div class="code-box">
           <div class="code-bar"><span>agent-prompt.md</span><button id="copy" class="btn small" type="button">Copy prompt</button></div>
           <pre><code id="prompt-text"><!-- @text:agent-prompt.md --></code></pre>
@@ -41,8 +41,8 @@
 
       <section id="load" class="panel" aria-labelledby="load-h">
         <h2 id="load-h">Load your mod (.json)</h2>
-        <p>Choose your mod's <code>patch.json</code>. It is checked here and stored <strong>only in this browser</strong>:
-          it then appears in <a href="./index.html#step-mods">Create your OS</a>, marked as local, until it is merged and the site is updated.</p>
+        <p>Choose your mod's <code>patch.json</code>. It is checked here and stored <strong>only in this browser</strong>.
+          It appears in <a href="./index.html#step-mods">Create your OS</a>, marked local, until it is merged and the site is updated.</p>
         <label class="drop" id="mod-drop">
           <input type="file" id="mod-file" accept=".json,application/json">
           <span class="drop-mark" aria-hidden="true">[ .json ]</span>
