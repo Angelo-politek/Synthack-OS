@@ -2,7 +2,7 @@
 
 ## What it does
 
-<!-- On the device: keys, pages, parameters, where it is saved. Link the issue (Closes #...). -->
+<!-- On the device: keys, pages, parameters, where saved. Closes #... -->
 
 ## Checklist
 
@@ -14,19 +14,20 @@
 - [ ] No Elektron firmware bytes: no `.syx`, no extracted sections, no disassembly dumps.
 - [ ] Sections 2 and 6 untouched; boot timing unchanged.
 - [ ] Builds with all the other mods (`tools/build/build.py`).
-- [ ] `python -m pytest` and the web-builder tests pass; CI is green.
+- [ ] `python -m pytest` and the web-builder tests pass. CI is green.
+- [ ] Text follows `docs/writing-style.md`.
 
 ## Tests
 
-<!-- Which tests ran locally with the stock OS (CI skips them). OS version. -->
+<!-- Tests run locally with the stock OS (CI skips them). OS version. -->
 
 ## Audio cost
 
-<!-- Instructions added per 32-sample block, idle and worst case, or "not in the audio interrupt". -->
+<!-- Instructions added per 32-sample block: idle, worst case. Or: not in the audio interrupt. -->
 
 ## Tested on the device
 
-<!-- What you tried on hardware (save/reload, pattern change, power cycle), and what is not tested yet. -->
+<!-- Tested on hardware: save/reload, pattern change, power cycle. Not tested yet: ... -->
 
 ## Credits and licenses
 

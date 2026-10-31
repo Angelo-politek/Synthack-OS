@@ -1,6 +1,8 @@
 # readable-values
 
-Shows parameters in real units instead of 0–127. Every value comes from the same OS data the DSP uses; parameters without a physical unit (PNCH, OVER, COL…) keep their numbers.
+Parameters in real units instead of 0–127. Every value comes from the same OS data the DSP uses.
+
+## Values
 
 | Parameter | Text | Source |
 |---|---|---|
@@ -15,17 +17,21 @@ Shows parameters in real units instead of 0–127. Every value comes from the sa
 | Delay REV / VOL, Reverb VOL | dB | gain (v/32768)² |
 | Reverb PRE | `0.8ms` … `337ms` | (v² >> 16) + 37 samples |
 | Reverb shelving FREQ / GAIN | `974Hz` … `14.0k` / dB | first-order bilinear high shelf |
-
 | Analog filter FREQ (tracks 9–12, FX track) | `15Hz` … `21.5k` | measured on the device: 14.645 Hz · e^(0.05741·FREQ), within 1.4 % |
 | Analog amp ATK / DEC / REL (tracks 9–12, FX track) | `~275ms`, `~7.58s` | digital times × measured factor (1.05–1.52); `~` = estimate, ±10–20 % |
 
-Still numbers: filter envelope and BASE/WDTH on analog tracks and the FX track, LFOs, RESO and parameters without a unit.
-Measurements: `tools/measure/analog.py` on recordings of the main out.
+- Still numbers: filter envelope and BASE/WDTH on analog tracks and the FX track, LFOs, RESO, parameters without a physical unit (PNCH, OVER, COL…).
+- Display only: nothing is saved.
+- Analog measurements: `tools/measure/analog.py` on recordings of the main out.
 
 ## How it works
 
-- `rv.c` (C, `m68k-linux-gnu-gcc -mcpu=54418`, no FPU, no libgcc) at offset `+0x2000` in the [mod area](../modarea).
-- At boot the OS copies each parameter's formatter (`std::function`, object `+20`) from a prototype; we patch the prototype operand of each handled id to `rv_proto`. One invoker finds the id from the object address.
-- Track parameters (58–85) are shared by all tracks: the formatter asks the OS for the active track the same way the parameter pages do (`0x4001FF74(project + 48)`, project = `*0x444E23F4`).
+| Part | Detail |
+|---|---|
+| Code | `rv.c` (C, `m68k-linux-gnu-gcc -mcpu=54418`, no FPU, no libgcc), mod area `+0x2000` ([modarea](../modarea)) |
+| Hook | At boot the OS copies each parameter's formatter (`std::function`, object `+20`) from a prototype. We patch the prototype operand of each handled id to `rv_proto`. One invoker finds the id from the object address. |
+| Active track | Track parameters (58–85) are shared by all tracks. The formatter asks for the active track as the parameter pages do: `0x4001FF74(project + 48)`, project = `*0x444E23F4`. |
 
-Test: `tests/test_readable_values.py` runs the original CPU #1 and CPU #2 code in the emulator and checks every text against it.
+## Test
+
+`tests/test_readable_values.py` runs the original CPU #1 and CPU #2 code in the emulator and checks every text against it.

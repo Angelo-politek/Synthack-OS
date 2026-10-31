@@ -1,40 +1,36 @@
-**Supported OS:** Syntakt OS 1.42. A mod written for 1.41 can be ported with `tools/build/port_source.py`.
+Target: **Syntakt OS 1.42**. Port a 1.41 mod with `tools/build/port_source.py`.
 
-Have an idea for the Syntakt, or a hack that already works on your device? Bring it here as a mod. Every mod merged
-into SyntHack is checked against all the others and reaches every user of this site, who can combine it with
-whatever else they pick. This page tells you how to build one, try it here, and submit it.
+A merged mod is checked against all the others and reaches every user of this site.
 
 ## Before you start
 
-- **Open an issue** ([mod proposal](https://github.com/Angelo-politek/Synthack-OS/issues/new?template=mod_proposal.md))
-  saying what the mod does and which OS parts it touches. Someone may already be working on it, or know where the
-  traps are.
-- **Check the [registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md)**: mod-area space,
-  parameter ids, pages, vparams slots and kit storage already taken.
-- **Read the [modding guide](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/modding-guide.md)** and the
-  rules in [CONTRIBUTING.md](https://github.com/Angelo-politek/Synthack-OS/blob/dev/CONTRIBUTING.md).
+1. Open a [mod proposal](https://github.com/Angelo-politek/Synthack-OS/issues/new?template=mod_proposal.md): what the mod does, which OS parts it touches.
+2. Check the [registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md): mod-area space, parameter ids, pages, vparams slots, kit storage already taken.
+3. Read the [modding guide](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/modding-guide.md) and [CONTRIBUTING.md](https://github.com/Angelo-politek/Synthack-OS/blob/dev/CONTRIBUTING.md).
 
 ## Build it
 
-1. Fork the repository and branch from `dev`.
-2. Set up the toolchain and put your stock OS in `firmware/` (never commit it).
-3. Claim your resources in `tools/build/registry.py`, then run `python tools/build/registry.py`.
-4. Write your code in `mods/<name>/` with a `make_patch.py` that compiles it and writes `patch.json`.
-5. Write `tests/test_<name>.py`: run the original OS code in the emulator with and without your patch.
-6. If your code runs in the audio interrupt, measure the instructions it adds per block.
+1. Fork the repository. Branch from `dev`.
+2. Install the toolchain. Put the stock OS in `firmware/`. Never commit it.
+3. Claim resources in `tools/build/registry.py`. Run `python tools/build/registry.py`.
+4. Write `mods/<name>/` with a `make_patch.py` that compiles the code and writes `patch.json`.
+5. Write `tests/test_<name>.py`: run the original OS code in the emulator, with and without your patch.
+6. Audio code: count the instructions it adds per block.
 7. Add `mod.json` and `README.md`.
 
-Full steps and commands: [guide for modders](https://github.com/Angelo-politek/Synthack-OS/blob/dev/web-builder/content/modders.md#workflow).
-Working with an AI coding agent? Use the agent prompt on this site: it makes the agent follow the same rules.
+Commands and details: [Workflow](modders.md#workflow). With an AI coding agent: use the prompt below. It enforces the same rules.
 
 ## Try it here
 
-Load your `patch.json` on this page. Your mod appears in the mod list **only in your browser**, next to the official
-mods, and you can build an OS with it exactly as users will. Nothing is uploaded. The build runs every check:
-original-byte hashes, overlaps with the other mods, protected sections, boot margin.
+1. Load your `patch.json` below.
+2. Open **Create your OS**. Your mod is in the list, marked local.
+3. Build. All checks run: hashes, overlaps with other mods, protected sections, boot margin.
 
-You can add an optional `card` object to `patch.json` to give your mod a title, kind and summary in the list (the same
-fields as `mod.json`):
+`[!]` The mod stays in this browser. Nothing is uploaded.
+
+`[!]` This does not replace emulator tests and a test on the device.
+
+Optional `card` object in `patch.json`, same fields as `mod.json`:
 
 ```json
 {
@@ -50,54 +46,61 @@ fields as `mod.json`):
 }
 ```
 
-`kind` is `feature` for a mod users pick, `machine` for a synth machine, `infra` for a mod others require. Without a
-card, the page shows the mod's `name` as its title, `feature` as its kind and `description` as its summary. In the pull
-request, the card goes in `mod.json`.
+| Field | Rule |
+|---|---|
+| `name` | lowercase letters, digits, dashes; not an existing mod |
+| `os` | the supported OS |
+| `requires` | existing mods |
+| `patches[]` | `section` 3 or 7; `addr` like `"0x4024F897"`; `len`; `hex` or `ascii` of exactly `len` bytes; `expect_sha256` unless `append` |
+| `card.kind` | `feature`, `machine`, `infra` or `test` |
+| no `card` | title = `name`, kind = `feature`, summary = `description` |
 
-The page checks the file before using it: `name` in lowercase letters, digits and dashes, not already taken by
-another mod; `os` the supported OS; `requires` naming existing mods; every patch with `section` 3 or 7, `addr` like
-`"0x4024F897"`, `len`, `hex` (or `ascii`) of exactly `len` bytes, and `expect_sha256` unless it is appended.
-
-Trying it here is not a substitute for the emulator tests and a test on the device.
+In the pull request, the card goes in `mod.json`.
 
 ## Submit it
 
-Open a pull request **against `dev`** (not `main`), with **one mod per pull request**. It must include:
+Pull request against **`dev`**, one mod per PR. Include:
 
-- [ ] `mods/<name>/patch.json`, generated by `mods/<name>/make_patch.py` (with the sources it builds from).
-- [ ] `mods/<name>/mod.json`: exactly `title`, `kind`, `summary` (plain ASCII English).
-- [ ] `mods/<name>/README.md`: use on the device (keys, pages, where it is saved), how it works, what the tests
-      cover, credits.
-- [ ] `tests/test_<name>.py`: runs the original OS code in the emulator; covers save → reload for anything stored.
-- [ ] Registry claims in `tools/build/registry.py` (and the layout files for kitstore / projstore slices).
-- [ ] `docs/registry.md` regenerated with `python tools/build/registry.py`.
-- [ ] CI green: no firmware, `python -m pytest`, web-builder tests and page build, registry up to date.
+- [ ] `mods/<name>/patch.json`, generated by `mods/<name>/make_patch.py`, with its sources.
+- [ ] `mods/<name>/mod.json`: exactly `title`, `kind`, `summary` (ASCII English).
+- [ ] `mods/<name>/README.md`: use on the device (keys, pages, where saved), how it works, tests, credits.
+- [ ] `tests/test_<name>.py`: original OS code in the emulator; save → reload for stored data.
+- [ ] Claims in `tools/build/registry.py` (and kitstore / projstore layout files).
+- [ ] `docs/registry.md` regenerated.
+- [ ] CI green: no firmware, `python -m pytest`, web-builder tests and build, registry up to date.
 - [ ] No firmware files: no `.syx`, no extracted sections, no disassembly dumps.
 
-In the description, say what you tested locally with the stock OS (CI skips those tests), on the device, the audio
-cost per block if any, and the issue it closes.
+In the description:
 
-**Review.** A maintainer reviews the code and `patch.json`, builds your mod together with all the others (hashes,
-overlaps, boot margin) and checks the registry claims. Expect questions and change requests, as in
-[#5](https://github.com/Angelo-politek/Synthack-OS/pull/5) and [#6](https://github.com/Angelo-politek/Synthack-OS/pull/6).
-Once merged into `dev`, the mod ships with the next release. Your name stays in its README; third-party code keeps its
-license and notice.
+- tests run locally with the stock OS (CI skips them);
+- what you tested on the device;
+- audio cost per block, if any;
+- the issue it closes.
+
+Review:
+
+1. A maintainer reads the code and `patch.json`.
+2. The maintainer builds your mod with all the others: hashes, overlaps, boot margin.
+3. The maintainer checks the registry claims.
+4. You get questions and change requests. Examples: [#5](https://github.com/Angelo-politek/Synthack-OS/pull/5), [#6](https://github.com/Angelo-politek/Synthack-OS/pull/6).
+5. Merged into `dev`, the mod ships with the next release.
+
+Your README keeps your name. Third-party code keeps its license and notice.
 
 ## Machines
 
-Custom synth machines run on CPU #2, the voice engine (section 7). The stock OS has 12 engines; a new machine needs
-room for its code on that CPU.
+Synth machines run on CPU #2, the voice engine (section 7). The stock OS has 12 engines.
 
-- **Status:** that room is **`modarea7`**, a shared CPU #2 code area that every machine will build on. It is being
-  prepared in [#1](https://github.com/Angelo-politek/Synthack-OS/issues/1). Until it lands, the build refuses to
-  append code to section 7, so new engines can't be merged yet. In-place patches to section 7 already work.
-- **Target:** OS 1.42 (v1.0).
-- **Propose one** with a [machine proposal](https://github.com/Angelo-politek/Synthack-OS/issues/new?template=machine_proposal.md):
-  sound, parameters, where they are stored, CPU #2 cost, hardware status. See also
-  [#7](https://github.com/Angelo-politek/Synthack-OS/issues/7) (adding a machine without replacing one).
-- **Things to settle early:** parameter ids (stay inside the 505-entry descriptor table; unclaimed ids 254–261 carry
-  MIDI CCs that must be cleared), p-locks and held-trig editing (don't route sound parameters through vparams: it
-  sends edits to the kit path), and files: a kit or pattern saved with the machine and opened on the stock OS or on a
-  build without the mod must not crash.
-- **Same pull request rules** as any mod: one machine per PR against `dev`, `"requires": ["modarea7", ...]`,
-  `kind: "machine"`, emulator tests, registry claims, CI green.
+| Topic | Status |
+|---|---|
+| `modarea7` | Shared CPU #2 code area for every machine. `[wip]` [#1](https://github.com/Angelo-politek/Synthack-OS/issues/1). |
+| Section 7 | In-place patches work. Appended code is refused until `modarea7` lands. |
+| Target | OS 1.42 |
+| Related research | [#7](https://github.com/Angelo-politek/Synthack-OS/issues/7): adding a machine without replacing one |
+
+1. Open a [machine proposal](https://github.com/Angelo-politek/Synthack-OS/issues/new?template=machine_proposal.md): sound, parameters, storage, CPU #2 cost, hardware status.
+2. Settle these early:
+   - Parameter ids: stay inside the 505-entry descriptor table. Unclaimed ids 254–261 carry MIDI CCs; clear them.
+   - P-locks and held-trig editing: don't route sound parameters through vparams. It sends edits to the kit path.
+   - Files: a kit or pattern saved with the machine must load on the stock OS, and on builds without the mod, without crashing.
+3. Submit like any mod: one machine per PR against `dev`, `"requires": ["modarea7", ...]`, `kind: "machine"`, emulator tests, registry claims, CI green.

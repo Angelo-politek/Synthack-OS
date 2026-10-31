@@ -1,4 +1,4 @@
-"""Registro delle risorse condivise tra le mod (OS 1.41): chi usa cosa.
+"""Registro delle risorse condivise tra le mod (OS 1.42): chi usa cosa.
 
 Una mod nuova prende qui il suo spazio, prima di scrivere codice; tests/test_registry.py controlla che i
 patch.json rispettino il registro e docs/registry.md ne e' la copia leggibile:
@@ -93,7 +93,7 @@ def free_modarea() -> list[tuple[int, int]]:
 
 def markdown() -> str:
     h = lambda v: f"`{v:#06x}`" if v < 0x10000 else f"`{v:#010x}`"
-    L = ["# Shared resources (OS 1.41)",
+    L = ["# Shared resources (OS 1.42)",
          "",
          "Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `tests/test_registry.py` checks "
          "every `patch.json` against it. **A new mod claims its space there first.**",

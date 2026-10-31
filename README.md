@@ -1,66 +1,72 @@
 # SyntHack OS
 
-Unofficial, modular firmware mods for the **Elektron Syntakt** (OS 1.42).
-Each mod is a small patch applied to the stock OS you download from elektron.se — no firmware is distributed here.
+Modular firmware mods for the **Elektron Syntakt**, OS 1.42.
+Each mod is a small patch on the stock OS from elektron.se. No firmware is distributed here.
 
 > **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
-> Learn the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.
+> Read the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.
 
-**Status:** `v0.9.0` — nine mods running on real hardware.
+**Status:** `v0.9.0` released (OS 1.41). `v1.0` (OS 1.42) in progress on `dev`.
 
 ## Features
 
 | Feature | Status | What it does |
 |---|---|---|
-| [Bus compressor](mods/master-comp) | ✅ v0.5.0 | Compressor on the **FX track bus**: it listens to and compresses the tracks routed to the FX track (send kick, snare, bass there and compress them together); tracks not routed to it are untouched. Digitakt-style curves. THR · ATK · REL · MUP · RAT + gain-reduction meter + ON/OFF switch on the FX track SYN page, values in dB / ms / ratio. Saved per pattern, or global with *SYN global*. |
-| [Dual mono input](mods/dual-mono) | ✅ v0.9 | With EXTERNAL IN set to mono, **IN L** and **IN R** are two separate inputs: the External Mixer page is IN L, a new **IN R** page in the MIXER tab has its own level and DEL / REV / FX3 sends (saved with the kit). |
-| [Boot splash](mods/splash) | ✅ v0.8.1 | "SyntHack" logo and version after the official intro. Boot time unchanged. |
-| [Mod area](mods/modarea) | ✅ infra | 64 KB for mod code, stored compressed and unpacked at boot into a block reserved from the OS heap. |
-| [Kit storage](mods/kitstore) | ✅ infra | 36 words for mod settings, saved with the kit in bytes the OS file format leaves unused. |
-| [Readable parameter values](mods/readable-values) | ✅ v0.5.0 | Hz, dB, ms and % instead of 0–127: filters, envelopes, levels, sends, delay and reverb, on every track and the FX track. Computed from the same data the DSP uses; analog parts measured on the device. |
-| [Performance FX](mods/perf-fx) | ✅ v0.9 | Sequencer effects on **all tracks** (analog too): select Mod A (FUNC+15) and keys 13–16 play repeat (1/16 … 1 bar), reverse (1/8 … 1 bar) or half speed, resuming in time on release. Each key's effect is set in the Mod A setup page and saved with the kit. Replaces beat-repeat. Also **quantized retrig**: QNT in the Retrig setup page starts retrigs on the next step. |
-| [Third send FX](mods/fx3) | ✅ v0.9 | **SND3** on every track (AMP page 1, next to DEL and REV; PAN moves to page 2) and on the external input into a **chorus, flanger, phaser or crusher**, with its own page (REVERB tab, page 2) saved with the kit. Sends into the delay and the reverb; SND3 is an LFO destination; the return can be routed to the FX track (FUNC+FX, trig 13). |
-| PIN lock | ⬜ planned | Optional PIN at power-on, as a theft deterrent. Recovery via OS reflash stays possible. |
-| New LFO shapes · 3rd LFO / mod matrix | ⬜ planned | |
-| Arpeggiator · Euclidean circle UI | ⬜ planned | |
-| Resampling to SP TWINSHOT · advanced sampler | ⬜ planned | |
-| New machines: RISER / DOWNFILTER, SY SWARM+ | ⬜ planned | Requires custom audio-engine code (CPU #2). |
-| [Web builder](web-builder) | 🔄 in progress | Pick mods in the browser, build your `.syx` locally (nothing uploaded). Same bytes as `build.py`; not online yet. |
+| [Bus compressor](mods/master-comp) | `[ok]` | Compresses the tracks routed to the FX track. THR, ATK, REL, MUP, RAT, GR meter, ON/OFF on the FX track SYN page. Saved per pattern or global. |
+| [Dual mono input](mods/dual-mono) | `[ok]` | EXTERNAL IN mono: IN L and IN R become two inputs. IN R page in the MIXER tab: level, DEL, REV, FX3 sends. Saved with the kit. |
+| [Readable values](mods/readable-values) | `[ok]` | Hz, dB, ms, % instead of 0–127: filters, envelopes, levels, sends, delay, reverb. |
+| [Performance FX](mods/perf-fx) | `[ok]` | Mod A (FUNC+15): keys 13–16 repeat, reverse or half-speed the pattern, all tracks. Quantized retrig (QNT). Saved with the kit. |
+| [Third send FX](mods/fx3) | `[ok]` | SND3 on every track and the input into chorus, flanger, phaser or crusher. REVERB tab, page 2. Saved with the kit. |
+| [Boot splash](mods/splash) | `[ok]` | Logo, version and optional name after the official intro. In every build. Boot time unchanged. |
+| [Mod area](mods/modarea) | `[ok]` infra | 64 KB for mod code in a reserved block of the OS heap. |
+| [Virtual parameters](mods/vparams) | `[ok]` infra | Mods add their own parameters to OS pages. |
+| [Kit storage](mods/kitstore) | `[ok]` infra | 36 words of mod settings saved with the kit. |
+| [Project storage](mods/projstore) | `[ok]` infra | 256 bytes of mod settings saved with the project. |
+| [Web builder](web-builder) | `[wip]` | Build your `.syx` in the browser. Nothing uploaded. Same bytes as `build.py`. Not online yet. |
+| New machines | `[wip]` | Need `modarea7`, a shared CPU #2 code area ([#1](https://github.com/Angelo-politek/Synthack-OS/issues/1)). |
+| PIN lock | planned | PIN at power-on. OS reflash still recovers. |
+| New LFO shapes · 3rd LFO / mod matrix | planned | |
+| Arpeggiator · Euclidean UI | planned | |
+| Resampling to SP TWINSHOT · sampler | planned | |
 
 ## Known issues
 
-- **v0.8.0 and earlier: projects with samples (SP TWINSHOT) can crash at boot** ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)). The mod code lived in RAM that the OS uses when it loads samples. Fixed in v0.8.1: the mod code now lives in a block of the OS heap. Recovery for the old versions: flash stock 1.41; projects and samples are not affected.
+| Issue | Status |
+|---|---|
+| UI lag with many tracks sent to FX3 and high feedback | `[wip]` being optimized |
+| Bus compressor: toggling *global* for the external input mixer also copies the compressor settings | known |
+| v0.8.0 and earlier: projects with SP TWINSHOT samples can crash at boot ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)) | fixed in v0.8.1. Flash the stock OS; projects and samples are not affected |
 
 ## Roadmap
 
 ```mermaid
 flowchart LR
-  A["Foundations ✅<br/>unpack/repack · emulator<br/>build tool · recovery"] --> B["First mods ✅<br/>splash · dual mono<br/>master compressor"]
-  B --> C["UI & usability<br/>readable values ✅ · PIN lock<br/>dual mono v2 ✅"]
-  C --> D["FX & performance<br/>beat repeat ✅ · third send FX ✅<br/>arp · euclidean UI · LFOs"]
-  D --> E["Engine mods<br/>new machines · sampler<br/>resampling"]
-  B -.-> W["Web builder"]
+  A["Foundations [ok]<br/>build · emulator · recovery"] --> B["Mods v0.5–v0.9 [ok]<br/>compressor · dual mono · readable values<br/>perf FX · third send FX"]
+  B --> C["v1.0 [wip]<br/>OS 1.42 · web builder · CPU budget"]
+  C --> D["After v1.0<br/>machines · arpeggiator · PIN lock<br/>LFOs · sampler"]
 ```
 
 ## How it works
 
-- `tools/unpack` — unpack/repack the `.syx` (wraps [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool)).
-- `mods/<name>/patch.json` — *where* to patch, a hash of the expected original bytes, and **our** new bytes.
-- `tools/build/build.py` — stock OS + chosen mods → verified `.syx` (refuses wrong OS, overlaps, protected sections).
-- `tools/emu` — ColdFire emulator (Unicorn + our EMAC model). Every mod is tested against the original code before flashing.
-
-Technical findings: [docs/](docs). Writing your own mod: [docs/modding-guide.md](docs/modding-guide.md).
+| Part | Role |
+|---|---|
+| `tools/unpack` | Unpack and repack the `.syx`. Wraps [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool). |
+| `mods/<name>/patch.json` | Where to patch, SHA-256 of the expected original bytes, our new bytes. |
+| `tools/build/build.py` | Stock OS + mods → verified `.syx`. Refuses a wrong OS, overlaps, protected sections. |
+| `tools/emu` | ColdFire emulator: Unicorn + our EMAC model. Every mod is tested against the original code. |
 
 ## Documentation
 
-- **Musicians:** [users guide](web-builder/content/users.md) — build, flash, go back, how to use each mod, FAQ.
-- **Modders:** [modders guide](web-builder/content/modders.md) — architecture, workflow, rules, CPU budget;
-  [create your mod](web-builder/content/create-mod.md) — try it in the builder and submit it.
-- [RECOVERY.md](RECOVERY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [LEGAL.md](LEGAL.md)
+| For | Doc |
+|---|---|
+| Musicians | [Users guide](web-builder/content/users.md): build, flash, use each mod, go back |
+| Modders | [Modders guide](web-builder/content/modders.md): architecture, workflow, rules, CPU budget |
+| Modders | [Create your mod](web-builder/content/create-mod.md): try it in the builder, submit it |
+| Everyone | [RECOVERY.md](RECOVERY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [LEGAL.md](LEGAL.md) · [docs/](docs) |
 
 ## Build your OS
 
-Requires Python 3, WSL/Linux and your own `Syntakt_OS1.42.syx` (see [firmware/README.md](firmware/README.md)).
+Requirements: Python 3, WSL or Linux, your own `Syntakt_OS1.42.syx` ([firmware/README.md](firmware/README.md)).
 
 ```sh
 bash tools/unpack/setup_eft.sh                 # once (WSL/Linux)
@@ -69,14 +75,15 @@ python tools/build/build.py --stock firmware/Syntakt_OS1.42.syx \
     mods/splash mods/dual-mono mods/master-comp mods/readable-values mods/perf-fx mods/fx3 -o out/synthack.syx
 ```
 
-List the mods you want; the ones they need (`modarea`, `vparams`, `kitstore`) are added automatically.
-
-Flash `out/synthack.syx` with Elektron Transfer (USB, *Drop* page). To go back, flash the stock OS the same way.
+- Required mods (`modarea`, `vparams`, `kitstore`) are added automatically.
+- Optional: `--name YOURNAME` puts your name on the boot screen.
+- Flash `out/synthack.syx` with Elektron Transfer: USB, **Drop** page.
+- Go back: flash the stock OS the same way.
 
 ## Contributing
 
-Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
-Please don't post mods or instructions on Elektronauts (forbidden there); use GitHub.
+Issues and pull requests: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Don't post mods or instructions on Elektronauts. It is forbidden there. Use GitHub.
 
 ## License
 

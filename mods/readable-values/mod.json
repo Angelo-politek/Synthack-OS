@@ -1,5 +1,5 @@
 {
-  "title": "Readable parameter values",
+  "title": "Readable values",
   "kind": "feature",
-  "summary": "Hz, dB, ms and % instead of 0-127 for filters, envelopes, levels, sends, delay and reverb."
+  "summary": "Hz, dB, ms and % instead of 0-127: filters, envelopes, levels, sends, delay, reverb."
 }

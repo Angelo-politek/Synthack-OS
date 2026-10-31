@@ -1,6 +1,6 @@
 ---
 name: Mod proposal
-about: Propose a new mod, or coordinate work on one, before writing code
+about: Propose a mod or coordinate work on one, before writing code
 title: "Mod: "
 labels: enhancement
 ---
@@ -9,7 +9,7 @@ labels: enhancement
 
 ## What it does on the device
 
-<!-- Keys, pages, parameters. What the user sees and hears. -->
+<!-- Keys, pages, parameters. What you see and hear. -->
 
 ## Where it is saved
 
@@ -17,7 +17,7 @@ labels: enhancement
 
 ## OS parts it touches
 
-<!-- Functions or addresses you plan to hook, if known. Supported OS version. -->
+<!-- Functions or addresses to hook, if known. OS version. -->
 
 ## Shared resources
 
@@ -33,4 +33,4 @@ labels: enhancement
 
 ## Credits
 
-<!-- Is it based on someone else's work? Link it and its license. -->
+<!-- Based on someone else's work? Link it and its license. -->

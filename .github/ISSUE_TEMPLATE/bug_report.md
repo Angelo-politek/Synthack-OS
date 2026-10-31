@@ -1,15 +1,15 @@
 ---
 name: Bug report
-about: Something doesn't work as described with a SyntHack build
+about: A SyntHack build doesn't work as documented
 title: ""
 labels: bug
 ---
 
-<!-- Device doesn't boot? Follow RECOVERY.md first: flash the stock OS over MIDI DIN. -->
+<!-- OS doesn't boot: follow RECOVERY.md first (stock OS over MIDI DIN). -->
 
 ## What happened
 
-<!-- What you did, what you expected, what happened instead. -->
+<!-- What you did. What you expected. What happened. -->
 
 ## Steps to reproduce
 
@@ -29,4 +29,4 @@ labels: bug
 
 ## Project
 
-<!-- Does it involve a project or kit from an older SyntHack version or from the stock OS? Samples loaded? -->
+<!-- Project or kit from an older SyntHack version or the stock OS? Samples loaded? -->

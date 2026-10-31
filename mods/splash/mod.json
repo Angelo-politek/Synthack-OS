@@ -1,5 +1,5 @@
 {
   "title": "Boot splash",
   "kind": "base",
-  "summary": "SyntHack logo and version after the official intro, optionally with your name. Boot time unchanged. Included in every build."
+  "summary": "SyntHack logo, version and optional name after the official intro. In every build. Boot time unchanged."
 }

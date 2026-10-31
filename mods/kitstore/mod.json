@@ -1,5 +1,5 @@
 {
   "title": "Kit storage",
   "kind": "infra",
-  "summary": "Mod settings saved with the kit, in bytes the OS file format leaves unused."
+  "summary": "36 words of mod settings, saved with the kit in bytes the OS leaves unused."
 }

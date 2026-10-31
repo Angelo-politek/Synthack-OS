@@ -1,4 +1,4 @@
-# Shared resources (OS 1.41)
+# Shared resources (OS 1.42)
 
 Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `tests/test_registry.py` checks every `patch.json` against it. **A new mod claims its space there first.**
 

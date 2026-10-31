@@ -5,7 +5,7 @@ title: "Machine: "
 labels: enhancement
 ---
 
-<!-- New machines build on modarea7, the shared CPU #2 code area being prepared in #1, and target OS 1.42. -->
+<!-- Machines build on modarea7, the shared CPU #2 code area ([wip] #1). Target: OS 1.42. -->
 
 ## Sound
 
@@ -17,7 +17,7 @@ labels: enhancement
 
 ## Replace or add
 
-<!-- Does it replace an existing machine or add a new one? -->
+<!-- Replaces an existing machine, or adds one? -->
 
 ## CPU #2 cost and memory
 
@@ -25,7 +25,7 @@ labels: enhancement
 
 ## Files without the mod
 
-<!-- What happens to a kit or pattern saved with this machine and opened on the stock OS or a build without it? -->
+<!-- A kit or pattern saved with this machine, opened on the stock OS or a build without it: what happens? -->
 
 ## Status
 

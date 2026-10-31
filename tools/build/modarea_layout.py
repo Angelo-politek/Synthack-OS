@@ -1,4 +1,4 @@
-"""Indirizzi dell'area mod, condivisi da mods/modarea e da tutte le mod che la usano (OS 1.41).
+"""Indirizzi dell'area mod, condivisi da mods/modarea e da tutte le mod che la usano (OS 1.42).
 
 Dalla v0.8.2 l'area mod e' un blocco dell'heap dell'OS (allocatore buddy 0x401036D0, pool di 16 MB nel BSS
 a 0x444E48C0..0x454E48C0): il primo blocco da 64 KB, prenotato da modarea alla prima allocazione, quindi

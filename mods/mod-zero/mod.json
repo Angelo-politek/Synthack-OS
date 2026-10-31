@@ -1,5 +1,5 @@
 {
   "title": "Build test",
   "kind": "test",
-  "summary": "Changes one label: checks the build and flash chain."
+  "summary": "Changes one menu label. Tests the build and flash chain."
 }

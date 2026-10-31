@@ -1,46 +1,48 @@
 # Contributing
 
-This file is the canonical list of rules. The step-by-step guide is
-[web-builder/content/modders.md](web-builder/content/modders.md); submitting is described in
-[web-builder/content/create-mod.md](web-builder/content/create-mod.md).
+The canonical rules list. Guides: [modders](web-builder/content/modders.md), [create your mod](web-builder/content/create-mod.md). Writing rules for every text: [docs/writing-style.md](docs/writing-style.md).
 
-**Supported OS:** Syntakt OS 1.42. Port a 1.41 mod with `python tools/build/port_source.py 1.42 mods/<name> tests/test_<name>.py` (then rerun `make_patch.py` and the tests); the technical notes in `docs/` use 1.41 addresses, converted by `tools/build/osmap.py`.
+**Target:** Syntakt OS 1.42.
+
+- Port a 1.41 mod: `python tools/build/port_source.py 1.42 mods/<name> tests/test_<name>.py`, then rerun `make_patch.py` and the tests.
+- `docs/` uses 1.41 addresses. Convert them with `tools/build/osmap.py`.
 
 ## Setup
 
-- **Windows 11 + WSL (Ubuntu)** or Linux. Python 3.11+, Node.js 24.
-- `bash tools/unpack/setup_eft.sh` — builds elektron-firmware-tool (pinned commit) into `third_party/`.
-- `pip install pytest unicorn numpy pyfiglet`
-- ColdFire binutils and gcc in WSL: `sudo apt install binutils-m68k-linux-gnu gcc-13-m68k-linux-gnu` (or unpack the `.deb`s into `~/tools/m68k/root`, as the `make_patch.py` scripts expect).
-- `cd web-builder && npm ci`
-- `git config core.hooksPath tools/hooks` — blocks firmware files from commits.
-- Put your stock OS in `firmware/` (see [firmware/README.md](firmware/README.md)) and run `python -m pytest` (tests needing it are skipped otherwise).
+1. Use Windows 11 + WSL (Ubuntu), or Linux. Python 3.11+, Node.js 24.
+2. Build elektron-firmware-tool (pinned commit) into `third_party/`: `bash tools/unpack/setup_eft.sh`
+3. `pip install pytest unicorn numpy pyfiglet`
+4. Install ColdFire binutils and gcc in WSL: `sudo apt install binutils-m68k-linux-gnu gcc-13-m68k-linux-gnu`. Or unpack the `.deb`s into `~/tools/m68k/root`, where the `make_patch.py` scripts look.
+5. `cd web-builder && npm ci`
+6. Block firmware files from commits: `git config core.hooksPath tools/hooks`
+7. Put your stock OS in `firmware/` ([firmware/README.md](firmware/README.md)). Run `python -m pytest`. Without it, those tests are skipped.
 
 ## Rules
 
-1. **Never commit firmware bytes.** No `.syx`, no extracted or disassembled sections. Patches hold addresses, a SHA-256 of the bytes they replace, and our bytes ([LEGAL.md](LEGAL.md)).
-2. **Never touch sections 2 (bootstrap) or 6 (boot).** They hold the recovery path; the build refuses them. Don't work around it.
-3. **Don't change boot timing.** The OS hangs on "PREPARING SAMPLES" if the intro gets longer.
-4. **Emulate before flashing.** Every mod has tests that run the original OS code in `tools/emu` and compare.
-5. **Claim shared resources first** in `tools/build/registry.py` (mod-area offsets, section 3 bytes, vparams slots, parameter ids, pages; kit/project slices in `kitstore_layout.py` / `projstore_layout.py`) and run `python tools/build/registry.py` to refresh [docs/registry.md](docs/registry.md). `tests/test_registry.py` fails otherwise.
-6. **Zero bytes are not free space.** Tables and buffers can be zero and still be read. The registry test rejects writes over stock zeros outside the registered free zones.
-7. **One mod per folder** (`mods/<name>/`, `name` in `patch.json` = folder name), **one mod per pull request**.
-8. **Every mod has** `make_patch.py` (writes `patch.json`), `mod.json`, `README.md` and `tests/test_<name>.py`.
-9. **Respect the audio CPU budget.** The stock OS uses ~89 % of the audio interrupt at rest. Measure the instructions your mod adds per block (see `tests/test_cpu_budget.py`) and keep a regression test.
-10. **Files must stay safe.** Kits and projects saved with your mod must survive the OS's save → reload, and load without crashing on the stock OS or on builds without the mod.
-11. **Pull requests against `dev`**, with CI green. `main` holds the latest release.
-12. **Third-party code** only under a compatible license, with its notice and credit.
-13. **Don't post mods or instructions on Elektronauts** (forbidden there). Use GitHub.
+1. **No firmware bytes.** No `.syx`, no extracted or disassembled sections. Patches hold addresses, the SHA-256 of the bytes they replace, our bytes ([LEGAL.md](LEGAL.md)).
+2. **Never touch sections 2 (bootstrap) or 6 (boot).** They hold the recovery path. The build refuses them. Don't work around it.
+3. **Don't change boot timing.** A longer intro hangs the OS on "PREPARING SAMPLES".
+4. **Emulate before flashing.** Every mod has tests that run the original OS code in `tools/emu`.
+5. **Claim shared resources first** in `tools/build/registry.py`: mod-area offsets, section 3 bytes, vparams slots, parameter ids, pages. Kit and project slices: `kitstore_layout.py`, `projstore_layout.py`. Run `python tools/build/registry.py` to refresh [docs/registry.md](docs/registry.md). `tests/test_registry.py` fails otherwise.
+6. **Zero bytes are not free space.** Tables and buffers can be zero and still be read. The registry test rejects writes over stock zeros outside registered free zones.
+7. **One mod per folder** (`mods/<name>/`, `name` = folder name). **One mod per pull request.**
+8. **Every mod has** `make_patch.py` (writes `patch.json`), `mod.json`, `README.md`, `tests/test_<name>.py`.
+9. **Audio CPU budget.** The stock OS uses ~89 % of the audio interrupt at rest. Count the instructions your mod adds per block (`tests/test_cpu_budget.py`). Keep a regression test.
+10. **Safe files.** Kits and projects saved with your mod survive the OS save → reload. They load on the stock OS and on builds without the mod, without crashing.
+11. **Pull requests against `dev`.** CI green. `main` holds the latest release.
+12. **Third-party code:** compatible license, notice, credit.
+13. **Text follows [docs/writing-style.md](docs/writing-style.md).**
+14. **No mods or instructions on Elektronauts.** It is forbidden there. Use GitHub.
 
 ## Writing a mod
 
 - Start from [docs/modding-guide.md](docs/modding-guide.md): hooks, parameters, pages, icons, saving, audio cost.
-- `mods/<name>/make_patch.py` builds your code (`m68k-linux-gnu-as` or `-gcc`, `-mcpu=54418`) and writes `patch.json`.
-- Code larger than a few hundred bytes goes in the mod area: link at `tools/build/modarea_layout.py` RAM + your offset and add `"requires": ["modarea"]`. The free fill of section 3 is nearly full.
-- `mods/<name>/mod.json`: exactly `{"title", "kind", "summary"}`, summary in plain ASCII English. `kind`: `feature` (users pick it), `machine` (synth machine on CPU #2), `infra` (required by other mods).
-- New machines need `modarea7`, the shared CPU #2 code area being prepared in [#1](https://github.com/Angelo-politek/Synthack-OS/issues/1).
-- ColdFire gotchas: no `exg`, `movem` only with `(An)`/`d16(An)`, `muls.l` takes no absolute address, short branches reach ±127 B. No `.bss`, no libgcc.
-- Document new findings in [docs/](docs), briefly.
+- `mods/<name>/make_patch.py` compiles (`m68k-linux-gnu-as` or `-gcc`, `-mcpu=54418`) and writes `patch.json`.
+- Code over a few hundred bytes goes in the mod area: link at `tools/build/modarea_layout.py` RAM + your offset, add `"requires": ["modarea"]`. The section 3 free fill is nearly full.
+- `mods/<name>/mod.json`: exactly `{"title", "kind", "summary"}`. Summary: ASCII English, ≤ 140 characters. `kind`: `feature` (users pick it), `machine` (synth machine on CPU #2), `infra` (required by other mods).
+- New machines need `modarea7`, the shared CPU #2 code area. `[wip]` [#1](https://github.com/Angelo-politek/Synthack-OS/issues/1).
+- ColdFire: no `exg`. `movem` only with `(An)` / `d16(An)`. `muls.l` takes no absolute address. Short branches: ±127 B. No `.bss`, no libgcc.
+- New findings go in [docs/](docs), briefly.
 
 ## Before the pull request
 
@@ -50,8 +52,10 @@ cd web-builder && npm test && npm run build && cd ..
 python tools/build/registry.py && git diff --exit-code docs/registry.md
 ```
 
-CI runs the same checks without the stock OS: run the skipped tests locally and say so in the pull request. Fill in the [pull request template](.github/PULL_REQUEST_TEMPLATE.md).
+- CI runs the same checks without the stock OS. Run the skipped tests locally. Say so in the pull request.
+- Fill in the [pull request template](.github/PULL_REQUEST_TEMPLATE.md).
 
 ## Where to start
 
-Open an issue to coordinate ([mod proposal](.github/ISSUE_TEMPLATE/mod_proposal.md), [machine proposal](.github/ISSUE_TEMPLATE/machine_proposal.md)). Good first targets: PIN lock, an arpeggiator.
+- Open an issue first: [mod proposal](.github/ISSUE_TEMPLATE/mod_proposal.md), [machine proposal](.github/ISSUE_TEMPLATE/machine_proposal.md).
+- First targets: PIN lock, arpeggiator.
