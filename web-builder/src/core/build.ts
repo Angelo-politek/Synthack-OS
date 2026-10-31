@@ -14,7 +14,7 @@ const APPENDABLE = new Set([3]);          // sezione 7: limite del caricatore de
 const PROTECTED = new Set([2, 6]);        // recovery: mai riscritte
 export const MIN_MARGIN = 4096;           // tools/build/bootcheck.py
 export const STOCK_SHA256: Record<string, string> = {
-  "1.41": "8e2488f462c4a5656396a895f113bcd415e9900fa8709340dccf45d4cb9ed19e",
+  "1.42": "ded3c59fdb909eb9e2c3307b30a486452c8fa6947b12c14e0ce35a187b7f37c1",
 };
 
 export interface PatchSpec {

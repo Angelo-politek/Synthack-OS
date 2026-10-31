@@ -1,5 +1,5 @@
 // Il builder del browser da riga di comando (Node 24, niente WSL): stesse mod e stesso output di build.py.
-//   node web-builder/scripts/build-cli.ts --stock firmware/Syntakt_OS1.41.syx splash fx3 ... -o out/web.syx
+//   node web-builder/scripts/build-cli.ts --stock firmware/Syntakt_OS1.42.syx splash fx3 ... -o out/web.syx
 
 import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
@@ -30,7 +30,7 @@ function main(argv: string[]): number {
     else mods.push(basename(argv[i].replace(/[\\/]+$/, "")));   // accetta anche mods/<nome>
   }
   if (!stock || !out || !mods.length) {
-    console.error("usage: build-cli.ts --stock <Syntakt_OS1.41.syx> <mod>... -o <out.syx> [--name NAME]");
+    console.error("usage: build-cli.ts --stock <Syntakt_OS1.42.syx> <mod>... -o <out.syx> [--name NAME]");
     return 2;
   }
   try {
