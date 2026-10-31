@@ -1,9 +1,20 @@
 ## Why SyntHack
 
-Syntakt hacks used to be single firmware files. You could not combine them.
-SyntHack checks every mod against the stock OS and against every other mod. You pick the ones you want.
-You build the OS in your browser, from your own stock file. Nothing is uploaded.
-To undo it, flash the stock OS.
+Sooner or later every artist needs one more feature, shaped around their own workflow.
+SyntHack adds features to the Syntakt and lets the community build and share them:
+mods for the OS, and machines, new digital synthesis engines.
+
+It started with one need: a compressor on the master.
+
+- The Syntakt's final mix is analog. It comes out low and flat next to other instruments.
+- The Digitakt has a master compressor. The Syntakt sums in analog, so there was no place for one.
+- The fix: drive the VCA of the FX send. An analog compressor with digital control.
+
+One idea changed the sound of the Syntakt. The next ideas come from the community.
+
+- Pick the mods you want. Each one is checked against the stock OS and against the others.
+- Build the OS in your browser, from your own stock file. Nothing is uploaded.
+- To undo it, flash the stock OS.
 
 ## What you need
 
@@ -46,7 +57,7 @@ Projects and samples stay on the device.
 
 ## Readable values
 
-Real units instead of 0–127: Hz, ms, s, dB, %.
+Set an envelope in milliseconds, not in steps of 0–127. Real units: Hz, ms, s, dB, %.
 
 <!-- @screen:readable-values/filter -->
 <!-- @screen:readable-values/amp -->
@@ -76,7 +87,7 @@ Real units instead of 0–127: Hz, ms, s, dB, %.
 
 ## Bus compressor
 
-Compresses the tracks routed to the FX track, together.
+More level from the analog output. Compresses the tracks routed to the FX track, together.
 
 <!-- @screen:master-comp/page -->
 <!-- @screen:master-comp/meter -->
@@ -108,7 +119,7 @@ Compresses the tracks routed to the FX track, together.
 
 ## Third send FX
 
-A third send effect: chorus, flanger, phaser or crusher.
+A third send effect next to delay and reverb: chorus, flanger, phaser or crusher.
 
 <!-- @screen:fx3/amp -->
 <!-- @screen:fx3/page -->
@@ -146,7 +157,7 @@ A third send effect: chorus, flanger, phaser or crusher.
 
 ## Performance FX
 
-Repeat, reverse and half speed on keys 13–16, on all tracks.
+Live effects on keys 13–16: repeat, reverse, half speed, on all tracks. Quantized retrig stays in time.
 
 <!-- @screen:perf-fx/moda -->
 <!-- @screen:perf-fx/retrig -->
@@ -180,7 +191,7 @@ Defaults: `1/16`, `1/8`, `R1/4`, `HALF`.
 
 ## Dual mono input
 
-Two separate mono inputs: IN L and IN R.
+Two mono instruments on the inputs, as separate channels: IN L and IN R, each with its own level and sends.
 
 <!-- @screen:dual-mono/inr -->
 

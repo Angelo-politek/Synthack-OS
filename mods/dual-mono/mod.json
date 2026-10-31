@@ -1,5 +1,5 @@
 {
   "title": "Dual mono input",
   "kind": "feature",
-  "summary": "EXTERNAL IN mono: IN L and IN R become two inputs. IN R page in the MIXER tab: level, DEL, REV, FX3 sends."
+  "summary": "Two mono instruments on the inputs, each with its own level and DEL, REV, FX3 sends. EXTERNAL IN set to mono."
 }

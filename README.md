@@ -1,7 +1,12 @@
 # SyntHack OS
 
-Modular firmware mods for the **Elektron Syntakt**, OS 1.42.
+**Make your Syntakt yours.**
+Community mods and machines for the **Elektron Syntakt**, OS 1.42.
 Each mod is a small patch on the stock OS from elektron.se. No firmware is distributed here.
+
+It started with one need: a compressor on the master. The Syntakt sums in analog and its output is low and flat
+next to other instruments. Driving the VCA of the FX send gave an analog compressor with digital control.
+One idea changed the sound of the Syntakt. SyntHack is the structure that lets everyone add the next one.
 
 > **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
 > Read the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.

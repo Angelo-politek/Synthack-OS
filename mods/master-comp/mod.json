@@ -1,5 +1,5 @@
 {
   "title": "Bus compressor",
   "kind": "feature",
-  "summary": "Compressor on the FX track bus. THR, ATK, REL, MUP, RAT, GR meter, ON/OFF on the FX track SYN page."
+  "summary": "More level from the analog output: compressor on the FX track bus, makeup up to +24 dB."
 }

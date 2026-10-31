@@ -1,5 +1,7 @@
 ## Why SyntHack
 
+SyntHack lets the community extend the Syntakt and share the result: mods for the OS, machines for the sound engine.
+
 A hack alone works alone. Here your mod is one folder next to everyone else's.
 Shared mod area, resource registry, automatic dependencies, byte-checked builds, CI and emulator tests keep the mods compatible.
 Once merged, your mod reaches every user of the web builder. You don't re-port it alone when the base changes.
