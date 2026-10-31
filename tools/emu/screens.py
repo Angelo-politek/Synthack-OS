@@ -466,15 +466,12 @@ def mono(ui: UI) -> None:
 
 # ---------------------------------------------------------------------- splash
 def sp_boot(r: Recorder) -> None:
-    """Animazione d'avvio dell'OS (voce 0 della tabella, accorciata dalla mod) e poi lo splash."""
+    """Solo lo splash della mod (l'intro ufficiale che lo precede e' grafica Elektron: non la mostriamo)."""
     ui = r.ui
     spec = json.loads((REPO / "mods" / "splash" / "patch.json").read_text(encoding="utf-8"))
     entry = int(spec["patches"][1]["hex"], 16)
-    func, frames, splash, sframes = struct.unpack(">4I", ui.uc.mem_read(entry, 16))
-    for i in range(0, frames, 3):                           # ~28 fps sul device: uno ogni tre
-        f = ui.paint(func, [i, frames])
-        if any(f) or len(r.frames) < 2:                     # il nero iniziale, accorciato
-            r.frames.append(f)
+    _, _, splash, sframes = struct.unpack(">4I", ui.uc.mem_read(entry, 16))
+    r.frames += [bytes(1024)] * 4                           # fine dell'intro: nero
     for i in range(0, sframes, 3):
         r.frames.append(ui.paint(splash, [i, sframes]))
     r.frames += [r.frames[-1]] * 8
@@ -499,7 +496,7 @@ SCENES = {
     "dual-mono": (["fx3", "dual-mono"], mono, [
         ("inr", "IN L and the new IN R page", dm_inr)]),
     "splash": (["splash"], None, [
-        ("boot", "Boot animation and the SyntHack logo", sp_boot)]),
+        ("boot", "SyntHack logo after the official intro", sp_boot)]),
 }
 
 
