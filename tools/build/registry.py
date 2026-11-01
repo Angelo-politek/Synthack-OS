@@ -30,6 +30,7 @@ MODAREA = [
     (0x7E00, 0x8000, "vparams", "code"),
     (0x8000, 0x8180, "vparams", "table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS)"),
     (0x8180, 0x8D00, "sy-fm4", "main CPU side: page 2/2, storage tables, shared RAM publisher"),
+    (0x8D00, 0x9800, "sampler", "main CPU side: value texts, names per machine type, tempo to shared RAM"),
     (0xA000, 0xDFF0, "fx3", "code and data"),
     (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
 ]
@@ -51,6 +52,7 @@ SEC3_NOT_FREE = [
 # ---- area dei motori sulla CPU #2 (mods/modarea7, RAM a engine_layout.RAM): (inizio, fine) come offset
 ENGINE = [
     (0x0000, 0x4000, "sy-fm4", "voice engine (engine 4) and its state"),
+    (0x4000, 0x20000, "sampler", "voice engine (engine 11), interpolation table, zero-crossing grids"),
 ]
 
 # ---- lista di avvio dell'area mod: posto -> mod (modarea_layout.boot_slot)
@@ -78,6 +80,10 @@ IDS = {
     269: ("fx3", "external input SND3"),
     **{254 + k: ("sy-fm4", f"SYN page 2/2 {n} (was Digitakt MIDI CC{k + 1} Value)")
        for k, n in enumerate(("ALGO", "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))},
+    **{497 + k: ("sampler", f"SAMPLER knob {n} (was SP TWINSHOT {w})") for k, (n, w) in enumerate(
+        (("A TUNE", "TUN1"), ("B PLAY", "SMP1"), ("C BR", "FLT1"), ("G LOOP/BARS/GRID, lix 0x18", "MIX"),
+         ("E STRT/SEG/SLICE", "TUN2"), ("F LEN/MODE", "SMP2"), ("H TYPE, lix 0x19", "OVER"),
+         ("D SAMP, lix 0x15", "DEC1")))},
 }
 
 # ---- pagine dell'interfaccia (indice -> mod) riusate

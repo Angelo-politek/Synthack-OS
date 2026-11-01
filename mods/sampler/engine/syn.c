@@ -1,0 +1,349 @@
+/* SAMPLER on the Syntakt's second CPU: engine 11 (SP TWINSHOT) prep and render.
+ *
+ * The voice dispatcher calls, per voice and per block (see mods/sy-fm4/engine/syn/fm4_syn.c):
+ *     prep(pitch, state, params)   pitch = note << 16; params = the voice's frame block
+ *     render(out, state)           out = 32 x Q1.31 at 48 kHz
+ * Parameters are the machine's words at params + 2 * logical index (sampler.h), sent by the main CPU
+ * like every machine's: saved with the sound, p-lockable, nothing to add on the main CPU.
+ *
+ * Per block, like the Digitakt: the part to play from the machine's position function; a window of
+ * samples (loop or silence past the end); 64 points at 96 kHz (sm_interp); the Syntakt's half-band
+ * filter down to 32; then the Syntakt's DEC and VCA, as SP TWINSHOT ends.
+ */
+#include "sampler.h"
+
+#define STATE_BASE 0x80000000u
+#define STATE_SIZE 0x708u
+#define VOICES 8
+#define BLOCK 32
+
+/* Section 7 (the same in 1.40A, 1.41, 1.42). */
+#define SAMPLES ((volatile const uint32_t *)0x4404f754)    /* 64 slots: {length in samples, pointer} */
+#define SLOTS 64
+#define MAX_LEN 0x7ffff                                      /* SP TWINSHOT's limit */
+#define FW_HALFBAND ((void (*)(void *, int32_t *, int32_t *))0x400051c6)  /* state at voice + 1388 */
+#define FW_DEC ((void (*)(uint8_t *))0x40003d42)
+#define FW_VCA ((void (*)(int32_t *, uint8_t *))0x400045a0)
+#define HB_STATE_AT 1388
+
+/* From the main CPU (main/smp_main.c): BPM x 120, in shared RAM. */
+#define TEMPO (*(volatile const uint32_t *)0x7f0)
+#define TEMPO_DEFAULT (120 * 120)
+#define BAR_120 1382400000u          /* samples of one bar at 48 kHz, times BPM x 120 */
+
+#define S32(st, off) (*(volatile int32_t *)((st) + (off)))
+
+#define UNITY (1 << 27)              /* rate Q4.28 per 96 kHz point: 0.5 sample */
+#define RATE_MAX 0x23000000          /* 140 samples per block, the Digitakt's window */
+#define WIN 160
+
+/* output scale: one sample at the level of SP TWINSHOT playing one sample (MIX at one end), Q30
+ * (tests/test_sampler.py) */
+#define OUT_GAIN 0x272fdfe2
+
+typedef struct {
+    const int16_t *data;
+    int32_t len;
+    int slot, mode, active;
+    int32_t ipos;                    /* absolute sample index */
+    int trig;                        /* this block started the note */
+    uint32_t frac;
+    int32_t a, b;                    /* the part being played, from a towards b */
+    uint32_t elapsed;                /* samples since the trig (WERP) */
+    int32_t seg;                     /* WERP: current segment number */
+    int32_t hb[12];                  /* half-band filter: 8 inputs + 4 outputs */
+} voice_t;
+
+static voice_t voices[VOICES];
+static int32_t *hb_ptr[VOICES];
+static sm_grid_t grids[SLOTS];
+static int16_t win[WIN];
+static int32_t hb_in[8 + 2 * BLOCK];
+static int32_t hb_out[BLOCK];
+static const sm_par_t *pars[VOICES];
+static int32_t pitches[VOICES];
+
+extern const uint32_t sm_exp2_q30[257];
+
+static int voice_index(uint8_t *st) {
+    uint32_t i = ((uint32_t)st - STATE_BASE) / STATE_SIZE;
+    return i < VOICES ? (int)i : 0;
+}
+
+static inline int32_t clamp(int32_t v, int32_t lo, int32_t hi) {
+    return v < lo ? lo : v > hi ? hi : v;
+}
+
+/* 2^(semis16 / 12 / 65536) x UNITY, semitones in 16.16 */
+static int32_t pitch_rate(int32_t semis16) {
+    int32_t oct = sm_fmul(semis16, 0x0aaaaaab);         /* / 12: Q16 octaves */
+    int32_t o = oct >> 16;
+    uint32_t f = (uint32_t)oct & 0xffff;
+    uint32_t i = f >> 8, r = f & 0xff;
+    uint32_t m = sm_exp2_q30[i] + (((sm_exp2_q30[i + 1] - sm_exp2_q30[i]) * r) >> 8);   /* Q30, 1..2 */
+    int sh = 3 - o;                                     /* Q30 -> Q4.28 x UNITY: >> (3 - octaves) */
+    if (sh <= 0)
+        return RATE_MAX;
+    if (sh >= 32)
+        return 0;
+    uint32_t v = m >> sh;
+    return v > RATE_MAX ? RATE_MAX : (int32_t)v;
+}
+
+static uint32_t bar_samples(int bars_log2) {
+    uint32_t t = TEMPO;
+    if (t < 20 * 120 || t > 400 * 120)
+        t = TEMPO_DEFAULT;
+    return (BAR_120 / t) << bars_log2;
+}
+
+static sm_grid_t *grid_of(voice_t *v) {
+    if (v->slot < 0 || v->slot >= SLOTS || v->data == 0)
+        return 0;
+    sm_grid_t *g = &grids[v->slot];
+    if (g->data != v->data || g->len != v->len) {
+        g->data = v->data;
+        g->len = v->len;
+        for (int k = 0; k < SM_GRID; k++)
+            g->done[k] = 0;
+        g->pt[0] = 0;
+        g->done[0] = 1;
+    }
+    return g;
+}
+
+/* The grid points the position functions of SLICE and WERP read, computed on first use. */
+static void need_slice(sm_grid_t *g, const sm_par_t *p, int32_t note16) {
+    int32_t grid = SM_BYTE(p, 6), sel = SM_BYTE(p, 4), l = SM_BYTE(p, 5);
+    grid = grid > 4 ? 4 : grid;
+    int32_t n = 4 << grid, shift = 4 - grid;
+    sel = sel < 0 ? 0 : sel;
+    int32_t s = (sel < n ? sel : n) - 1;
+    if (s < 0)
+        s = (n - 1) & ((int32_t)(int16_t)(note16 >> 16) - 12);
+    l = (l > 63 ? 63 : l) + 1;
+    int32_t i0 = (s << shift) << 2, i1 = i0 + ((l << shift) << 2);
+    sm_grid_need(g, i0);
+    sm_grid_need(g, i1);
+}
+
+static void need_werp(sm_grid_t *g, const sm_par_t *p, uint32_t phase) {
+    int32_t seg = clamp((int16_t)p->w[4] >> 8, 0, 2) + 3, bars = clamp((int16_t)p->w[6] >> 8, 0, 3);
+    uint32_t i0 = (phase + 0x400000u) >> 23;
+    sm_grid_need(g, (int)(i0 & 255));
+    sm_grid_need(g, (int)(i0 + (1u << (seg - bars))));
+}
+
+/* WERP: phase of the BARS cycle and the segment number at the voice's time. */
+static uint32_t werp_phase(voice_t *v, const sm_par_t *p, int32_t *segno) {
+    int32_t bars = clamp((int16_t)p->w[6] >> 8, 0, 3);
+    int32_t seg = clamp((int16_t)p->w[4] >> 8, 0, 2) + 3;
+    uint32_t cycle = bar_samples(bars);
+    uint32_t t = v->elapsed % cycle;
+    int play = SM_BYTE(p, 1);
+    if ((uint32_t)(play & 0xffff) <= 1)                 /* REV, REV.L: segments last to first */
+        t = cycle - 1 - t;
+    uint32_t seglen = cycle >> 8 << (seg - bars);       /* samples per segment */
+    *segno = seglen ? (int32_t)(v->elapsed / seglen) : 0;
+    return sm_udivshl(t, cycle, 31);                    /* t < cycle: below 2^31 */
+}
+
+static void part(voice_t *v, const sm_par_t *p, int32_t note16, uint32_t phase) {
+    sm_grid_t *g;
+    switch (v->mode) {
+    case M_WERP:
+        g = grid_of(v);
+        if (g)
+            need_werp(g, p, phase);
+        sm_pos_werp(p, phase, v->len, g, &v->a, &v->b);
+        break;
+    case M_REPITCH:
+        sm_pos_repitch(p, v->len, &v->a, &v->b);
+        break;
+    case M_SLICE:
+        g = grid_of(v);
+        if (g)
+            need_slice(g, p, note16);
+        sm_pos_slice(p, note16, v->len, g, &v->a, &v->b);
+        break;
+    default:
+        sm_pos_oneshot(p, v->len, v->trig, &v->a, &v->b);
+        break;
+    }
+}
+
+static int loops(const sm_par_t *p, int mode) {
+    int play = SM_BYTE(p, mode == M_WERP ? 5 : 1);     /* WERP: the segment's MODE */
+    return (uint32_t)((play - 1) & 0xffff) <= 1;
+}
+
+static void start_part(voice_t *v) {
+    v->ipos = v->a;
+    v->frac = 0;
+}
+
+void syn_smp_prep(int32_t pitch, uint8_t *st, uint8_t *params) {
+    int vi = voice_index(st);
+    voice_t *v = &voices[vi];
+    const sm_par_t *p = (const sm_par_t *)(params + 2 * LIX_TUNE);
+    pars[vi] = p;
+    pitches[vi] = pitch;
+    /* no knob for OVER on this machine: the overdrive after the engines (0x4000112C) reads this word */
+    *(volatile int16_t *)(params + 2 * LIX_OVER) = 0;
+
+    /* SP TWINSHOT's DEC1 left at its end: no decay of the machine's own */
+    S32(st, 1000) = (int32_t)0x80000000;
+    S32(st, 1004) = 0;
+    S32(st, 1008) = (int32_t)0x80000000;
+    hb_ptr[vi] = v->hb;
+
+    if (S32(st, 0x38)) {                                /* trig */
+        int slot = SM_BYTE(p, 3);
+        v->slot = slot;
+        v->data = 0;
+        v->len = 0;
+        if (slot >= 0 && slot < SLOTS) {
+            uint32_t len = SAMPLES[2 * slot], ptr = SAMPLES[2 * slot + 1];
+            if (len > MAX_LEN)
+                len = MAX_LEN;
+            if (len && ptr) {
+                v->data = (const int16_t *)ptr;
+                v->len = (int32_t)len;
+            }
+        }
+        v->mode = clamp(SM_BYTE(p, 7), 0, 3);
+        v->trig = 1;
+        v->elapsed = 0;
+        v->seg = 0;
+        v->active = v->data != 0;
+        for (int k = 0; k < 12; k++)
+            v->hb[k] = 0;
+        uint32_t phase = 0;
+        if (v->mode == M_WERP)
+            phase = werp_phase(v, p, &v->seg);
+        part(v, p, pitch, phase);
+        start_part(v);
+        if (v->a == v->b && v->mode != M_WERP)
+            v->active = 0;
+    }
+}
+
+/* Sample at absolute index i of the part being played: the loop wraps past b, nothing else
+ * plays past b; before a the sample's own data (taps reaching back). */
+static inline int16_t fetch(const voice_t *v, int32_t i, int loop, int32_t la) {
+    int fwd = v->b >= v->a;
+    if (fwd ? i >= v->b : i < v->b) {
+        if (!loop || la == v->b)
+            return 0;
+        int32_t span = fwd ? v->b - la : la - v->b;
+        if (span <= 0)
+            return 0;
+        int32_t over = fwd ? i - v->b : v->b - 1 - i;
+        over %= span;
+        i = fwd ? la + over : la - 1 - over;
+    }
+    return (i >= 0 && i < v->len) ? v->data[i] : 0;
+}
+
+void syn_smp_render(int32_t *out, uint8_t *st) {
+    int vi = voice_index(st);
+    voice_t *v = &voices[vi];
+    const sm_par_t *p = pars[vi];
+    int32_t pitch = pitches[vi];
+
+    if (!v->active || p == 0) {
+        for (int k = 0; k < BLOCK; k++)
+            out[k] = 0;
+        FW_DEC(st);
+        FW_VCA(out, st);
+        return;
+    }
+
+    /* the part, with this block's parameters (the Digitakt recomputes it every block) */
+    int32_t tune = p->w[0];
+    int32_t semis = pitch - (60 << 16) + ((tune - 0x4000) << 8);
+    int32_t rate = pitch_rate(semis);
+    if (v->mode == M_WERP) {
+        int32_t segno;
+        uint32_t phase = werp_phase(v, p, &segno);
+        if (segno != v->seg) {                          /* next segment: from its start */
+            v->seg = segno;
+            part(v, p, pitch, phase);
+            start_part(v);
+        } else {
+            int32_t a = v->a;
+            part(v, p, pitch, phase);
+            v->a = a;
+        }
+        int32_t bars = clamp((int16_t)p->w[6] >> 8, 0, 3);
+        if (!loops(p, M_REPITCH) && v->elapsed >= bar_samples(bars))   /* PLAY without loop: one cycle */
+            v->active = 0;
+    } else {
+        part(v, p, pitch, 0);
+    }
+    if (v->mode == M_REPITCH) {
+        /* the part lasts BARS (1, 2, 4, 8 bars) at the tempo, then TUNE and the note */
+        int32_t bars = clamp((int16_t)p->w[6] >> 8, 0, 3);
+        int32_t n = v->b - v->a;
+        n = n < 0 ? -n : n;
+        uint32_t d = bar_samples(bars);
+        uint32_t r = (d && (uint32_t)n < 16 * d) ? sm_udivshl((uint32_t)n, d, 27) : RATE_MAX;  /* n/d x UNITY */
+        uint32_t x = sm_umulshr(r, (uint32_t)pitch_rate(semis), 27);
+        rate = x > RATE_MAX ? RATE_MAX : (int32_t)x;
+    }
+    int fwd = v->b >= v->a;
+    if (!fwd)
+        rate = -rate;
+
+    int loop = loops(p, v->mode);
+    int32_t la = v->a;                                  /* where a loop starts again */
+    if (loop && v->mode == M_ONESHOT) {
+        int32_t a, b;
+        sm_pos_oneshot(p, v->len, 0, &a, &b);
+        la = a;
+    }
+
+    /* window: every tap of the 64 points */
+    int32_t span = (int32_t)((((uint32_t)(rate < 0 ? -rate : rate) >> 4) * 63) >> 24) + 2;
+    int32_t base = (rate >= 0 ? v->ipos : v->ipos - span) - 2;
+    int32_t n = span + 8;
+    if (n > WIN)
+        n = WIN;
+    int br = clamp(SM_BYTE(p, 2), 0, 127);
+    int16_t mask = (int16_t)~((1 << ((br * 15 + 63) / 127)) - 1);
+    for (int k = 0; k < n; k++)
+        win[k] = fetch(v, base + k, loop, la) & mask;
+
+    int32_t rel = v->ipos - base - 2;
+    sm_interp(win, &v->frac, &rel, rate, hb_in + 8, 2 * BLOCK, sm_interp_table);
+    int32_t moved = rel - (v->ipos - base - 2);
+    v->ipos += moved;
+    v->elapsed += BLOCK;
+
+    /* past the end of the part: wrap, or stop once the taps are past it too */
+    if (fwd ? v->ipos >= v->b : v->ipos < v->b) {
+        if (loop) {
+            if (v->mode == M_ONESHOT) {
+                sm_pos_oneshot(p, v->len, 0, &v->a, &v->b);
+                la = v->a;
+            }
+            int32_t s = fwd ? v->b - la : la - v->b;
+            if (s > 0) {
+                int32_t over = fwd ? v->ipos - v->b : v->b - 1 - v->ipos;
+                v->ipos = fwd ? la + over % s : la - 1 - over % s;
+            } else if (v->mode != M_WERP) {
+                v->active = 0;
+            }
+        } else if (fwd ? v->ipos >= v->b + 6 : v->ipos < v->b - 6) {
+            if (v->mode != M_WERP)
+                v->active = 0;
+        }
+    }
+
+    FW_HALFBAND((uint8_t *)&hb_ptr[vi] - HB_STATE_AT, hb_in, hb_out);
+    for (int k = 0; k < BLOCK; k++)
+        out[k] = sm_fmul(hb_out[k], OUT_GAIN) << 1;
+    v->trig = 0;
+    FW_DEC(st);
+    FW_VCA(out, st);
+}

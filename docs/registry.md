@@ -17,7 +17,8 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x7e00` | `0x8000` | vparams | code |
 | `0x8000` | `0x8180` | vparams | table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS) |
 | `0x8180` | `0x8d00` | sy-fm4 | main CPU side: page 2/2, storage tables, shared RAM publisher |
-| `0x8d00` | `0xa000` | **free** |  |
+| `0x8d00` | `0x9800` | sampler | main CPU side: value texts, names per machine type, tempo to shared RAM |
+| `0x9800` | `0xa000` | **free** |  |
 | `0xa000` | `0xdff0` | fx3 | code and data |
 | `0xdff0` | `0xf000` | fx3 | feedback (+0xDFFC) and delay line (+0xE000, 4 KB) |
 | `0xf000` | `0xfff0` | **free** |  |
@@ -29,6 +30,7 @@ Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4.
 | From | To | Mod | Use |
 |---|---|---|---|
 | `0x0000` | `0x4000` | sy-fm4 | voice engine (engine 4) and its state |
+| `0x4000` | `0x00020000` | sampler | voice engine (engine 11), interpolation table, zero-crossing grids |
 
 ## Section 3 free fill (`0x40339740–0x4033a000`)
 
@@ -107,6 +109,14 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 267 | master-comp | compressor |
 | 268 | master-comp | compressor |
 | 269 | fx3 | external input SND3 |
+| 497 | sampler | SAMPLER knob A TUNE (was SP TWINSHOT TUN1) |
+| 498 | sampler | SAMPLER knob B PLAY (was SP TWINSHOT SMP1) |
+| 499 | sampler | SAMPLER knob C BR (was SP TWINSHOT FLT1) |
+| 500 | sampler | SAMPLER knob G LOOP/BARS/GRID, lix 0x18 (was SP TWINSHOT MIX) |
+| 501 | sampler | SAMPLER knob E STRT/SEG/SLICE (was SP TWINSHOT TUN2) |
+| 502 | sampler | SAMPLER knob F LEN/MODE (was SP TWINSHOT SMP2) |
+| 503 | sampler | SAMPLER knob H TYPE, lix 0x19 (was SP TWINSHOT OVER) |
+| 504 | sampler | SAMPLER knob D SAMP, lix 0x15 (was SP TWINSHOT DEC1) |
 
 Ids 254–261 (Digitakt MIDI CC values) are free but have MIDI CCs; ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).
 

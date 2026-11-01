@@ -1,0 +1,482 @@
+"""SAMPLER (mods/sampler): le machine a campioni della Digitakt riscritte, al posto di SP TWINSHOT.
+
+- Riferimento: le funzioni della Digitakt 1.54 (firmware/Digitakt_OS1.54.syx, solo in locale) eseguite
+  nell'emulatore accanto alle nostre (il blob della CPU #2 della build), con gli stessi ingressi:
+  posizioni di ONESHOT, REPITCH, SLICE, WERP; ricerca dello zero-crossing; griglia dei 256 punti;
+  interpolazione (con la tabella della Digitakt al posto della nostra: aritmetica identica).
+- La nostra tabella: stessa risposta in frequenza della Digitakt entro 0.2 dB fino a 0.5 fs.
+- CPU #2 (build vera, avvio a freddo della sezione 7 compressa): il campione suona, TUNE, REV, STRT/LEN,
+  loop, SLICE; le altre machine non cambiano; costo per blocco.
+- CPU #1: descrittori, testi dei valori, tempo nella RAM condivisa.
+"""
+
+import json
+import math
+import random
+import struct
+import sys
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("unicorn")
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path[:0] = [str(ROOT / "tests"), str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "build"),
+                str(ROOT / "tools" / "unpack"), str(ROOT / "mods" / "sampler" / "engine")]
+import build  # noqa: E402
+import eft  # noqa: E402
+
+STOCK = ROOT / "firmware" / "Syntakt_OS1.42.syx"
+DT = ROOT / "firmware" / "Digitakt_OS1.54.syx"
+pytestmark = pytest.mark.skipif(not STOCK.exists(), reason="firmware stock assente")
+need_dt = pytest.mark.skipif(not DT.exists(), reason="Digitakt 1.54 assente (riferimento solo locale)")
+SPEC = json.loads((ROOT / "mods" / "sampler" / "patch.json").read_text(encoding="utf-8"))
+SYM = {k: int(v, 16) for k, v in SPEC["symbols"].items()}
+LOAD = 0x4000_0400
+BLOB7 = next(p for p in SPEC["patches"] if p["section"] == 7 and p.get("append"))
+STACK, RET = 0x4FF0_8000, 0x4FF0_F000
+
+# Digitakt 1.54, sezione 3
+DT_ONESHOT, DT_REPITCH, DT_SLICE, DT_WERP = 0x4007_4C9C, 0x4007_4D72, 0x4007_4DF2, 0x4007_4EBE
+DT_ZERO_CROSS, DT_REGISTER = 0x4007_62EE, 0x4007_63B4
+DT_GRIDS = 0x402F_A380                   # 256 posizioni per slot
+DT_VOICE_SLOT = 0x8000_EE20              # slot della voce, 94 B per voce
+DT_TABLE_IMG, DT_TABLE_RAM = 0x4025_A350, 0x8000_C000
+DT_INTERP, DT_INTERP_END = 0x4007_5EA2, 0x4007_5F00
+
+
+class Cpu:
+    """Unicorn con la sezione 3 della Digitakt e il nostro blob della CPU #2, chiamate a funzione C."""
+
+    def __init__(self, dt3: bytes):
+        from unicorn import UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, Uc
+        from unicorn.m68k_const import UC_CPU_M68K_ANY
+        import emac
+        uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN)
+        uc.ctl_set_cpu_model(UC_CPU_M68K_ANY)
+        uc.mem_map(0x4000_0000, 0x0800_0000)
+        uc.mem_map(0x4FF0_0000, 0x0001_0000)
+        uc.mem_map(0x8000_0000, 0x0001_0000)
+        uc.mem_write(LOAD, dt3)
+        uc.mem_write(int(BLOB7["ram"], 16), bytes.fromhex(BLOB7["hex"]))
+        sites = json.loads((ROOT / "tools" / "emu" / "emac_sites_dt154.json").read_text())
+        self.emac = emac.UnicornEmac(uc, sites["sites"])
+        self.uc = uc
+
+    def call(self, fn: int, *args: int, sr: int = 0x2700) -> tuple[int, int]:
+        from unicorn.m68k_const import UC_M68K_REG_A7, UC_M68K_REG_D0, UC_M68K_REG_D1, UC_M68K_REG_SR
+        uc = self.uc
+        sp = STACK - 4 * (len(args) + 1)
+        uc.mem_write(sp, struct.pack(f">{len(args) + 1}I", RET, *[a & 0xFFFF_FFFF for a in args]))
+        self.emac.state.load_macsr(0xA0)          # come nel render della Digitakt: frazionario, saturato
+        for n in range(4):
+            self.emac.state.clear_acc(n)
+        uc.reg_write(UC_M68K_REG_SR, sr)          # prima di A7: SR sceglie la pila
+        uc.reg_write(UC_M68K_REG_A7, sp)
+        uc.emu_start(fn, RET, count=50_000_000)
+        s = lambda v: v - (1 << 32) if v & 0x8000_0000 else v       # noqa: E731
+        return s(uc.reg_read(UC_M68K_REG_D0)), s(uc.reg_read(UC_M68K_REG_D1))
+
+    def w32(self, a: int, *v: int) -> None:
+        self.uc.mem_write(a, struct.pack(f">{len(v)}i", *v))
+
+    def r32(self, a: int, n: int = 1) -> list[int]:
+        return list(struct.unpack(f">{n}i", self.uc.mem_read(a, 4 * n)))
+
+
+@pytest.fixture(scope="module")
+def dt3():
+    if not DT.exists():
+        pytest.skip("Digitakt 1.54 assente")
+    return eft.unpack(DT, ROOT / "unpacked" / DT.stem, ids=[3])[3].read_bytes()
+
+
+@pytest.fixture(scope="module")
+def cpu(dt3):
+    return Cpu(dt3)
+
+
+PAR, PAR_OURS = 0x4600_0000, 0x4600_0100
+OUT_A = 0x4600_0200
+GRID = 0x4600_1000                       # sm_grid_t: data, len, pt[256], done[256]
+
+
+def put_par(cpu, words):
+    blob = struct.pack(">8h", *words)
+    cpu.uc.mem_write(PAR, blob)
+    cpu.uc.mem_write(PAR_OURS, blob)
+
+
+def ours(cpu, fn, *args):
+    cpu.call(SYM[fn], *args, OUT_A, OUT_A + 4)
+    return tuple(cpu.r32(OUT_A, 2))
+
+
+def random_par(rng, play=None):
+    w = [rng.randrange(-0x800, 0x8000) for _ in range(8)]
+    w[1] = (rng.randrange(0, 4) if play is None else play) << 8 | rng.randrange(256)
+    return w
+
+
+@need_dt
+def test_positions_oneshot_repitch_as_digitakt(cpu):
+    rng = random.Random(1)
+    for n in range(400):
+        w = random_par(rng)
+        if n % 3 == 0:
+            w[6] = 0
+        put_par(cpu, w)
+        length = rng.choice([1, 2, 100, 4800, 48000, 0x7FFFF, rng.randrange(1, 0x80000)])
+        first = rng.randrange(2)
+        assert cpu.call(DT_ONESHOT, PAR, length, first) == ours(cpu, "sm_pos_oneshot", PAR_OURS, length, first), w
+        assert cpu.call(DT_REPITCH, PAR, length) == ours(cpu, "sm_pos_repitch", PAR_OURS, length), w
+
+
+@need_dt
+def test_positions_slice_werp_as_digitakt(cpu):
+    rng = random.Random(2)
+    slot = 5
+    pts = sorted(rng.randrange(0, 0x7FFFF) for _ in range(256))
+    pts[0] = 0
+    cpu.w32(DT_GRIDS + 1024 * slot, *pts)
+    cpu.w32(GRID, 0, 0x7FFFF, *pts)
+    for n in range(400):
+        w = random_par(rng)
+        w[3] = slot << 8 | rng.randrange(256)
+        w[4] = rng.randrange(0, 0x4100) if n % 2 else rng.randrange(-0x400, 0x7F00)
+        w[6] = rng.randrange(0, 0x800)
+        put_par(cpu, w)
+        length = rng.randrange(1, 0x80000)
+        note = rng.randrange(0, 128) << 16 | rng.randrange(0x10000)
+        track = rng.randrange(8)
+        cpu.uc.mem_write(DT_VOICE_SLOT + 94 * track, bytes([slot]))
+        assert cpu.call(DT_SLICE, PAR, note, length, track) == \
+            ours(cpu, "sm_pos_slice", PAR_OURS, note, length, GRID), w
+        phase = rng.randrange(0, 0x7FC0_0000)
+        assert cpu.call(DT_WERP, PAR, phase, length) == ours(cpu, "sm_pos_werp", PAR_OURS, phase, length, GRID), w
+    # nessun campione: tutto il campione
+    cpu.uc.mem_write(DT_VOICE_SLOT, bytes([200]))
+    assert cpu.call(DT_SLICE, PAR, 60 << 16, 1000, 0) == ours(cpu, "sm_pos_slice", PAR_OURS, 60 << 16, 1000, 0)
+
+
+def make_signal(rng, n):
+    """Audio di prova: toni e rumore con tratti di silenzio e di continua (zero-crossing rari)."""
+    out, ph = [], 0.0
+    for i in range(n):
+        f = 0.002 + 0.03 * (math.sin(i / 3000) ** 2)
+        ph += f
+        v = 9000 * math.sin(2 * math.pi * ph) + rng.randrange(-300, 300)
+        if (i // 2000) % 7 == 3:
+            v = 0
+        elif (i // 2500) % 9 == 5:
+            v = 1200 + rng.randrange(0, 50)
+        out.append(max(-32768, min(32767, int(v))))
+    return out
+
+
+@need_dt
+def test_zero_crossing_and_grid_as_digitakt(cpu):
+    rng = random.Random(3)
+    for length in (5, 700, 20000, 150001):
+        data = make_signal(rng, length + 1)
+        ptr = 0x4500_0000
+        cpu.uc.mem_write(ptr, struct.pack(f">{len(data)}h", *data))
+        end = ptr + 2 * length
+        for _ in range(60):
+            idx = rng.randrange(0, length + 2)
+            d = rng.choice([-1, 1])
+            md = rng.randrange(0, 2000)
+            assert cpu.call(DT_ZERO_CROSS, ptr, end, idx, d, md)[0] == \
+                cpu.call(SYM["sm_zero_cross"], ptr, end, idx, d, md)[0]
+        slot = 9
+        cpu.call(DT_REGISTER, slot, ptr, 2 * length, 48000)
+        ref = cpu.r32(DT_GRIDS + 1024 * slot, 256)
+        got = [cpu.call(SYM["sm_grid_point"], ptr, length, k)[0] for k in range(256)]
+        assert got == ref, length
+
+
+def interp_ref(cpu, table_img: bytes, win: list[int], frac: int, rate: int) -> list[int]:
+    """Il ciclo d'interpolazione della Digitakt eseguito da solo, con i registri che si aspetta."""
+    from unicorn.m68k_const import (UC_M68K_REG_A0, UC_M68K_REG_A1, UC_M68K_REG_A7, UC_M68K_REG_D0,
+                                    UC_M68K_REG_D1, UC_M68K_REG_D2, UC_M68K_REG_D3, UC_M68K_REG_SR)
+    uc = cpu.uc
+    uc.mem_write(DT_TABLE_RAM, table_img)
+    w = 0x4500_8000
+    uc.mem_write(w, struct.pack(f">{len(win)}h", *win))
+    sp = STACK - 0x100
+    uc.mem_write(sp + 88, struct.pack(">I", w))
+    uc.mem_write(sp + 96, struct.pack(">I", (rate << 4) & 0xFFFF_FFFF))
+    out = 0x8000_ECC0
+    for reg, v in ((UC_M68K_REG_SR, 0x2700), (UC_M68K_REG_A7, sp), (UC_M68K_REG_A0, DT_TABLE_RAM),
+                   (UC_M68K_REG_A1, out), (UC_M68K_REG_D0, 24), (UC_M68K_REG_D1, 28), (UC_M68K_REG_D2, frac),
+                   (UC_M68K_REG_D3, (rate >> 28) & 0xFFFF_FFFF)):
+        uc.reg_write(reg, v)
+    cpu.emac.state.load_macsr(0xA0)
+    uc.emu_start(DT_INTERP, DT_INTERP_END, count=100_000)
+    return list(struct.unpack(">64i", uc.mem_read(out, 256)))
+
+
+@need_dt
+def test_interpolation_as_digitakt(cpu, dt3):
+    table = dt3[DT_TABLE_IMG - LOAD:DT_TABLE_IMG - LOAD + 3072]
+    tab_ours = 0x4600_4000
+    cpu.uc.mem_write(tab_ours, table)
+    rng = random.Random(4)
+    for _ in range(40):
+        win = [rng.randrange(-32768, 32768) for _ in range(160)]
+        frac = rng.randrange(0, 1 << 32)
+        rate = rng.randrange(1, 0x2300_0000)
+        ref = interp_ref(cpu, table, win, frac, rate)
+        w = 0x4500_9000
+        cpu.uc.mem_write(w, struct.pack(f">{len(win)}h", *win))
+        cpu.w32(OUT_A, frac - (1 << 32) if frac >= 1 << 31 else frac, 0)
+        cpu.call(SYM["sm_interp"], w, OUT_A, OUT_A + 4, rate, OUT_A + 16, 64, tab_ours)
+        assert cpu.r32(OUT_A + 16, 64) == ref
+
+
+def response_db(table, freqs):
+    """Risposta del prototipo (256 x 6 punti) in dB, normalizzata alla continua."""
+    import numpy as np
+    v = np.zeros(1536)
+    for p in range(256):
+        for k in range(6):
+            v[256 * k + 255 - p] = table[k // 2][p][k % 2]
+    nfft = 1 << 16
+    h = np.abs(np.fft.rfft(v, nfft))
+    return [20 * math.log10(max(h[int(f / 256 * nfft)] / h[0], 1e-9)) for f in freqs]
+
+
+@need_dt
+def test_our_table_has_the_digitakt_response(dt3):
+    pytest.importorskip("numpy")
+    import gen_table
+    raw = struct.unpack(">1536h", dt3[DT_TABLE_IMG - LOAD:DT_TABLE_IMG - LOAD + 3072])
+    theirs = [[[raw[r * 512 + 2 * p], raw[r * 512 + 2 * p + 1]] for p in range(256)] for r in range(3)]
+    freqs = [0.05 * i for i in range(1, 12)]
+    a, b = response_db(gen_table.table(), freqs), response_db(theirs, freqs)
+    assert max(abs(x - y) for x, y in zip(a, b)) < 0.2
+    stop = [0.75, 1.0, 1.25]
+    assert all(x < -55 for x in response_db(gen_table.table(), stop))
+
+
+def test_table_file_is_generated():
+    import gen_table
+    src = (ROOT / "mods" / "sampler" / "engine" / "interp_table.c").read_text()
+    nums = [int(x) for x in src.split("sm_interp_table[3][256][2] = {", 1)[1].split("};", 1)[0]
+            .replace("{", " ").replace("}", " ").replace(",", " ").split()]
+    t = gen_table.table()
+    assert nums == [t[r][p][i] for r in range(3) for p in range(256) for i in range(2)]
+
+
+# ---- CPU #2: la build vera, sezione 7 compressa, avvio a freddo
+
+SAMPLE_PTR, SAMPLE_TABLE = 0x4500_0000, 0x4404_F754
+SR = 48000
+
+
+@pytest.fixture(scope="module")
+def built(tmp_path_factory):
+    t = tmp_path_factory.mktemp("sampler")
+    out = t / "o.syx"
+    build.build(STOCK, [ROOT / "mods" / "sampler"], out, log=lambda *_: None)
+    f = eft.unpack(out, t / "u", ids=[3, 7])
+    return f[3].read_bytes(), f[7].read_bytes()
+
+
+def load_sample(e, data, slot=0):
+    e.uc.mem_write(SAMPLE_PTR + 0x10_0000 * slot, struct.pack(f">{len(data)}h", *data))
+    e.uc.mem_write(SAMPLE_TABLE + 8 * slot, struct.pack(">II", len(data), SAMPLE_PTR + 0x10_0000 * slot))
+
+
+@pytest.fixture(scope="module")
+def engines(built):
+    import engine as eng
+    e = eng.Engine(image=built[1])
+    e.boot(cold=True)
+    ref = eng.Engine()
+    ref.boot()
+    return e, ref
+
+
+def frame(words, machine=44, note=60, over=0):
+    import cli
+    p = cli.make_params(machine, note)
+    for k, w in enumerate(words):                      # indici 0x12.. dalla parola 1 del blocco della traccia
+        struct.pack_into(">h", p, 2 + 2 * k, w)
+    struct.pack_into(">h", p, 2 + 2 * (0x1A - 0x12), over)
+    return p
+
+
+def play(e, words, blocks=24, **kw):
+    p, out = frame(words, **kw), []
+    for b in range(blocks):
+        q = bytearray(p)
+        if b in (0, 2):
+            q[0x180] = 1                                # trig (il primo carica la machine)
+        out += e.render_block(bytes(q))[0]
+    return out
+
+
+def sine(n, f=1000.0, amp=16000):
+    return [int(amp * math.sin(2 * math.pi * f * i / SR)) for i in range(n)]
+
+
+def freq(x):
+    zc = sum(1 for i in range(1, len(x)) if (x[i - 1] < 0) != (x[i] < 0))
+    return zc / 2 / (len(x) / SR)
+
+
+def peak(x):
+    return max(abs(v) for v in x)
+
+
+ONESHOT = [0x4000, 0x300, 0, 0, 0, 0x7800, 0, 0]       # TUNE PLAY BR SAMP STRT LEN LOOP TYPE
+TAIL = 32 * 8                                          # dopo l'attacco dell'inviluppo
+
+
+def test_plays_at_the_level_of_sp_twinshot(engines):
+    e, ref = engines
+    data = sine(48000)
+    load_sample(e, data)
+    load_sample(ref, data)
+    out = play(e, ONESHOT)
+    tw = play(ref, [0x4000, 0x4000, 0x4000, 0, 0x4000, 0x4000, 0x7F00, 0x7F00])  # SMP1 = slot 0, MIX tutto A
+    ratio = peak(out[TAIL:]) / peak(tw[TAIL:])
+    assert abs(20 * math.log10(ratio)) < 0.3
+    assert abs(freq(out[TAIL:]) - 1000) < 40
+
+
+def test_tune_reverse_start_length_loop(engines):
+    e, _ = engines
+    load_sample(e, sine(24000, 500))
+    up = play(e, [0x4C00] + ONESHOT[1:])               # TUNE +12
+    assert abs(freq(up[TAIL:]) - 1000) < 40
+    n = 24000                                          # glissando: 300 Hz -> 3.3 kHz
+    load_sample(e, [int(12000 * math.sin(2 * math.pi * (300 + 1500 * i / n) * i / SR)) for i in range(n)])
+    base = play(e, ONESHOT)
+    rev = play(e, [0x4000, 0x000] + ONESHOT[2:])       # REV: dalla fine (frequenza alta)
+    assert freq(rev[TAIL:TAIL + 1024]) > 2 * freq(base[TAIL:TAIL + 1024])
+    late = play(e, ONESHOT[:4] + [0x3C00, 0x7800] + ONESHOT[6:])   # STRT 60: dalla meta'
+    assert freq(late[TAIL:TAIL + 1024]) > 1.5 * freq(base[TAIL:TAIL + 1024])
+    short = play(e, ONESHOT[:5] + [0x0200] + ONESHOT[6:], blocks=60)   # LEN 2/120 = 400 campioni
+    assert peak(short[-512:]) == 0 and peak(short[TAIL:TAIL + 256]) > 0
+    looped = play(e, [0x4000, 0x200, 0, 0, 0, 0x0200, 0, 0], blocks=60)   # FWD.L: continua
+    assert peak(looped[-512:]) > 0
+
+
+def test_slice_and_repitch(engines):
+    e, _ = engines
+    n = 48000
+    data = [int(12000 * math.sin(2 * math.pi * f * i / SR)) for f in (500, 1000, 2000, 4000) for i in range(n // 4)]
+    load_sample(e, data)
+    for sel, f in ((1, 500), (2, 1000), (4, 4000)):    # GRID 0 = 4 slice
+        out = play(e, [0x4000, 0x300, 0, 0, sel << 8, 0, 0, 0x300], blocks=40)
+        assert abs(freq(out[TAIL:TAIL + 2048]) - f) < f * 0.08, sel
+    load_sample(e, sine(48000))                        # 1 s a 120 BPM, BARS 0 = 1 battuta (2 s): meta' velocita'
+    out = play(e, [0x4000, 0x300, 0, 0, 0, 0x7800, 0x000, 0x200], blocks=40)
+    assert abs(freq(out[TAIL:]) - 500) < 30
+
+
+def test_over_has_no_effect(built):
+    """OVER (0x1A) non ha manopola: il motore lo azzera prima della saturazione comune, dal primo blocco in cui
+    gira (il blocco del primo trig e' ancora della machine precedente)."""
+    import engine as eng
+    outs = []
+    for over in (0, 0x7F00):
+        e = eng.Engine(image=built[1])
+        e.boot(cold=True)
+        load_sample(e, sine(48000))
+        outs.append(play(e, ONESHOT, blocks=20, over=over))
+    assert outs[0][-32 * 8:] == outs[1][-32 * 8:]
+
+
+def test_other_machines_unchanged(built):
+    import engine as eng
+    for m in (0, 4, 37):                                   # motori nuovi: lo stato delle voci non passa da un test all'altro
+        e = eng.Engine(image=built[1])
+        e.boot(cold=True)
+        ref = eng.Engine()
+        ref.boot()
+        assert play(e, [0x4000] * 8, machine=m, blocks=12) == play(ref, [0x4000] * 8, machine=m, blocks=12), m
+
+
+def test_werp_plays_segments(engines):
+    e, _ = engines
+    load_sample(e, sine(96000, 700))
+    out = play(e, [0x4000, 0x300, 0, 0, 0x100, 0x300, 0x200, 0x100], blocks=40)   # SEG 1/16, MODE FWD, 4 bars
+    assert peak(out[TAIL:]) > 0
+    assert abs(freq(out[TAIL:]) - 700) < 60               # tono invariato: si allunga il tempo, non l'altezza
+
+
+# ---- CPU #1: interfaccia (emulatore dell'OS principale)
+
+@pytest.fixture(scope="module")
+def ui():
+    import screens
+
+    def setup(u):
+        obj = u.call(0x4000_F04C, [u.project + 304, 0])          # suono della traccia 1
+        u.call(0x4002_5594, [obj, 44, 0, 1], count=400_000_000)  # machine 44
+    return screens.UI(["sampler"], setup=setup)
+
+
+OBJS, DESC = 0x41BA_0A24, 0x4022_D83C
+
+
+def text(u, i, v):
+    buf = 0x4FE0_3000
+    u.uc.mem_write(buf, bytes(32))
+    u.call(u.sym["sm_invoke"], [OBJS + 84 * i + 20, v, buf])
+    return bytes(u.uc.mem_read(buf, 16)).split(b"\0")[0].decode()
+
+
+def short(u, i):
+    a = struct.unpack(">I", u.uc.mem_read(DESC + 52 * i + 48, 4))[0]
+    return bytes(u.uc.mem_read(a, 8)).split(b"\0")[0].decode()
+
+
+def test_page_names_and_values(ui):
+    tab = ui.tab("SRC")
+    ids = [ui.param(tab, e) for e in "ABCDEFGH"]
+    lix = [struct.unpack(">I", ui.uc.mem_read(DESC + 52 * i + 4, 4))[0] for i in ids]
+    assert lix == list(range(0x12, 0x1A))                        # A..H = indici 0x12..0x19, 0x1A (OVER) fuori
+    assert [short(ui, i) for i in ids[:4]] + [short(ui, ids[7])] == ["TUNE", "PLAY", "BR", "SAMP", "TYPE"]
+    for i in ids[1:]:                                            # TUNE tiene il formattatore dell'OS
+        f = struct.unpack(">4I", ui.uc.mem_read(OBJS + 84 * i + 20, 16))
+        assert f[2:] == (ui.sym["sm_mgr"], ui.sym["sm_invoke"])
+    assert [text(ui, ids[1], v << 8) for v in range(4)] == ["REV", "REV.L", "FWD.L", "FWD"]
+    assert text(ui, ids[3], 0) == "1" and text(ui, ids[3], 0x3F00) == "64"
+    seq = 0x8000_21B0 + 2 * (0xE + 0x19)                         # TYPE della traccia 1 nei valori del sequencer
+    expect = {0: (["STRT", "LEN", "LOOP"], "ONE"), 1: (["SEG", "SMOD", "BARS"], "WERP"),
+              2: (["STRT", "LEN", "BARS"], "PTCH"), 3: (["SLIC", "LEN", "GRID"], "SLIC")}
+    for t, (names, name) in expect.items():
+        ui.put(seq, ">h", t << 8)
+        assert text(ui, ids[7], t << 8) == name
+        assert [short(ui, i) for i in ids[4:7]] == names
+    ui.put(seq, ">h", 3 << 8)
+    assert [text(ui, ids[6], v << 8) for v in range(5)] == ["4", "8", "16", "32", "64"]
+    assert text(ui, ids[4], 0) == "KEY"
+    ui.put(seq, ">h", 1 << 8)
+    assert [text(ui, ids[4], v << 8) for v in range(3)] == ["1/32", "1/16", "1/8"]
+    assert [text(ui, ids[6], v << 8) for v in range(4)] == ["1", "2", "4", "8"]
+
+
+def test_tempo_to_shared_ram(ui):
+    ui.call(ui.sym["sm_block"], [0])
+    tempo = struct.unpack(">I", ui.uc.mem_read(0x402D_7360, 4))[0]
+    assert tempo == 120 * 120                                    # progetto nuovo: 120 BPM
+    assert struct.unpack(">I", ui.uc.mem_read(0x1000_07F0, 4))[0] == tempo
+
+
+def test_main_cpu_cost_per_block(ui):
+    """sm_block a ogni blocco: il tempo nella RAM condivisa, poi la chiamata originale."""
+    import budget
+    from unicorn import UC_HOOK_CODE
+    n = [0]
+    h = ui.uc.hook_add(UC_HOOK_CODE, lambda *a: n.__setitem__(0, n[0] + 1))
+    ui.call(0x4009_5608, [0])
+    orig, n[0] = n[0], 0
+    ui.call(ui.sym["sm_block"], [0])
+    ui.uc.hook_del(h)
+    assert n[0] - orig <= budget.AUDIO_CPU["sampler"], n[0] - orig

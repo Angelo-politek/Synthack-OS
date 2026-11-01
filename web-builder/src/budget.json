@@ -77,6 +77,13 @@
       "project": 0,
       "sec7": 0
     },
+    "sampler": {
+      "cpu": 8,
+      "modarea": 2816,
+      "kit": 0,
+      "project": 0,
+      "sec7": 11292
+    },
     "splash": {
       "cpu": 0,
       "modarea": 0,
