@@ -82,6 +82,7 @@ stock .syx (user's own)          mods/<name>/patch.json (ours)
     python -m pytest
     cd web-builder && npm test && npm run build && cd ..
     python tools/build/registry.py && git diff --exit-code docs/registry.md
+    python tools/build/budget.py && git diff --exit-code web-builder/src/budget.json
     ```
     CI has no stock OS and skips the tests that need it. Run them locally. Say so in the PR.
 14. Open the pull request against `dev`, one mod per PR. See [Submit it](create-mod.md#submit-it).

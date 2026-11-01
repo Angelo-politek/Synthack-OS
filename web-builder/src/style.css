@@ -335,3 +335,19 @@ input[type="text"]:focus { border-color: var(--accent); outline: none; box-shado
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ---- indicatore di carico: resta in fondo allo schermo mentre si scelgono le mod */
+.load { position: sticky; bottom: 0; z-index: 20; margin: 0 0 2.4rem; padding: .7rem .9rem .5rem; background: rgba(9, 9, 9, .94);
+  border: 1px solid var(--line-2); border-radius: var(--r); backdrop-filter: blur(6px);
+  display: grid; gap: .35rem 1.6rem; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); font-family: var(--mono); }
+.meter { display: grid; grid-template-columns: auto 1fr; gap: .1rem .6rem; align-items: baseline; font-size: .78rem; }
+.m-label { color: var(--fg); text-transform: uppercase; letter-spacing: .06em; }
+.m-val { color: var(--muted); text-align: right; white-space: nowrap; }
+.m-track { grid-column: 1 / -1; position: relative; height: 5px; background: var(--bg-3); border: 1px solid var(--line); }
+.m-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--accent); transition: width .3s; }
+.m-mark { position: absolute; top: -4px; bottom: -4px; width: 1px; background: var(--muted); }
+.meter.over .m-val { color: var(--bad); }
+.meter.over .m-fill { background: repeating-linear-gradient(-45deg, var(--bad) 0 4px, rgba(224, 112, 107, .45) 4px 8px); }
+.m-note { grid-column: 1 / -1; margin: .1rem 0 0; color: var(--muted); font-size: .72rem; }
+.m-note.bad { color: var(--bad); }
+@media (max-width: 560px) { .load { padding: .5rem .7rem .4rem; gap: .3rem 1rem; } .meter { font-size: .7rem; } }

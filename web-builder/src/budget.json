@@ -1,0 +1,88 @@
+{
+  "limits": {
+    "cpu": 3000,
+    "modarea": 65520,
+    "kit": 36,
+    "project": 256,
+    "sec7": 9451
+  },
+  "mods": {
+    "dual-mono": {
+      "cpu": 457,
+      "modarea": 8192,
+      "kit": 3,
+      "project": 0,
+      "sec7": 0
+    },
+    "fx3": {
+      "cpu": 3197,
+      "modarea": 20480,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "kitstore": {
+      "cpu": 0,
+      "modarea": 512,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "master-comp": {
+      "cpu": 578,
+      "modarea": 8192,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "mod-zero": {
+      "cpu": 0,
+      "modarea": 0,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "modarea": {
+      "cpu": 0,
+      "modarea": 0,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "perf-fx": {
+      "cpu": 0,
+      "modarea": 4096,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "projstore": {
+      "cpu": 0,
+      "modarea": 512,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "readable-values": {
+      "cpu": 0,
+      "modarea": 8192,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "splash": {
+      "cpu": 0,
+      "modarea": 0,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "vparams": {
+      "cpu": 0,
+      "modarea": 896,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    }
+  }
+}

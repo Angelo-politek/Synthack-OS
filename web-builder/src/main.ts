@@ -2,6 +2,7 @@ import { BASE_MODS, resolve, STOCK_SHA256, type ModSpec, type Progress } from ".
 import { sha256hex } from "./core/sha256.ts";
 import { cleanName, NAME_MAX, splashPixels } from "./core/splash.ts";
 import { localMods, removeLocal, type LocalMod } from "./local.ts";
+import { measured, renderLoad, updateLoad } from "./load.ts";
 import { reveal } from "./logo.ts";
 import { info, modUrl, specs as repoSpecs, type Card } from "./mods.ts";
 import { previewFor } from "./previews/index.ts";
@@ -149,13 +150,15 @@ function renderTiles(): void {
 
 function update(): void {
   const mods = [...chosen];
-  let deps = "";
+  let deps = "", order: string[] = [];
   try {
-    const added = resolve([...BASE_MODS, ...mods], allSpecs()).added;
-    if (added.length) deps = "Added automatically: " + added.map(titleOf).join(", ") + ".";
+    const r = resolve([...BASE_MODS, ...mods], allSpecs());
+    order = r.order;
+    if (r.added.length) deps = "Added automatically: " + r.added.map(titleOf).join(", ") + ".";
   } catch (e) {
     deps = e instanceof Error ? e.message : String(e);
   }
+  updateLoad($("load"), order, order.filter((n) => !measured(n)).map(titleOf));
   $("deps").textContent = deps;
   const list = mods.map(titleOf);
   $("summary").textContent = `Boot splash${list.length ? " + " + list.join(", ") : " only (no mods selected)"}.`;
@@ -285,6 +288,7 @@ document.querySelectorAll(".os-ver").forEach((e) => (e.textContent = OS_VERS.joi
 document.querySelectorAll(".os-file").forEach((e) => (e.textContent = OS_VERS.map((v) => `Syntakt_OS${v}.syx`).join(" or ")));
 reveal($("logo"));
 bootScreen();
+renderLoad($("load"));
 renderTiles();
 window.addEventListener("storage", (e) => {
   if (e.key === null || e.key.startsWith("synthack.")) renderTiles();

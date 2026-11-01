@@ -27,7 +27,7 @@ The canonical rules list. Guides: [modders](web-builder/content/modders.md), [cr
 6. **Zero bytes are not free space.** Tables and buffers can be zero and still be read. The registry test rejects writes over stock zeros outside registered free zones.
 7. **One mod per folder** (`mods/<name>/`, `name` = folder name). **One mod per pull request.**
 8. **Every mod has** `make_patch.py` (writes `patch.json`), `mod.json`, `README.md`, `tests/test_<name>.py`.
-9. **Audio CPU budget.** The stock OS uses ~89 % of the audio interrupt at rest. Count the instructions your mod adds per block (`tests/test_cpu_budget.py`). Keep a regression test.
+9. **Audio CPU budget.** The stock OS uses ~89 % of the audio interrupt at rest. Count the instructions your mod adds per block (`tests/test_cpu_budget.py`). Keep a regression test. Enter the worst case in `AUDIO_CPU` of `tools/build/budget.py` and run it: the site's load indicator reads `web-builder/src/budget.json`.
 10. **Safe files.** Kits and projects saved with your mod survive the OS save → reload. They load on the stock OS and on builds without the mod, without crashing.
 11. **Pull requests against `dev`.** CI green. `main` holds the latest release.
 12. **Third-party code:** compatible license, notice, credit.
@@ -50,6 +50,7 @@ The canonical rules list. Guides: [modders](web-builder/content/modders.md), [cr
 python -m pytest
 cd web-builder && npm test && npm run build && cd ..
 python tools/build/registry.py && git diff --exit-code docs/registry.md
+python tools/build/budget.py && git diff --exit-code web-builder/src/budget.json
 ```
 
 - CI runs the same checks without the stock OS. Run the skipped tests locally. Say so in the pull request.

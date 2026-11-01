@@ -99,3 +99,9 @@ def test_worst_case_load_of_all_mods():
     for k, v in got.items():
         assert v <= CEILING[k], (k, v)
     assert sum(got.values()) <= TOTAL, got
+    # il sito (tools/build/budget.py) non deve mostrare meno del misurato
+    sys.path.insert(0, str(ROOT.parent / "tools" / "build"))
+    import budget
+    shown = budget.AUDIO_CPU
+    assert got["fx3"] <= shown["fx3"] and got["master-comp"] <= shown["master-comp"]
+    assert got["dual-mono v2"] + got["dual-mono v1"] <= shown["dual-mono"]
