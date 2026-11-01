@@ -53,7 +53,8 @@ def main() -> None:
     sec3 = eft.unpack(stock, REPO / "unpacked" / stock.stem, ids=[3])[3].read_bytes()
     if LOAD + len(sec3) > IMG:
         raise SystemExit("l'immagine stock arriva oltre IMG")
-    defs = {"IMG": IMG, "RAM": RAM, "SIZE": SIZE, "HEAP_BLOCK_SIZE": L.HEAP_BLOCK_SIZE}
+    defs = {"IMG": IMG, "RAM": RAM, "SIZE": SIZE, "HEAP_BLOCK_SIZE": L.HEAP_BLOCK_SIZE, "BOOT_LIST": L.BOOT_LIST,
+            "BOOT_N": L.BOOT_N}
     with tempfile.TemporaryDirectory(prefix="modarea-") as tmp:
         tmp = Path(tmp)
         shutil.copy(HERE / "modarea.S", tmp / "modarea.S")
@@ -91,7 +92,7 @@ def main() -> None:
                        "che prenota alla prima allocazione.",
         "generated_by": "mods/modarea/make_patch.py",
         "layout": {"img": f"{IMG:#010x}", "ram": f"{RAM:#010x}", "size": f"{SIZE:#x}", "compress": "shlz",
-                   "heap_block": f"{L.HEAP_BLOCK:#010x}"},
+                   "heap_block": f"{L.HEAP_BLOCK:#010x}", "boot_list": f"{L.BOOT_LIST:#x}", "boot_n": L.BOOT_N},
         "symbols": {k: f"{syms[k]:#010x}" for k in ("modarea_load", "modarea_reserve", "modarea_block")},
         "patches": patches,
     }

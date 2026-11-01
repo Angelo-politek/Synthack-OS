@@ -11,3 +11,11 @@ HEAP_BLOCK_SIZE = 0x1_0000      # richiesta all'allocatore: 64 KB (ordine 12)
 RAM = HEAP_BLOCK + 0x10         # i primi 12 byte li scrive l'inizializzazione dell'heap
 SIZE = HEAP_BLOCK + HEAP_BLOCK_SIZE - RAM
 IMG = 0x4034_9000               # flusso compresso accodato alla sezione 3
+BOOT_LIST = 0x7400              # offset della lista di avvio: BOOT_N puntatori a funzioni chiamate dopo la decompressione
+BOOT_N = 8
+
+
+def boot_slot(n: int) -> int:
+    """Indirizzo nell'immagine (IMG) del posto n della lista di avvio."""
+    assert 0 <= n < BOOT_N
+    return IMG + BOOT_LIST + 4 * n

@@ -21,7 +21,11 @@
 |   0xxxxxxx         -> x+1 byte letterali
 |   1lllllll hi lo   -> l+3 byte copiati da (hi<<8|lo) byte indietro
 |
-| Costanti da make_patch.py (--defsym): IMG, RAM, SIZE, HEAP_BLOCK_SIZE.
+| Lista di avvio (RAM + BOOT_LIST, BOOT_N puntatori): dopo la decompressione e il BSS, modarea_load chiama ogni
+| puntatore diverso da zero (funzioni C senza argomenti; cache spente, pila dell'avvio). Una mod ci scrive il suo
+| con una patch accodata a IMG + BOOT_LIST + 4 * posto (posti in tools/build/registry.py).
+|
+| Costanti da make_patch.py (--defsym): IMG, RAM, SIZE, HEAP_BLOCK_SIZE, BOOT_LIST, BOOT_N.
 
         .equ    MAGIC,          0x53484C5A      | "SHLZ"
         .equ    BSS_LO,         0x4033A000      | BSS dell'OS (come 0x400004B2)
@@ -85,6 +89,14 @@ modarea_load:
         lea     16(%a0),%a0
         cmpa.l  %a2,%a0
         bcs.s   9b
+        lea     RAM+BOOT_LIST,%a3               | lista di avvio: le mod che devono preparare dati
+        moveq   #BOOT_N,%d4                     | prima che l'OS li legga (BOOT_N puntatori, 0 = vuoto)
+10:     move.l  (%a3)+,%d0
+        beq.s   11f
+        movea.l %d0,%a0
+        jsr     (%a0)
+11:     subq.l  #1,%d4
+        bne.s   10b
         movem.l (%sp),%d0-%d2/%d4-%d7/%a0-%a3
         lea     44(%sp),%sp
         rts
