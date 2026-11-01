@@ -58,6 +58,10 @@ V2_LONGS = [
     (0x4019_5074, "40251e30", "dm_page_l", "pagina 27: nome lungo 'External In R'"),
 ]
 MIXER_COUNT = (0x4003_58E8, "7203", "7204")
+# bit 5 del byte di controllo degli ingressi (hw+0xA6): in mono l'OS lo spegne e l'hardware somma IN L e IN R
+# prima dei due VCA (provato sulla macchina il 2026-11-01: l'altro ingresso restava udibile). Lo teniamo acceso:
+# gli ingressi restano separati, ognuno sul suo VCA (IN L a sinistra, IN R a destra) e sul suo ADC.
+HW_STEREO = (0x4009_09D4, "6706", "4e71")       # beq.s (mono -> bclr #5) diventa nop: sempre bset #5
 VP_SLOTS = {129: 17, 130: 18}            # posti della tabella di vparams (master-comp 0..6, fx3 7, 9..16)
 
 
@@ -178,6 +182,9 @@ def main() -> None:
         v2.append(fixed(addr, struct.pack(">I", syms2[sym]), what, orig))
     v2.append(fixed(MIXER_COUNT[0], bytes.fromhex(MIXER_COUNT[2]), "tab MIXER: 4 pagine (la quarta solo in mono)",
                     MIXER_COUNT[1]))
+    v2.append(fixed(HW_STEREO[0], bytes.fromhex(HW_STEREO[2]),
+                    "ingressi separati anche in mono: l'hardware resta in stereo (bit 5 di hw+0xA6 sempre acceso)",
+                    HW_STEREO[1]))
     for pid, slot in VP_SLOTS.items():
         v2.append(vparams.entry(slot, pid, syms2["dm_get"], syms2["dm_set"], f"dual-mono {pid} (lato R nella pagina IN R)"))
 

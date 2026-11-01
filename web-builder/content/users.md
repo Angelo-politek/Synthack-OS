@@ -205,7 +205,7 @@ Two mono instruments on the inputs, as separate channels: IN L and IN R, each wi
 
 `[!]` Page 4 exists only in mono.
 
-`[!]` Each input reaches delay, reverb, FX3 and the FX track (ROUTING, trig 16) centered.
+Dry signal: IN L on the left output, IN R on the right. Delay, reverb, FX3 and the FX track (ROUTING, trig 16) get both inputs centered.
 
 `[!]` In stereo, everything works as in the stock OS.
 

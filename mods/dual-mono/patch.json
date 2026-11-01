@@ -175,6 +175,14 @@
     },
     {
       "section": 3,
+      "addr": "0X400909D4",
+      "len": 2,
+      "expect_sha256": "c6988a6881f0312aed6878fe6f40767807d62e1a004432bc4cdb19c302ed47ff",
+      "hex": "4e71",
+      "what": "ingressi separati anche in mono: l'hardware resta in stereo (bit 5 di hw+0xA6 sempre acceso)"
+    },
+    {
+      "section": 3,
       "addr": "0X403510CC",
       "len": 12,
       "append": true,

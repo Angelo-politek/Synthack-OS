@@ -194,3 +194,31 @@ def test_mono_restores_the_mixer_parameters(sec3):
 def test_original_block_is_not_copied(sec3):
     """Il nostro codice non contiene il calcolo dei guadagni: nessuna istruzione EMAC."""
     assert SPEC["emac_sites"] == []
+
+
+TAIL, TAIL_END = 0x4009_09BA, 0x4009_09E0      # fine della funzione dei guadagni: bit 4/5 di hw+0xA6
+HW_CTRL = HW + 0xA6
+
+
+@pytest.mark.parametrize("mono", [True, False])
+@pytest.mark.parametrize("route", [0, 1])
+def test_inputs_stay_separate_in_hardware(sec3, mono, route):
+    """In mono l'OS spegne il bit 5 (l'hardware somma IN L e IN R prima dei VCA, provato sulla macchina):
+    con la mod resta acceso come in stereo. Il bit 4 (ingresso verso la FX track) resta dell'OS."""
+    for patched in (False, True):
+        m = Machine(sec3, patched, 0xA0)
+        uc = m.uc
+        p = bytearray(0x800)
+        struct.pack_into(">H", p, 0x71A, route)
+        uc.mem_write(PARAMS, bytes(p))
+        uc.mem_write(HW_CTRL, bytes([0x00 if mono else 0xFF]))
+        uc.mem_write(FLAG, bytes([0 if mono else 1]))
+        uc.mem_write(STACK, bytes(64))
+        uc.reg_write(UC_M68K_REG_SR, 0x2700)
+        uc.reg_write(UC_M68K_REG_A7, STACK)
+        uc.reg_write(UC_M68K_REG_A2, PARAMS)
+        uc.reg_write(UC_M68K_REG_A3, HW)
+        uc.emu_start(TAIL, TAIL_END, count=1000)
+        ctrl = uc.mem_read(HW_CTRL, 1)[0]
+        assert bool(ctrl & 0x10) == bool(route)
+        assert bool(ctrl & 0x20) == (patched or not mono)
