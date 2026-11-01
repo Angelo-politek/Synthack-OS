@@ -162,15 +162,14 @@ Live effects on keys 13–16: repeat, reverse, half speed, on all tracks. Quanti
 <!-- @screen:perf-fx/moda -->
 <!-- @screen:perf-fx/retrig -->
 
-1. Press `FUNC` + `15` to select Mod A.
+1. Press `FUNC` + `15`. Mod A is on (`Perf FX ON`) and its setup page opens: M1–M4 set the effect of each key.
 2. Hold a key 13–16. Its effect plays.
 3. Release. Playback resumes in time.
-4. To change a key's effect, open the Mod A setup page (`Perf FX`). Turn M1–M4.
 
 | Control | Values | Saved |
 |---|---|---|
 | M1–M4: effect of keys 13–16 | `--`, `1/16`, `1/8`, `3/16`, `1/4`, `1/2`, `1BAR`, `R1/8`, `R1/4`, `R1/2`, `RBAR`, `HALF` | kit |
-| `QNT`: Retrig setup page, knob D | `OFF` / `ON` | kit |
+| `QNT`: Retrig setup page (`FUNC` + `13`), knob D | `OFF` / `ON` | kit |
 
 | Value | Effect |
 |---|---|
@@ -197,7 +196,7 @@ Two mono instruments on the inputs, as separate channels: IN L and IN R, each wi
 
 1. Set **SETTINGS → AUDIO ROUTING → EXTERNAL IN** to **mono**.
 2. Open the **MIXER** tab, page 3 (External Mixer): this is IN L.
-3. Press the tab again for page 4: this is IN R.
+3. Press the tab again until the last page, page 4: this is IN R.
 
 | Page | Knobs | Saved |
 |---|---|---|
