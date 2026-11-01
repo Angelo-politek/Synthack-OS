@@ -57,6 +57,7 @@ class EngineError(RuntimeError):
 class Engine:
     section7_path: Path | None = None
     trace_periph: bool = False
+    image: bytes | None = None          # sezione 7 gia' preparata (es. compressa da modarea7): niente controllo hash
     uc: Uc = field(init=False)
     periph: Peripherals = field(init=False)
     emac: UnicornEmac = field(init=False)
@@ -76,7 +77,10 @@ class Engine:
         sites = json.loads(EMAC_SITES.read_text())
         if sites["section7_sha256"] != memmap.SECTION7_SHA256:
             raise EngineError("emac_sites_os141.json non corrisponde alla sezione 7 caricata")
-        self.emac = UnicornEmac(uc, sites["sites"])
+        self.emac = UnicornEmac(uc, sites["sites"])     # siti letti dallo stock: con 'image' tornano uguali dopo l'avvio
+        if self.image is not None:
+            uc.mem_write(memmap.LOAD_ADDR, bytes(max(len(sec), len(self.image))))
+            uc.mem_write(memmap.LOAD_ADDR, self.image)
 
         uc.hook_add(UC_HOOK_MEM_WRITE, self._cpu1_mailbox, begin=MBOX_STATUS, end=MBOX_STATUS + 1)
         uc.hook_add(UC_HOOK_CODE, self._fast_memclr, begin=MEMCLR, end=MEMCLR)
@@ -143,10 +147,19 @@ class Engine:
 
     # ---------------------------------------------------------------- API
 
-    def boot(self) -> None:
+    def boot(self, cold: bool = False) -> None:
+        """cold: parte come il bootloader della CPU #2 (sezione 6, 0x8000065A), da *(0x40000400) con la pila in
+        SRAM; altrimenti direttamente dall'entry dello stock."""
         self.uc.reg_write(UC_M68K_REG_SR, 0x2700)       # supervisore, come dopo un reset
-        self.uc.reg_write(UC_M68K_REG_A7, 0x47F0_0000)
-        self._run(memmap.ENTRY, IDLE_LOOP)
+        if cold:
+            self.uc.reg_write(UC_M68K_REG_A7, 0x8000_FFF0)
+            self.uc.mem_write(0x8000_FFF4, bytes(4))     # clr.l 4(sp) del bootloader
+            self._run(self.rd32(memmap.LOAD_ADDR), memmap.ENTRY)
+            self.emac.rearm()                            # il codice e' stato riscritto: siti EMAC di nuovo attivi
+            self._run(memmap.ENTRY, IDLE_LOOP)
+        else:
+            self.uc.reg_write(UC_M68K_REG_A7, 0x47F0_0000)
+            self._run(memmap.ENTRY, IDLE_LOOP)
         if self.status[-len(BOOT_STEPS):] != BOOT_STEPS:
             raise EngineError(f"handshake inatteso: {self.status}")
         if self.rd32(VBR + 4 * VECTOR_DTIM0) != AUDIO_ISR:

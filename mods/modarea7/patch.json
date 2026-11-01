@@ -1,0 +1,17 @@
+{
+  "name": "modarea7",
+  "os": "1.42",
+  "description": "Sezione 7 (CPU #2) compressa: uno stub la decomprime all'avvio prima dell'entry originale, insieme all'area dei motori delle machine (0x47000000, 0x40000 B). Spazio per i motori: ~125 KB compressi invece di 9 KB.",
+  "generated_by": "mods/modarea7/make_patch.py",
+  "layout7": {
+    "stub": "4000040441fafffa227c46000000203a00a05680e48822d8538066fa203c000cc1004e7b00024e714ef94600002e41fa0090227c400004006130200856800280fffffffc2040227a0070611e203a006e67064219538066fa203c000cc1004e7b00024e71227a004e4ed120100c8053484c5a663a2428000441e8000c2449d5c2b3ca642a700010186b0812d853806cfa60ee02800000007f548072001218e1891218264997c112db53806cfa60d24e7500000000000000000000000000000000",
+    "hdr": "0xb0",
+    "entry": "0x40001070",
+    "img": "0x4005df10",
+    "ram": "0x47000000",
+    "size": "0x40000",
+    "max": "0x5fffb",
+    "compress": "shlz"
+  },
+  "patches": []
+}

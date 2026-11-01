@@ -1,0 +1,5 @@
+{
+  "title": "Engine area",
+  "kind": "infra",
+  "summary": "Room for machine code on the sound engine (CPU #2). Section 7 travels compressed and unpacks at boot."
+}

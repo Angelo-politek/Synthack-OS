@@ -10,7 +10,7 @@ import { cleanName, namedSplash } from "./splash.ts";
 
 const LOAD_ADDR = 0x4000_0400;            // sezioni 3 e 7 si caricano qui
 const PATCHABLE = new Set([3, 7]);
-const APPENDABLE = new Set([3]);          // sezione 7: limite del caricatore della CPU #2 da trovare
+const APPENDABLE = new Set([3]);          // sezione 7: solo con modarea7 (packSection7)
 const PROTECTED = new Set([2, 6]);        // recovery: mai riscritte
 export const MIN_MARGIN = 4096;           // tools/build/bootcheck.py
 export const STOCK_SHA256: Record<string, string> = {
@@ -32,6 +32,7 @@ export interface ModSpec {
   os?: string;
   requires?: string[];
   layout?: Record<string, unknown>;
+  layout7?: Record<string, string>;
   patches: PatchSpec[];
 }
 
@@ -123,6 +124,51 @@ function modArea(specs: ModSpec[]): { img: number; size: number } | null {
   return null;
 }
 
+interface Layout7 { stub: Uint8Array; hdr: number; entry: number; img: number; ram: number; size: number; max: number }
+
+function engineLayout(specs: ModSpec[]): Layout7 | null {
+  for (const s of specs) {
+    const l = s.layout7;
+    if (l) return { stub: fromHex(l.stub), hdr: parseInt(l.hdr, 16), entry: parseInt(l.entry, 16), img: parseInt(l.img, 16),
+                    ram: parseInt(l.ram, 16), size: parseInt(l.size, 16), max: parseInt(l.max, 16) };
+  }
+  return null;
+}
+
+const u32be = (b: Uint8Array, at: number, v: number): void => {
+  b[at] = v >>> 24; b[at + 1] = (v >>> 16) & 0xff; b[at + 2] = (v >>> 8) & 0xff; b[at + 3] = v & 0xff;
+};
+const rd32 = (b: Uint8Array, at: number): number => ((b[at] << 24) | (b[at + 1] << 16) | (b[at + 2] << 8) | b[at + 3]) >>> 0;
+
+/** Sezione 7 compressa di modarea7 (come pack_section7 di build.py): stub + SHLZ(sezione) + SHLZ(area motori). */
+function packSection7(sec: Uint8Array, stockLen: number, lay: Layout7): Uint8Array {
+  const engine = sec.subarray(stockLen);
+  if (engine.length > lay.size) throw new BuildError(`engine area: ${engine.length} B, more than the ${lay.size} B in RAM`);
+  const a = shlz.compress(sec.subarray(0, stockLen));
+  const pad = (4 - ((lay.stub.length + a.length) % 4)) % 4;
+  const b = engine.length ? shlz.compress(engine) : new Uint8Array(0);
+  const out = new Uint8Array(lay.stub.length + a.length + pad + b.length);
+  out.set(lay.stub);
+  out.set(a, lay.stub.length);
+  out.set(b, lay.stub.length + a.length + pad);
+  u32be(out, lay.hdr, out.length);
+  u32be(out, lay.hdr + 4, lay.entry);
+  u32be(out, lay.hdr + 8, lay.ram);
+  u32be(out, lay.hdr + 12, lay.size - engine.length);
+  if (out.length > lay.max) throw new BuildError(`compressed section 7: ${out.length} B, more than the ${lay.max} B of the CPU #1 staging`);
+  return out;
+}
+
+function unpackSection7(packed: Uint8Array, lay: Layout7): { base: Uint8Array; engine: Uint8Array } {
+  const n = lay.stub.length;
+  for (let i = 0; i < lay.hdr; i++) if (packed[i] !== lay.stub[i]) throw new BuildError("section 7: the stub is not modarea7's");
+  const base = shlz.decompress(packed.subarray(n));
+  let end = n + 12 + rd32(packed, n + 8);
+  end += (4 - (end % 4)) % 4;
+  const isShlz = packed[end] === 0x53 && packed[end + 1] === 0x48 && packed[end + 2] === 0x4c && packed[end + 3] === 0x5a;
+  return { base, engine: isShlz ? shlz.decompress(packed.subarray(end)) : new Uint8Array(0) };
+}
+
 function expectedArea(patches: Patch[], img: number): Uint8Array {
   let len = 0;
   for (const p of patches) if (p.append) len = Math.max(len, p.addr - img + p.data.length);
@@ -133,7 +179,7 @@ function expectedArea(patches: Patch[], img: number): Uint8Array {
 
 const hexAddr = (a: number): string => "0x" + a.toString(16);
 
-function applyPatches(sections: Map<number, Uint8Array>, patches: Patch[]): Map<number, Uint8Array> {
+function applyPatches(sections: Map<number, Uint8Array>, patches: Patch[], appendable: Set<number> = APPENDABLE): Map<number, Uint8Array> {
   const taken = new Map<number, Patch[]>();
   for (const p of patches) {
     const sec = sections.get(p.section);
@@ -141,7 +187,7 @@ function applyPatches(sections: Map<number, Uint8Array>, patches: Patch[]): Map<
     for (const q of taken.get(p.section) ?? [])
       if (p.offset < q.end && q.offset < p.end) throw new BuildError(`${p.mod} and ${q.mod} modify the same bytes (${hexAddr(p.addr)})`);
     if (p.append) {
-      if (!APPENDABLE.has(p.section)) throw new BuildError(`${p.mod}: appended patch to section ${p.section}: only section 3 for now`);
+      if (!appendable.has(p.section)) throw new BuildError(`${p.mod}: appended patch to section ${p.section}: needs modarea7 ("requires": ["modarea7"])`);
       if (p.offset < sec.length) throw new BuildError(`${p.mod}: appended patch at ${hexAddr(p.addr)} inside the stock section`);
     } else {
       if (p.offset < 0 || p.end > sec.length) throw new BuildError(`${p.mod}: ${hexAddr(p.addr)} outside section ${p.section}`);
@@ -187,7 +233,8 @@ export function build(stock: Uint8Array, mods: string[], specs: Record<string, M
 
   onProgress({ stage: "patch" });
   const original = new Map(needed.map((s) => [s, fw.extract(s)]));
-  const sections = applyPatches(original, patches);
+  const lay7 = engineLayout(modSpecs);
+  const sections = applyPatches(original, patches, lay7 ? new Set([...APPENDABLE, 7]) : APPENDABLE);
   const area = modArea(modSpecs);
   let image: Uint8Array | null = null;
   if (area && sections.has(3) && sections.get(3)!.length > area.img - LOAD_ADDR) {
@@ -200,6 +247,7 @@ export function build(stock: Uint8Array, mods: string[], specs: Record<string, M
     b.set(z, off);
     sections.set(3, b);
   }
+  if (lay7 && sections.has(7)) sections.set(7, packSection7(sections.get(7)!, original.get(7)!.length, lay7));
   for (const s of sections.keys()) if (PROTECTED.has(s)) throw new BuildError(`section ${s} is protected (recovery)`);
   const syx = fw.rebuild(sections, 3, (_id, done, total) => onProgress({ stage: "compress", done, total }));
 
@@ -221,6 +269,17 @@ export function build(stock: Uint8Array, mods: string[], specs: Record<string, M
     const mine = patches.filter((p) => p.section === id);
     const allowed = new Uint8Array(Math.max(old.length, neu.length));
     for (const p of mine) allowed.fill(1, Math.max(0, p.offset), Math.min(allowed.length, p.end));
+    if (lay7 && id === 7) {                                 // sezione 7 compressa: confronto dopo la decompressione
+      const { base, engine } = unpackSection7(neu, lay7);
+      let d = 0, bad = base.length !== old.length;
+      for (let i = 0; i < old.length; i++) if (base[i] !== old[i]) { d++; if (!allowed[i]) bad = true; }
+      if (bad) throw new BuildError("section 7: changes outside the declared patches");
+      const want = expectedArea(mine, lay7.img);
+      if (engine.length !== want.length || engine.some((x, i) => x !== want[i]))
+        throw new BuildError("section 7: the compressed engine area does not reproduce the appended patches");
+      log.push(`section 7: ${d} bytes changed, all inside the patches; engine area ${engine.length} B; compressed ${neu.length} B (maximum ${lay7.max})`);
+      continue;
+    }
     let diff = 0, outside = false;
     for (let i = 0; i < old.length; i++)
       if (i >= neu.length || old[i] !== neu[i]) {

@@ -20,14 +20,17 @@ Formato di mods/<nome>/patch.json:
 
 Patch accodate ("append": true, solo "hex"): byte NUOVI oltre la fine della sezione stock (area
 mod, vedi mods/modarea); lo spazio tra la fine stock e "addr" viene riempito di zeri. Non hanno
-impronta (non sostituiscono byte Elektron). Solo nella sezione 3: per la sezione 7 il limite del
-caricatore della CPU #2 non e' ancora noto.
+impronta (non sostituiscono byte Elektron). Nella sezione 7 solo con modarea7 (area dei motori).
 
 Dipendenze: una mod dichiara "requires": ["modarea", ...]. Le mod richieste e non indicate vengono
 aggiunte da sole (cercate tra le cartelle indicate, poi in mods/), prima di chi le richiede.
 
 Area mod compressa: se modarea dichiara "compress": "shlz", i byte accodati (da "img" in poi)
 vengono sostituiti dal loro flusso SHLZ (lz.py), che il rilocatore decomprime in RAM all'avvio.
+
+Sezione 7 compressa: se modarea7 dichiara "layout7", la sezione 7 (stock + patch) e l'area dei motori
+(i byte accodati da "img" in poi) diventano due flussi SHLZ dietro al suo stub, che li decomprime sulla
+CPU #2 all'avvio; il risultato deve stare nello staging della CPU #1 ("max").
 
 Controllo di avvio (bootcheck.py): il bootstrap decomprime la sezione 3 quasi sul posto; se il
 margine scende sotto bootcheck.MIN_MARGIN l'immagine non si avvierebbe e il build la scarta.
@@ -38,6 +41,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import struct
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -56,7 +60,7 @@ import render  # noqa: E402
 
 LOAD_ADDR = 0x4000_0400                 # sezioni 3 e 7 si caricano qui (vedi docs/)
 PATCHABLE = {3, 7}
-APPENDABLE = {3}                        # sezione 7: limite del caricatore della CPU #2 da trovare (modarea7)
+APPENDABLE = {3}                        # sezione 7: solo con modarea7 (pack_section7)
 STOCK_SHA256 = {"1.42": "ded3c59fdb909eb9e2c3307b30a486452c8fa6947b12c14e0ce35a187b7f37c1"}
 
 
@@ -192,7 +196,46 @@ def expected_area(patches: list[Patch], area: dict) -> bytes:
     return bytes(img)
 
 
-def apply_patches(sections: dict[int, bytearray], patches: list[Patch]) -> None:
+def engine_layout(moddirs: list[Path]) -> dict | None:
+    """Disposizione della sezione 7 compressa, se una delle mod (modarea7) la dichiara."""
+    for d in moddirs:
+        lay = json.loads((Path(d) / "patch.json").read_text(encoding="utf-8")).get("layout7")
+        if lay:
+            return {k: (bytes.fromhex(v) if k == "stub" else v if k == "compress" else int(v, 16))
+                    for k, v in lay.items()}
+    return None
+
+
+def pack_section7(sec: bytes, stock_len: int, lay: dict) -> bytes:
+    """stub + SHLZ(sezione stock con le patch) + SHLZ(area motori), intestazione dello stub compilata."""
+    engine = bytes(sec[stock_len:])
+    if len(engine) > lay["size"]:
+        raise BuildError(f"area motori: {len(engine)} B, piu' dei {lay['size']} B in RAM")
+    out = bytearray(lay["stub"])
+    struct.pack_into(">4I", out, lay["hdr"], 0, lay["entry"], lay["ram"], lay["size"] - len(engine))
+    out += lz.compress(bytes(sec[:stock_len]))
+    out += bytes(-len(out) % 4)
+    if engine:
+        out += lz.compress(engine)
+    struct.pack_into(">I", out, lay["hdr"], len(out))
+    if len(out) > lay["max"]:
+        raise BuildError(f"sezione 7 compressa: {len(out)} B, oltre i {lay['max']} B dello staging della CPU #1")
+    return bytes(out)
+
+
+def unpack_section7(packed: bytes, lay: dict) -> tuple[bytes, bytes]:
+    """Inverso di pack_section7, come lo fa lo stub: (sezione, area motori)."""
+    n = len(lay["stub"])
+    if packed[:lay["hdr"]] != lay["stub"][:lay["hdr"]]:
+        raise BuildError("sezione 7: lo stub non e' quello di modarea7")
+    base = lz.decompress(packed[n:])
+    end = n + lz.HDR + struct.unpack_from(">I", packed, n + 8)[0]
+    end += -end % 4
+    engine = lz.decompress(packed[end:]) if packed[end:end + 4] == lz.MAGIC else b""
+    return base, engine
+
+
+def apply_patches(sections: dict[int, bytearray], patches: list[Patch], appendable: set[int] = APPENDABLE) -> None:
     """Applica le patch verificando impronte e sovrapposizioni. Modifica 'sections' sul posto."""
     taken: dict[int, list[Patch]] = {}
     stock_len = {s: len(b) for s, b in sections.items()}
@@ -204,9 +247,9 @@ def apply_patches(sections: dict[int, bytearray], patches: list[Patch]) -> None:
             if p.offset < q.end and q.offset < p.end:
                 raise BuildError(f"{p.mod} e {q.mod} modificano gli stessi byte ({p.addr:#x})")
         if p.append:
-            if p.section not in APPENDABLE:
-                raise BuildError(f"{p.mod}: patch accodata alla sezione {p.section}: per ora solo la sezione 3 "
-                                 f"(il limite del caricatore della CPU #2 non e' ancora noto)")
+            if p.section not in appendable:
+                raise BuildError(f"{p.mod}: patch accodata alla sezione {p.section}: serve modarea7 "
+                                 f"(\"requires\": [\"modarea7\"])")
             if p.offset < stock_len[p.section]:
                 raise BuildError(f"{p.mod}: patch accodata a {p.addr:#x} dentro la sezione stock")
         else:
@@ -242,7 +285,8 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print, splash_name: s
         files = eft.unpack(stock, tmp / "stock", ids=needed)
         original = {s: files[s].read_bytes() for s in needed}
         sections = {s: bytearray(b) for s, b in original.items()}
-        apply_patches(sections, patches)
+        lay7 = engine_layout(moddirs)
+        apply_patches(sections, patches, APPENDABLE | ({7} if lay7 else set()))
         area = mod_area(moddirs)
         image = None
         if area and 3 in sections and len(sections[3]) > area["img"] - LOAD_ADDR:
@@ -253,6 +297,8 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print, splash_name: s
                 raise BuildError(f"area mod: {len(image)} B, piu' dei {area['size']} B in RAM")
             del sec[off:]
             sec.extend(lz.compress(image))
+        if lay7 and 7 in sections:
+            sections[7] = bytearray(pack_section7(bytes(sections[7]), len(original[7]), lay7))
         replaced = {}
         for s in needed:
             f = tmp / f"section_{s}.patched"
@@ -283,6 +329,22 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print, splash_name: s
                 continue
             mine = [p for p in patches if p.section == sid]
             allowed = {i for p in mine for i in range(p.offset, p.end)}
+            if lay7 and sid == 7:                          # sezione 7 compressa: confronto dopo la decompressione
+                base, engine = unpack_section7(new, lay7)
+                diff = [i for i in range(len(old)) if base[i] != old[i]]
+                if len(base) != len(old) or not set(diff) <= allowed:
+                    raise BuildError("sezione 7: modifiche fuori dalle patch dichiarate")
+                want = bytearray()
+                for p in mine:
+                    if p.append:
+                        k = p.offset - len(old)
+                        want.extend(bytes(max(0, k + len(p.data) - len(want))))
+                        want[k:k + len(p.data)] = p.data
+                if engine != bytes(want):
+                    raise BuildError("sezione 7: l'area motori compressa non riproduce le patch accodate")
+                log(f"  sezione 7: {len(diff)} byte modificati, tutti dentro le patch; area motori {len(engine)} B; "
+                    f"compressa {len(new)} B (massimo {lay7['max']})")
+                continue
             diff = [i for i in range(len(old)) if i >= len(new) or old[i] != new[i]]
             if image is not None and sid == 3:              # area compressa: confronto dopo la decompressione
                 off = area["img"] - LOAD_ADDR

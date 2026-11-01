@@ -327,6 +327,15 @@ class UnicornEmac:
             uc.mem_write(a, ILLEGAL)
         uc.hook_add(UC_HOOK_INTR, self._intr)
 
+    def rearm(self) -> None:
+        """Rimette ILLEGAL sui siti dopo che il codice e' stato riscritto (sezione 7 decompressa da modarea7):
+        l'istruzione ritrovata dev'essere la stessa."""
+        for a, op in self.ops.items():
+            found = int.from_bytes(self.uc.mem_read(a, 2), "big")
+            if found != op:
+                raise EmacUnsupported(f"{a:08X}: dopo la riscrittura {found:04X}, attesa {op:04X}")
+            self.uc.mem_write(a, ILLEGAL)
+
     def _intr(self, uc, intno: int, _ud) -> None:
         pc = self.fast.read(self._pc)
         fn = self._compiled.get(pc)
