@@ -31,14 +31,19 @@ OUT = REPO / "web-builder" / "src" / "budget.json"
 # istruzioni per blocco, caso peggiore (2026-10-30, OS 1.42): fx3 PHSR con 12 tracce e ingresso in mandata,
 # master-comp con compressione piena, dual-mono = mandate di IN R (v2) + VCA degli ingressi (v1).
 # perf-fx gira nell'interrupt del sequencer, readable-values nell'interfaccia: 0 qui.
-AUDIO_CPU = {"fx3": 3197, "master-comp": 578, "dual-mono": 324 + 133}
+# sy-fm4: copia della pagina 2/2 verso la CPU #2 a ogni blocco (fm4m_dma_wait, tests/test_sy_fm4.py).
+AUDIO_CPU = {"fx3": 3197, "master-comp": 578, "dual-mono": 324 + 133, "sy-fm4": 410}
+
+SEC7_ROOM = 127_695
 
 LIMITS = {
     "cpu": 3000,                   # ~3 000 istruzioni in piu' per blocco fanno gia' laggare l'interfaccia (prova sulla macchina)
     "modarea": modarea_layout.SIZE,
     "kit": kitstore_layout.WORDS_PER_BLOCK * kitstore_layout.N_BLOCKS,
     "project": 256,
-    "sec7": 0x60000 - 5 - 0x5DB10,  # limite della sezione 7 (controllo dell'OS all'avvio) meno lo stock
+    # staging della sezione 7 (0x60000 - 5) meno lo stub di modarea7 e la sezione stock compressa (SHLZ):
+    # il codice dei motori si conta non compresso, quindi per eccesso (tests/test_modarea7.py controlla il valore)
+    "sec7": SEC7_ROOM,
 }
 
 

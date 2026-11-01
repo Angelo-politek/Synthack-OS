@@ -4,7 +4,7 @@
     "modarea": 65520,
     "kit": 36,
     "project": 256,
-    "sec7": 9451
+    "sec7": 127695
   },
   "mods": {
     "dual-mono": {
@@ -44,6 +44,13 @@
     },
     "modarea": {
       "cpu": 0,
+      "modarea": 32,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
+    "modarea7": {
+      "cpu": 0,
       "modarea": 0,
       "kit": 0,
       "project": 0,
@@ -76,6 +83,13 @@
       "kit": 0,
       "project": 0,
       "sec7": 0
+    },
+    "sy-fm4": {
+      "cpu": 410,
+      "modarea": 2944,
+      "kit": 0,
+      "project": 0,
+      "sec7": 7524
     },
     "vparams": {
       "cpu": 0,

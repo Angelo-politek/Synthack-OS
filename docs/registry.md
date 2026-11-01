@@ -12,13 +12,23 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x5000` | `0x7000` | dual-mono | dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py) |
 | `0x7000` | `0x7200` | projstore | code, then the 256 bytes saved with the project |
 | `0x7200` | `0x7400` | kitstore | code |
-| `0x7400` | `0x7e00` | **free** |  |
+| `0x7400` | `0x7420` | modarea | boot list: 8 pointers, called after unpacking (BOOT_SLOTS) |
+| `0x7420` | `0x7e00` | **free** |  |
 | `0x7e00` | `0x8000` | vparams | code |
 | `0x8000` | `0x8180` | vparams | table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS) |
-| `0x8180` | `0xa000` | **free** |  |
+| `0x8180` | `0x8d00` | sy-fm4 | main CPU side: page 2/2, storage tables, shared RAM publisher |
+| `0x8d00` | `0xa000` | **free** |  |
 | `0xa000` | `0xdff0` | fx3 | code and data |
 | `0xdff0` | `0xf000` | fx3 | feedback (+0xDFFC) and delay line (+0xE000, 4 KB) |
 | `0xf000` | `0xfff0` | **free** |  |
+
+Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4.
+
+## Engine area (CPU #2, `mods/modarea7`, RAM `0x47000000`, offsets)
+
+| From | To | Mod | Use |
+|---|---|---|---|
+| `0x0000` | `0x4000` | sy-fm4 | voice engine (engine 4) and its state |
 
 ## Section 3 free fill (`0x40339740–0x4033a000`)
 
@@ -81,6 +91,14 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 251 | fx3 | FX3 page |
 | 252 | fx3 | FX3 page |
 | 253 | fx3 | FX3 page |
+| 254 | sy-fm4 | SYN page 2/2 ALGO (was Digitakt MIDI CC1 Value) |
+| 255 | sy-fm4 | SYN page 2/2 RAT3 (was Digitakt MIDI CC2 Value) |
+| 256 | sy-fm4 | SYN page 2/2 LEV3 (was Digitakt MIDI CC3 Value) |
+| 257 | sy-fm4 | SYN page 2/2 DEC3 (was Digitakt MIDI CC4 Value) |
+| 258 | sy-fm4 | SYN page 2/2 RAT4 (was Digitakt MIDI CC5 Value) |
+| 259 | sy-fm4 | SYN page 2/2 LEV4 (was Digitakt MIDI CC6 Value) |
+| 260 | sy-fm4 | SYN page 2/2 DEC4 (was Digitakt MIDI CC7 Value) |
+| 261 | sy-fm4 | SYN page 2/2 DET (was Digitakt MIDI CC8 Value) |
 | 262 | master-comp | compressor |
 | 263 | master-comp | compressor |
 | 264 | master-comp | compressor |

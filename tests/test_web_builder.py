@@ -77,7 +77,7 @@ MODS = ["splash", "dual-mono", "master-comp", "readable-values", "perf-fx", "fx3
 
 @needs_node
 @pytest.mark.skipif(not SY.exists(), reason="OS stock assente")
-@pytest.mark.parametrize("mods,name", [(MODS, ""), (["splash"], "Angelo Tedesco")])
+@pytest.mark.parametrize("mods,name", [(MODS, ""), (["splash"], "Angelo Tedesco"), (MODS + ["sy-fm4"], "")])
 def test_full_build_identical_to_build_py(tmp_path, mods, name):
     import build
     import eft

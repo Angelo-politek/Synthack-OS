@@ -17,7 +17,7 @@ const METERS: { key: Key; label: string; kb: boolean; over: string; note: string
   { key: "kit", label: "Kit words", kb: false, over: "Kit words full: these mods don't fit together.",
     note: "Spare words saved with the kit (kitstore)." },
   { key: "sec7", label: "Engine code", kb: true, over: "Engine code full: these machines don't fit together.",
-    note: "Code space for machines on the sound engine (CPU #2)." },
+    note: "Code for machines on the sound engine (CPU #2), counted uncompressed against the room left in the compressed section 7." },
 ];
 
 const fmt = (n: number): string => n.toLocaleString("en-US").replace(/,/g, " ");

@@ -107,6 +107,8 @@ class UI:
         for m in self.mods:
             spec = json.loads((REPO / "mods" / m / "patch.json").read_text(encoding="utf-8"))
             for p in spec["patches"]:
+                if p["section"] != 3:                   # sezione 7: CPU #2, non qui
+                    continue
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
             self.sym.update({k: int(v, 16) for k, v in spec.get("symbols", {}).items()})
         uc.mem_write(RET, b"\x4e\x75")

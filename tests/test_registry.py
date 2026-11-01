@@ -14,6 +14,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools" / "build"), str(ROOT / "tools" / "unpack")]
+import engine_layout as EN  # noqa: E402
 import kitstore_layout as KS  # noqa: E402
 import modarea_layout as MA  # noqa: E402
 import registry as R  # noqa: E402
@@ -56,9 +57,18 @@ def test_allocations_disjoint_and_inside():
     assert all(who in specs() for _, _, who, _ in R.MODAREA + R.SEC3_FILL)
 
 
+BOOT = MA.RAM + MA.BOOT_LIST
+
+
 def test_mod_area_writes_inside_own_space():
     for name, p, ram, n in patches(fixed=False):
-        if VP_TABLE <= ram < VP_TABLE + 12 * VP_N:
+        if p["section"] == 7:
+            off = ram - EN.RAM
+            assert owners(R.ENGINE, off, off + n) == {name}, f"{name}: area motori {off:#x}..{off + n:#x} non sua"
+        elif BOOT <= ram < BOOT + 4 * MA.BOOT_N:
+            assert (ram - BOOT) % 4 == 0 and n == 4
+            assert R.BOOT_SLOTS.get((ram - BOOT) // 4) == name, f"{name}: posto {(ram - BOOT) // 4} della lista di avvio"
+        elif VP_TABLE <= ram < VP_TABLE + 12 * VP_N:
             slot = (ram - VP_TABLE) // 12
             pid = struct.unpack(">H", bytes.fromhex(p["hex"])[:2])[0]
             assert (ram - VP_TABLE) % 12 == 0 and n == 12
@@ -66,6 +76,16 @@ def test_mod_area_writes_inside_own_space():
         else:
             off = ram - MA.RAM
             assert owners(R.MODAREA, off, off + n) == {name}, f"{name}: {off:#x}..{off + n:#x} fuori dal suo spazio"
+
+
+def test_engine_area_and_boot_slots():
+    rows = sorted(R.ENGINE)
+    assert all(0 <= a < b <= EN.SIZE for a, b, _, _ in rows)
+    assert all(x[1] <= y[0] for x, y in zip(rows, rows[1:]))
+    used = {(ram - BOOT) // 4: name for name, p, ram, n in patches(fixed=False)
+            if p["section"] == 3 and BOOT <= ram < BOOT + 4 * MA.BOOT_N}
+    assert used == R.BOOT_SLOTS
+    assert set(R.BOOT_SLOTS.values()) | {w for *_, w, _ in R.ENGINE} <= set(specs())
 
 
 def test_vparams_slots_all_used_as_registered():

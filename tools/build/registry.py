@@ -26,8 +26,10 @@ MODAREA = [
     (0x5000, 0x7000, "dual-mono", "dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py)"),
     (0x7000, 0x7200, "projstore", "code, then the 256 bytes saved with the project"),
     (0x7200, 0x7400, "kitstore", "code"),
+    (0x7400, 0x7420, "modarea", "boot list: 8 pointers, called after unpacking (BOOT_SLOTS)"),
     (0x7E00, 0x8000, "vparams", "code"),
     (0x8000, 0x8180, "vparams", "table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS)"),
+    (0x8180, 0x8D00, "sy-fm4", "main CPU side: page 2/2, storage tables, shared RAM publisher"),
     (0xA000, 0xDFF0, "fx3", "code and data"),
     (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
 ]
@@ -45,6 +47,14 @@ SEC3_NOT_FREE = [
     (0x402A_BC3C, 0x402C_BC3C, "two 128x128 tables of longs read by 0x400AD480 (conversion of loaded "
                                "sounds/kits); rows are zero but read"),
 ]
+
+# ---- area dei motori sulla CPU #2 (mods/modarea7, RAM a engine_layout.RAM): (inizio, fine) come offset
+ENGINE = [
+    (0x0000, 0x4000, "sy-fm4", "voice engine (engine 4) and its state"),
+]
+
+# ---- lista di avvio dell'area mod: posto -> mod (modarea_layout.boot_slot)
+BOOT_SLOTS = {0: "sy-fm4"}
 
 # ---- vparams: posto nella tabella -> (mod, id)
 VPARAMS_SLOTS = {
@@ -66,6 +76,8 @@ IDS = {
     **{i: ("fx3", "FX3 page") for i in range(246, 254)},
     **{i: ("master-comp", "compressor") for i in range(262, 269)},
     269: ("fx3", "external input SND3"),
+    **{254 + k: ("sy-fm4", f"SYN page 2/2 {n} (was Digitakt MIDI CC{k + 1} Value)")
+       for k, n in enumerate(("ALGO", "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))},
 }
 
 # ---- pagine dell'interfaccia (indice -> mod) riusate
@@ -103,6 +115,11 @@ def markdown() -> str:
          "| From | To | Mod | Use |", "|---|---|---|---|"]
     rows = [(a, b, who, use) for a, b, who, use in MODAREA] + [(a, b, "**free**", "") for a, b in free_modarea()]
     L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in sorted(rows)]
+    L += ["", f"Boot list (`+{modarea_layout.BOOT_LIST:#06x}`, {modarea_layout.BOOT_N} pointers called after unpacking): "
+          + ", ".join(f"slot {s} {who}" for s, who in sorted(BOOT_SLOTS.items())) + ".",
+          "", "## Engine area (CPU #2, `mods/modarea7`, RAM `0x47000000`, offsets)", "",
+          "| From | To | Mod | Use |", "|---|---|---|---|"]
+    L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in sorted(ENGINE)]
     L += ["", f"## Section 3 free fill (`{SEC3_FREE[0]:#010x}–{SEC3_FREE[1]:#010x}`)", "",
           "| From | To | Mod | Use |", "|---|---|---|---|"]
     L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in SEC3_FILL]
