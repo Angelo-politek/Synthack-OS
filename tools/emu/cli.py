@@ -22,7 +22,7 @@ import engine as eng  # noqa: E402
 from wav import SAMPLE_RATE, write_q31  # noqa: E402
 
 MACHINE_MAP = 0x4001_4950      # mappa ID machine -> engine (46 byte), sezione 7
-MACHINE_NAMES = 0x4022_AF88    # tabella (nome lungo, sigla) per ID, sezione 3 (OS 1.41)
+MACHINE_NAMES = 0x4022_B228    # tabella (nome lungo, sigla) per ID, sezione 3 (OS 1.42)
 N_MACHINES = 45
 TRIG_LOAD, TRIG_NOTE = 0, 2    # il primo trig carica la machine, il secondo suona la nota
 
