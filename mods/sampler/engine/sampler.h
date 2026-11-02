@@ -25,8 +25,9 @@ enum {
     LIX_P5 = 0x16,      /* STRT | SEG | STRT | SLICE */
     LIX_P6 = 0x17,      /* LEN | MODE | LEN | LEN */
     LIX_P7 = 0x18,      /* LOOP | BARS | BARS | GRID */
-    LIX_MODE = 0x19,    /* 0 ONESHOT, 1 WERP, 2 REPITCH, 3 SLICE (Digitakt machine numbers) */
-    LIX_OVER = 0x1a,    /* the Syntakt's overdrive, applied after the engines: kept at 0 */
+    LIX_LEV = 0x19,     /* sample level, 100 = unity (the Digitakt's LEV) */
+    LIX_TYPE = 0x1a,    /* 0 ONESHOT, 1 WERP, 2 REPITCH, 3 SLICE (Digitakt machine numbers). The word of the
+                           Syntakt's overdrive, which runs after the engines: read, then zeroed */
 };
 
 enum { M_ONESHOT, M_WERP, M_REPITCH, M_SLICE };

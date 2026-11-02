@@ -5,7 +5,8 @@ SLICE) al posto di SP TWINSHOT, sull'OS 1.42.
 
 - CPU #2 (engine/): area motori di modarea7 a +OFF_ENGINE; motore 11 (SP TWINSHOT) -> SAMPLER.
 - CPU #1 (main/smp_main.c): area mod a +OFF_MAIN; descrittori 497..504 riscritti (pagina della Digitakt,
-  manopola G sull'indice 0x18, H = tipo di machine), testi dei valori, tempo nella RAM condivisa.
+  manopola G sull'indice 0x18, H = LEV), pagine SYN 1/2 e 2/2 con syn-pages (forma d'onda), grafiche delle
+  caselle, testi dei valori, tempo nella RAM condivisa.
 """
 
 from __future__ import annotations
@@ -26,12 +27,14 @@ import eft  # noqa: E402
 import engine_layout as E  # noqa: E402
 import modarea_layout as M  # noqa: E402
 import registry  # noqa: E402
+import synpages_layout as SP  # noqa: E402
 
 LOAD = 0x4000_0400
 OFF_MAIN = next(a for a, b, who, _ in registry.MODAREA if who == "sampler")
 OFF_ENGINE = next(a for a, b, who, _ in registry.ENGINE if who == "sampler")
+BOOT_SLOT = next(n for n, who in registry.BOOT_SLOTS.items() if who == "sampler")
 TOOLS = "~/tools/m68k/root"
-CFLAGS = ("-mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
+CFLAGS = (f"-DSP_TABLE={SP.TABLE:#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
           "--param=min-pagesize=0")             # la RAM condivisa della CPU #2 parte da 0
 
 # sezione 3 (OS 1.42)
@@ -43,6 +46,10 @@ STOCK_LIX = (0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x1A, 0x19)
 PROTO_OPERANDS = {498: (0x4019_4264, 0x41B9_ECE0), 499: (0x4019_42BA, 0x41B9_EF70), 500: (0x4019_430C, 0x41B9_EF70),
                   501: (0x4019_4360, 0x41B9_EF90), 502: (0x4019_43AA, 0x41B9_ECE0), 503: (0x4019_43FC, 0x41B9_EFD0),
                   504: (0x4019_4444, 0x41B9_EDB0)}
+# grafica della casella (+36): operando nell'inizializzatore, prototipo stock. TUNE (497) tiene la sua.
+GFX_OPERANDS = {498: (0x4019_4276, 0x41B9_EB20), 499: (0x4019_42C8, 0x41B9_E690), 500: (0x4019_431A, 0x41B9_EC80),
+                501: (0x4019_436E, 0x41B9_EC60), 502: (0x4019_43B8, 0x41B9_EB10), 503: (0x4019_440E, 0x41B9_ECB0),
+                504: (0x4019_4456, 0x41B9_E7A0)}
 NAME, SHORT = 0x4025_3AFB, 0x4025_3B07
 BLOCK_CALL = 0x400A_4E78                # jsr 0x40095608 nell'interrupt audio: una volta per blocco
 BLOCK_WAS = 0x4009_5608
@@ -90,12 +97,13 @@ def compile_blob(sources: list[str], base: int, entry: str) -> tuple[bytes, dict
         tmp = Path(tmp)
         shutil.copytree(HERE / "engine", tmp / "engine")
         shutil.copytree(HERE / "main", tmp / "main")
+        shutil.copy(REPO / "mods" / "syn-pages" / "synpages.h", tmp / "main" / "synpages.h")
         (tmp / "blob.ld").write_text(LDS.format(entry=entry, base=base), encoding="ascii")
         w = eft.to_wsl_path(tmp)
         env = f"R={TOOLS}; export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu; cd {w}; "
         gcc = "$R/usr/bin/m68k-linux-gnu-gcc-13 -B$R/usr/libexec/gcc/m68k-linux-gnu/13/ -B$R/usr/bin/m68k-linux-gnu-"
         srcs = " ".join(sources)
-        out = wsl(env + f"{gcc} {CFLAGS} -Iengine -nostdlib -Wl,--no-warn-rwx-segments,--build-id=none -T blob.ld "
+        out = wsl(env + f"{gcc} {CFLAGS} -Iengine -Imain -nostdlib -Wl,--no-warn-rwx-segments,--build-id=none -T blob.ld "
                         f"-o b.elf {srcs}")      # niente libgcc: e' codice 68020
         if "warning" in out:
             raise SystemExit(out)
@@ -137,7 +145,10 @@ def main() -> None:
 
     p = [{"section": 3, "addr": f"{M.IMG + OFF_MAIN:#010X}", "len": len(blob3), "append": True, "hex": blob3.hex(),
           "ram": f"{main_ram:#010x}", "what": "(area mod) smp_main.c: testi dei valori, nomi per tipo, tempo"}]
-    proto, block, rows = struct.unpack_from(">3I", blob3, 0)
+    proto, block, rows, gfx, boot = struct.unpack_from(">5I", blob3, 0)
+    p.append({"section": 3, "addr": f"{M.boot_slot(BOOT_SLOT):#010X}", "len": 4, "append": True,
+              "hex": long(boot).hex(), "ram": f"{M.RAM + M.BOOT_LIST + 4 * BOOT_SLOT:#010x}",
+              "what": "(area mod) lista di avvio: sm_boot (pagine SYN in syn-pages)"})
     for k, i in enumerate(IDS):
         row = DESC + 52 * i
         st = struct.unpack_from(">10I", sec3, row - LOAD)
@@ -148,6 +159,8 @@ def main() -> None:
         p.append(fixed(sec3, 3, row, bytes(ours), f"descrittore {i}: SAMPLER"))
     for i, (addr, was) in PROTO_OPERANDS.items():
         p.append(fixed(sec3, 3, addr, long(proto), f"formattatore dell'id {i}: sm_proto", long(was)))
+    for i, (addr, was) in GFX_OPERANDS.items():
+        p.append(fixed(sec3, 3, addr, long(gfx), f"grafica della casella dell'id {i}: sm_gfx_proto", long(was)))
     p += [
         fixed(sec3, 3, NAME, b"SAMPLER\x00\x00\x00\x00\x00", "nome della machine 44", b"SP TWINSHOT\x00"),
         fixed(sec3, 3, SHORT, b"SMPL\x00", "sigla della machine 44", b"SPTS\x00"),
@@ -164,9 +177,10 @@ def main() -> None:
          "ram": f"{E.RAM + OFF_ENGINE:#010x}", "what": "(area motori) SAMPLER sulla CPU #2"},
     ]
     spec = {
-        "name": "sampler", "os": "1.42", "requires": ["modarea", "modarea7"],
+        "name": "sampler", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages"],
         "description": "SAMPLER al posto di SP TWINSHOT: le machine a campioni della Digitakt (ONESHOT, WERP, "
-                       "REPITCH, SLICE), riscritte. Pagina SYN TUNE PLAY BR SAMP / tre parametri del tipo / TYPE.",
+                       "REPITCH, SLICE), riscritte. SYN 1/2 come la Digitakt (TUNE PLAY BR SAMP / tre parametri del tipo / LEV), "
+                       "SYN 2/2 la forma d'onda con i tre parametri e TYPE.",
         "generated_by": "mods/sampler/make_patch.py",
         "symbols": {k: f"{v:#010x}" for k, v in sorted(s3.items()) if k.startswith("sm_")}
         | {k: f"{v:#010x}" for k, v in sorted(s7.items()) if k.startswith(("syn_smp", "smp_", "sm_"))},

@@ -28,18 +28,17 @@ import eft  # noqa: E402
 import engine_layout as E  # noqa: E402
 import modarea_layout as M  # noqa: E402
 import registry  # noqa: E402
+import synpages_layout as SP  # noqa: E402
 
 LOAD = 0x4000_0400
-OFF_MAIN = 0x8180                       # area mod (registry.py)
+OFF_MAIN = 0x5800                       # area mod (registry.py)
 OFF_ENGINE = 0x0000                     # area motori di modarea7 (registry.py)
 BOOT_SLOT = next(n for n, who in registry.BOOT_SLOTS.items() if who == "sy-fm4")
 TOOLS = "~/tools/m68k/root"
-CFLAGS = "-mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer"
+CFLAGS = f"-DSP_TABLE={SP.TABLE:#x} -mcpu=54418 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer"
 
 # sezione 3 (OS 1.42)
-SRC_VPTR = 0x401C_A37C                  # vtable di SourcePageView: slot 47 (manopola -> descrittore), 19 (titolo)
-SLOT_RECORD, RECORD_WAS = 47, 0x4004_4C54
-SLOT_TITLE, TITLE_WAS = 19, 0x4004_4894
+PAGE1_IDS = range(190, 198)             # SY TONE: nomi di pagina 1/2 (fm4m_names)
 DESC = 0x4022_D83C                      # descrittori, 52 B per id
 PAGE2_IDS = range(254, 262)             # "CC1..CC8 Value" delle tracce MIDI della Digitakt: nessuna pagina sulla Syntakt
 LIX2PHYS, PHYS2LIX = 0x4023_4344, 0x4023_441C
@@ -87,16 +86,17 @@ def wsl(cmd: str) -> str:
     return r.stdout + r.stderr
 
 
-def compile_blob(sources: list[str], base: int, entry: str) -> tuple[bytes, dict[str, int]]:
+def compile_blob(sources: list[str], base: int, entry: str, opt: str) -> tuple[bytes, dict[str, int]]:
     with tempfile.TemporaryDirectory(prefix="sy-fm4-") as tmp:
         tmp = Path(tmp)
         shutil.copytree(HERE / "engine", tmp / "engine")
+        shutil.copy(REPO / "mods" / "syn-pages" / "synpages.h", tmp / "engine" / "synpages.h")
         (tmp / "blob.ld").write_text(LDS.format(entry=entry, base=base), encoding="ascii")
         w = eft.to_wsl_path(tmp)
         env = f"R={TOOLS}; export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu; cd {w}; "
         gcc = "$R/usr/bin/m68k-linux-gnu-gcc-13 -B$R/usr/libexec/gcc/m68k-linux-gnu/13/ -B$R/usr/bin/m68k-linux-gnu-"
         srcs = " ".join(f"engine/{s}" for s in sources)
-        out = wsl(env + f"{gcc} {CFLAGS} -Iengine -nostdlib -Wl,--no-warn-rwx-segments,--build-id=none -T blob.ld -o b.elf {srcs} -lgcc")
+        out = wsl(env + f"{gcc} {CFLAGS} {opt} -Iengine -nostdlib -Wl,--no-warn-rwx-segments,--build-id=none -T blob.ld -o b.elf {srcs} -lgcc")
         if "warning" in out:
             raise SystemExit(out)
         wsl(env + "$R/usr/bin/m68k-linux-gnu-objcopy -O binary --only-section=.text b.elf b.bin")
@@ -119,11 +119,11 @@ def main() -> None:
     long = lambda v: struct.pack(">I", v)                                 # noqa: E731
 
     main_ram = M.RAM + OFF_MAIN
-    blob3, s3 = compile_blob(MAIN_SRC, main_ram, "fm4m_entries")
+    blob3, s3 = compile_blob(MAIN_SRC, main_ram, "fm4m_entries", "-Os")   # CPU #1: spazio
     room = next(b for a, b, who, _ in registry.MODAREA if who == "sy-fm4" and a == OFF_MAIN)
     if s3["__bss_end"] > M.RAM + room:
         raise SystemExit(f"CPU #1: {s3['__bss_end'] - main_ram} B con il BSS, oltre lo spazio registrato")
-    blob7, s7 = compile_blob(SYN_SRC, E.RAM + OFF_ENGINE, "fm4_entries")
+    blob7, s7 = compile_blob(SYN_SRC, E.RAM + OFF_ENGINE, "fm4_entries", "-O2")
     room7 = next(b for a, b, who, _ in registry.ENGINE if who == "sy-fm4")
     if s7["__bss_end"] > E.RAM + room7:
         raise SystemExit(f"CPU #2: {s7['__bss_end'] - E.RAM - OFF_ENGINE} B con il BSS, oltre lo spazio registrato")
@@ -140,11 +140,16 @@ def main() -> None:
          {"section": 3, "addr": f"{M.boot_slot(BOOT_SLOT):#010X}", "len": 4, "append": True,
           "hex": long(s3["fm4m_boot"]).hex(), "ram": f"{M.RAM + M.BOOT_LIST + 4 * BOOT_SLOT:#010x}",
           "what": "(area mod) lista di avvio: fm4m_boot (tabelle degli slot e delle lane)"}]
-    entries = struct.unpack_from(">2I", blob3, 0)
-    p.append(fixed(sec3, 3, SRC_VPTR + 4 * SLOT_RECORD, long(entries[0]), "SourcePageView slot 47: pagina SYN 2/2",
-                   long(RECORD_WAS)))
-    p.append(fixed(sec3, 3, SRC_VPTR + 4 * SLOT_TITLE, long(entries[1]), "SourcePageView slot 19: titolo 1/2, 2/2",
-                   long(TITLE_WAS)))
+    names = s3["fm4m_names"] - main_ram
+    for k, i in enumerate(PAGE1_IDS):
+        row = DESC + 52 * i
+        st = bytearray(sec3[row - LOAD:row - LOAD + 52])
+        if struct.unpack_from(">ii", st, 0) != (4, (0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x1A, 0x19)[k]):
+            raise SystemExit(f"descrittore {i}: non e' di SY TONE ({struct.unpack_from('>ii', st, 0)})")
+        long_name, short_name = struct.unpack_from(">2I", blob3, names + 8 * k)
+        struct.pack_into(">I", st, 40, long_name)
+        struct.pack_into(">I", st, 48, short_name)
+        p.append(fixed(sec3, 3, row, bytes(st), f"descrittore {i}: nome di SY FM4 pagina 1/2"))
     recs = s3["fm4m_records"] - main_ram
     for k, i in enumerate(PAGE2_IDS):
         row = DESC + 52 * i
@@ -181,7 +186,7 @@ def main() -> None:
          "ram": f"{E.RAM + OFF_ENGINE:#010x}", "what": "(area motori) SY FM4 sulla CPU #2"},
     ]
     spec = {
-        "name": "sy-fm4", "os": "1.42", "requires": ["modarea", "modarea7"],
+        "name": "sy-fm4", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages"],
         "description": "SY FM4 (Rxuting, MIT): SY TONE diventa una machine FM a 4 operatori. ALGO 0 = SY TONE, "
                        "ALGO 1-11 algoritmi FM; seconda pagina SYN (ALGO, RAT3, LEV3, DEC3, DET, RAT4, LEV4, DEC4), "
                        "salvata con il suono e con i p-lock.",

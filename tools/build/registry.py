@@ -23,14 +23,15 @@ MODAREA = [
     (0x0000, 0x2000, "master-comp", "code and data"),
     (0x2000, 0x4000, "readable-values", "code and data"),
     (0x4000, 0x5000, "perf-fx", "code and data"),
-    (0x5000, 0x7000, "dual-mono", "dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py)"),
+    (0x5000, 0x5800, "dual-mono", "dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py)"),
+    (0x5800, 0x7000, "sy-fm4", "main CPU side: pages, algorithm drawings, storage tables, shared RAM publisher"),
     (0x7000, 0x7200, "projstore", "code, then the 256 bytes saved with the project"),
     (0x7200, 0x7400, "kitstore", "code"),
     (0x7400, 0x7420, "modarea", "boot list: 8 pointers, called after unpacking (BOOT_SLOTS)"),
+    (0x7420, 0x7E00, "syn-pages", "machine table (synpages_layout.TABLE), SRC view: pages, titles, drawing"),
     (0x7E00, 0x8000, "vparams", "code"),
     (0x8000, 0x8180, "vparams", "table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS)"),
-    (0x8180, 0x8D00, "sy-fm4", "main CPU side: page 2/2, storage tables, shared RAM publisher"),
-    (0x8D00, 0x9800, "sampler", "main CPU side: value texts, names per machine type, tempo to shared RAM"),
+    (0x8180, 0xA000, "sampler", "main CPU side: pages, knob graphics, waveform, value texts, tempo to shared RAM"),
     (0xA000, 0xDFF0, "fx3", "code and data"),
     (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
 ]
@@ -56,7 +57,7 @@ ENGINE = [
 ]
 
 # ---- lista di avvio dell'area mod: posto -> mod (modarea_layout.boot_slot)
-BOOT_SLOTS = {0: "sy-fm4"}
+BOOT_SLOTS = {0: "sy-fm4", 1: "sampler"}
 
 # ---- vparams: posto nella tabella -> (mod, id)
 VPARAMS_SLOTS = {
@@ -78,11 +79,14 @@ IDS = {
     **{i: ("fx3", "FX3 page") for i in range(246, 254)},
     **{i: ("master-comp", "compressor") for i in range(262, 269)},
     269: ("fx3", "external input SND3"),
+    **{190 + k: ("sy-fm4", f"SYN page 1/2 {n} (SY TONE's {w}, renamed)") for k, (n, w) in enumerate(
+        (("TUNE", "TUNE"), ("RAT2", "RATIO"), ("LEV2", "MOD"), ("FDBK", "FDBK"), ("DEC2", "MENV"), ("PNCH", "PNCH"),
+         ("OVER", "OVER"), ("DEC1", "DEC")))},
     **{254 + k: ("sy-fm4", f"SYN page 2/2 {n} (was Digitakt MIDI CC{k + 1} Value)")
        for k, n in enumerate(("ALGO", "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))},
     **{497 + k: ("sampler", f"SAMPLER knob {n} (was SP TWINSHOT {w})") for k, (n, w) in enumerate(
         (("A TUNE", "TUN1"), ("B PLAY", "SMP1"), ("C BR", "FLT1"), ("G LOOP/BARS/GRID, lix 0x18", "MIX"),
-         ("E STRT/SEG/SLICE", "TUN2"), ("F LEN/MODE", "SMP2"), ("H TYPE, lix 0x19", "OVER"),
+         ("E STRT/SEG/SLICE", "TUN2"), ("F LEN/MODE", "SMP2"), ("H LEV, lix 0x19 (TYPE, lix 0x1A, on page 2/2)", "OVER"),
          ("D SAMP, lix 0x15", "DEC1")))},
 }
 

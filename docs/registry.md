@@ -9,21 +9,20 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x0000` | `0x2000` | master-comp | code and data |
 | `0x2000` | `0x4000` | readable-values | code and data |
 | `0x4000` | `0x5000` | perf-fx | code and data |
-| `0x5000` | `0x7000` | dual-mono | dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py) |
+| `0x5000` | `0x5800` | dual-mono | dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py) |
+| `0x5800` | `0x7000` | sy-fm4 | main CPU side: pages, algorithm drawings, storage tables, shared RAM publisher |
 | `0x7000` | `0x7200` | projstore | code, then the 256 bytes saved with the project |
 | `0x7200` | `0x7400` | kitstore | code |
 | `0x7400` | `0x7420` | modarea | boot list: 8 pointers, called after unpacking (BOOT_SLOTS) |
-| `0x7420` | `0x7e00` | **free** |  |
+| `0x7420` | `0x7e00` | syn-pages | machine table (synpages_layout.TABLE), SRC view: pages, titles, drawing |
 | `0x7e00` | `0x8000` | vparams | code |
 | `0x8000` | `0x8180` | vparams | table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS) |
-| `0x8180` | `0x8d00` | sy-fm4 | main CPU side: page 2/2, storage tables, shared RAM publisher |
-| `0x8d00` | `0x9800` | sampler | main CPU side: value texts, names per machine type, tempo to shared RAM |
-| `0x9800` | `0xa000` | **free** |  |
+| `0x8180` | `0xa000` | sampler | main CPU side: pages, knob graphics, waveform, value texts, tempo to shared RAM |
 | `0xa000` | `0xdff0` | fx3 | code and data |
 | `0xdff0` | `0xf000` | fx3 | feedback (+0xDFFC) and delay line (+0xE000, 4 KB) |
 | `0xf000` | `0xfff0` | **free** |  |
 
-Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4.
+Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler.
 
 ## Engine area (CPU #2, `mods/modarea7`, RAM `0x47000000`, offsets)
 
@@ -85,6 +84,14 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 125 | dual-mono | IN R: alias of BAL |
 | 129 | dual-mono | DEL: R side while the IN R page is open |
 | 130 | dual-mono | REV: R side while the IN R page is open |
+| 190 | sy-fm4 | SYN page 1/2 TUNE (SY TONE's TUNE, renamed) |
+| 191 | sy-fm4 | SYN page 1/2 RAT2 (SY TONE's RATIO, renamed) |
+| 192 | sy-fm4 | SYN page 1/2 LEV2 (SY TONE's MOD, renamed) |
+| 193 | sy-fm4 | SYN page 1/2 FDBK (SY TONE's FDBK, renamed) |
+| 194 | sy-fm4 | SYN page 1/2 DEC2 (SY TONE's MENV, renamed) |
+| 195 | sy-fm4 | SYN page 1/2 PNCH (SY TONE's PNCH, renamed) |
+| 196 | sy-fm4 | SYN page 1/2 OVER (SY TONE's OVER, renamed) |
+| 197 | sy-fm4 | SYN page 1/2 DEC1 (SY TONE's DEC, renamed) |
 | 246 | fx3 | FX3 page |
 | 247 | fx3 | FX3 page |
 | 248 | fx3 | FX3 page |
@@ -115,7 +122,7 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 500 | sampler | SAMPLER knob G LOOP/BARS/GRID, lix 0x18 (was SP TWINSHOT MIX) |
 | 501 | sampler | SAMPLER knob E STRT/SEG/SLICE (was SP TWINSHOT TUN2) |
 | 502 | sampler | SAMPLER knob F LEN/MODE (was SP TWINSHOT SMP2) |
-| 503 | sampler | SAMPLER knob H TYPE, lix 0x19 (was SP TWINSHOT OVER) |
+| 503 | sampler | SAMPLER knob H LEV, lix 0x19 (TYPE, lix 0x1A, on page 2/2) (was SP TWINSHOT OVER) |
 | 504 | sampler | SAMPLER knob D SAMP, lix 0x15 (was SP TWINSHOT DEC1) |
 
 Ids 254–261 (Digitakt MIDI CC values) are free but have MIDI CCs; ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).

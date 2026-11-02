@@ -44,6 +44,7 @@ CTOR_COUNT, CTOR_TABLE = 0x4033_950C, 0x4033_9510
 SEQ_INIT = 0x4008_C5D8
 PATTERN0 = 0x40A3_9B34                          # pattern 0: +0x21374 lunghezza, +0x2137A scala
 PROJECT = 0x4016_E9C8                           # singleton del progetto
+MODAREA_RAM = 0x444E_48D0                       # tools/build/modarea_layout.RAM
 PROJECT_DATA = 0x4600_0000                      # dati del progetto (pattern, kit): ~18 MB, sopra il BSS
 NEW_PROJECT = 0x4001_D16A                       # Project::initializeNewProject(this, int)
 MALLOC = 0x4010_394C
@@ -147,6 +148,10 @@ class UI:
     # ------------------------------------------------------------------ avvio
     def _boot(self) -> None:
         self.call(SRAM_COPY)
+        boot_list = MODAREA_RAM + 0x7400                # modarea: posti della lista di avvio, come dopo l'unpack
+        for f in struct.unpack(">8I", self.uc.mem_read(boot_list, 32)):
+            if f:
+                self.call(f)
         n = self.long(CTOR_COUNT)
         for f in struct.unpack(f">{n}I", self.uc.mem_read(CTOR_TABLE, 4 * n)):
             self.call(f)

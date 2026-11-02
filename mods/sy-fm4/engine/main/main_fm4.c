@@ -11,12 +11,9 @@
  * which every track has room for (the sound, the pattern's lock table and
  * the sequencer's per-track values are 0x47 wide; tracks use 0..0x35).
  *
- * The SYN page is a SourcePageView: its knob -> descriptor lookup (vtable
- * slot 47, FUN_40043f9c) reads the machine's page object, one per machine.
- * The page view base already cycles through its page list on a second press
- * of its key (FUN_4003b8a4: index +0x90 = (index + 1) % pages). So for
- * SY FM4 the view gets a two-entry page list, and on page index 1 the lookup
- * answers with page 2/2's descriptors.
+ * The SYN pages come from syn-pages (mods/syn-pages): fm4m_boot registers machine 4 (key: SY TONE's TUNE on
+ * knob A) with two pages. Page 1/2 is SY TONE's parameters, renamed and ordered as page 2/2 (ratio, level,
+ * decay per column); page 2/2 answers with its own descriptors; turning ALGO draws the algorithm.
  *
  * The descriptors are eight of the table's unused "Error" placeholders
  * (0x4022d83c, 0x34 bytes each), rewritten by patch/s3patch.py from
@@ -26,13 +23,11 @@
  * the same range, centre and display).
  */
 #include <stdint.h>
+#include "synpages.h"
 
 typedef uint32_t u32;
 
 #define ORIG_SRC_BC    ((u32 (*)(void *, u32))0x40044c54)
-/* The OS returns pointers in d0; this compiler (m68k-linux ABI) reads a pointer result from a0. */
-#define FW_MALLOC      ((u32 (*)(u32))0x4010394c)
-#define FW_FREE        ((void (*)(void *))0x40103958)
 #define REC_INFO(r)    ((u32 *)(0x41ba0a24 + (r) * 0x54))
 #define INFO_LONGS     (0x54 / 4)
 
@@ -40,8 +35,11 @@ typedef uint32_t u32;
 #define R_TUNE  190
 #define R_RATIO 191
 #define R_MOD   192
+#define R_FDBK  193
 #define R_MENV  194
+#define R_PNCH  195
 #define R_OVER  196
+#define R_DEC   197
 #define R_LEVEL 10
 #define R_DUAL_DET 369     /* SY DUAL VCO "Osc 2 Detune" */
 
@@ -57,12 +55,6 @@ typedef uint32_t u32;
 
 #define PAGE2_FIRST 0x36
 #define PAGE2_N 8
-
-#define V(view, off) (*(volatile u32 *)((uint8_t *)(view) + (off)))
-#define PAGES_BEGIN 0x7c
-#define PAGES_END   0x80
-#define PAGES_CAP   0x84
-#define PAGE_INDEX  0x90
 
 typedef struct {
     u32 owner, lix, min, max, def, r5, midi, cc, id, flags;
@@ -88,13 +80,144 @@ __attribute__((used)) const record_t fm4m_records[PAGE2_N] = {
 __attribute__((used)) const u32 fm4m_record_index[PAGE2_N] = {
     R_ALGO, R_RAT3, R_LEV3, R_DEC3, R_RAT4, R_LEV4, R_DEC4, R_DET};
 
-/* Page 2/2, knobs A..H and LEVEL: operator 3 on the top row, operator 4
- * under it on the bottom row, each column one kind (ratio, level, decay). */
+/* Page 1/2's names, written by the patcher into SY TONE's descriptors 190..197 (SY FM4 takes its machine
+ * slot): operator 2 is SY TONE's modulator, operator 1 the carrier. */
+__attribute__((used)) const char *const fm4m_names[8][2] = {
+    {"Tune", "TUNE"}, {"Op2 Ratio", "RAT2"}, {"Op2 Level", "LEV2"}, {"Feedback", "FDBK"},
+    {"Op2 Decay", "DEC2"}, {"Pitch Punch", "PNCH"}, {"Overdrive", "OVER"}, {"Op1 Decay", "DEC1"}};
+
+/* Knobs A..H and LEVEL. Page 1/2: operator 2 on the top row; page 2/2: operator 3 on the top row, operator 4
+ * under it; on both, a column is one kind (ratio, level, decay). */
+static const u32 page1[9] = {R_TUNE, R_RATIO, R_MOD, R_MENV,
+                             R_PNCH, R_FDBK, R_OVER, R_DEC, R_LEVEL};
 static const u32 page2[9] = {R_ALGO, R_RAT3, R_LEV3, R_DEC3,
                              R_DET,  R_RAT4, R_LEV4, R_DEC4, R_LEVEL};
 /* Where each new descriptor takes its knob/formatter/icon info from. */
 static const u32 info_from[PAGE2_N] = {R_MOD, R_RATIO, R_MOD, R_MENV,
                                        R_RATIO, R_MOD, R_MENV, R_DUAL_DET};
+
+/* ---- algorithms, drawn as SY FM4 routes them (engine/fm4.c): operators in boxes, modulation as lines into
+ * the box modulated, carriers dotted up to the output, feedback as a hook under the box. */
+typedef struct {
+    uint8_t ops;            /* operators shown: 2 (SY TONE) or 4 */
+    uint8_t at[4][2];       /* operator 1..4: column, row (row 0 at the top) */
+    uint8_t edges;
+    uint8_t edge[4][2];     /* modulator -> modulated */
+    uint8_t carriers;       /* bit k = operator k + 1 */
+    uint8_t fb;             /* operator with feedback, 0 none; 5 = ring (1 back to 4) */
+} algo_t;
+
+static const algo_t algos[12] = {
+    {2, {{1, 0}, {1, 1}}, 1, {{2, 1}}, 1, 2},
+    {4, {{1, 0}, {1, 1}, {1, 2}, {1, 3}}, 3, {{2, 1}, {3, 2}, {4, 3}}, 1, 4},
+    {4, {{1, 0}, {1, 1}, {0, 2}, {2, 2}}, 3, {{2, 1}, {3, 2}, {4, 2}}, 1, 4},
+    {4, {{1, 0}, {0, 1}, {0, 2}, {2, 1}}, 3, {{2, 1}, {3, 2}, {4, 1}}, 1, 4},
+    {4, {{1, 0}, {0, 1}, {2, 1}, {2, 2}}, 3, {{2, 1}, {3, 1}, {4, 3}}, 1, 4},
+    {4, {{0, 0}, {0, 1}, {2, 0}, {2, 1}}, 2, {{2, 1}, {4, 3}}, 5, 4},
+    {4, {{0, 0}, {1, 0}, {2, 0}, {1, 1}}, 3, {{4, 1}, {4, 2}, {4, 3}}, 7, 4},
+    {4, {{0, 0}, {1, 0}, {2, 0}, {2, 1}}, 1, {{4, 3}}, 7, 4},
+    {4, {{0, 0}, {1, 0}, {2, 0}, {3, 0}}, 0, {{0, 0}}, 15, 4},
+    {4, {{0, 0}, {2, 0}, {1, 1}, {1, 2}}, 3, {{3, 1}, {3, 2}, {4, 3}}, 3, 4},
+    {4, {{1, 0}, {0, 1}, {2, 1}, {1, 2}}, 4, {{2, 1}, {3, 1}, {4, 2}, {4, 3}}, 1, 4},
+    {4, {{1, 0}, {1, 1}, {1, 2}, {1, 3}}, 3, {{2, 1}, {3, 2}, {4, 3}}, 1, 5},
+};
+
+static const uint8_t digit[10][5] = {   /* 3x5, bit 2 = left */
+    {7, 5, 5, 5, 7}, {2, 6, 2, 2, 7}, {6, 1, 2, 4, 7}, {6, 1, 2, 1, 6}, {5, 5, 7, 1, 1},
+    {7, 4, 6, 1, 6}, {3, 4, 7, 5, 7}, {7, 1, 2, 2, 2}, {7, 5, 7, 5, 7}, {7, 5, 7, 1, 6}};
+
+static void glyph(void *bm, int x, int y, int d, int scale) {
+    for (int r = 0; r < 5; r++)
+        for (int c = 0; c < 3; c++)
+            if (digit[d][r] >> (2 - c) & 1)
+                for (int i = 0; i < scale; i++)
+                    for (int j = 0; j < scale; j++)
+                        sp_px(bm, x + c * scale + i, y + r * scale + j, 1);
+}
+
+static void number(void *bm, int x, int y, u32 n, int scale) {
+    if (n >= 10) {
+        glyph(bm, x, y, 1, scale);
+        x += 4 * scale;
+        n -= 10;
+    }
+    glyph(bm, x, y, (int)n, scale);
+}
+
+#define BOX 9
+#define COL(ox, i) ((ox) + 2 + (i) * 11)
+#define ROW(oy, j) ((oy) + 8 + (j) * 12)
+
+static void draw_algo(void *bm, int ox, int oy, u32 n) {
+    const algo_t *a = &algos[n < 12 ? n : 0];
+    int lo = 999, hi = -1;
+    for (int k = 0; k < a->ops; k++) {
+        int x = COL(ox, a->at[k][0]), y = ROW(oy, a->at[k][1]);
+        sp_hline(bm, x + 1, x + BOX - 2, y, 1);
+        sp_hline(bm, x + 1, x + BOX - 2, y + BOX - 1, 1);
+        sp_vline(bm, x, y + 1, y + BOX - 2, 1);
+        sp_vline(bm, x + BOX - 1, y + 1, y + BOX - 2, 1);
+        glyph(bm, x + 3, y + 2, k + 1, 1);
+        if (a->carriers >> k & 1) {
+            sp_vline(bm, x + 4, oy + 4, y - 1, 2);
+            lo = x + 4 < lo ? x + 4 : lo;
+            hi = x + 4 > hi ? x + 4 : hi;
+        }
+    }
+    for (int e = 0; e < a->edges; e++) {
+        const uint8_t *m = a->at[a->edge[e][0] - 1], *t = a->at[a->edge[e][1] - 1];
+        int xa = COL(ox, m[0]) + 4, xb = COL(ox, t[0]) + 4;
+        if (m[1] > t[1]) {                      /* modulator below: up, across, into the bottom of the box */
+            int ym = ROW(oy, m[1]) - 2;
+            sp_vline(bm, xa, ym, ROW(oy, m[1]) - 1, 1);
+            sp_hline(bm, xa, xb, ym, 1);
+            sp_vline(bm, xb, ROW(oy, t[1]) + BOX, ym, 1);
+        } else {                                /* same row: side to side */
+            int l = m[0] < t[0] ? m[0] : t[0], r = m[0] < t[0] ? t[0] : m[0];
+            sp_hline(bm, COL(ox, l) + BOX, COL(ox, r) - 1, ROW(oy, m[1]) + 4, 1);
+        }
+    }
+    int mid = (lo + hi) / 2;                    /* output: an arrow up, over the carriers */
+    if (hi > lo) {
+        sp_hline(bm, lo, hi, oy + 4, 1);
+        sp_vline(bm, mid, oy + 1, oy + 4, 1);
+    }
+    sp_px(bm, mid, oy, 1);
+    sp_hline(bm, mid - 1, mid + 1, oy + 1, 1);
+    sp_hline(bm, mid - 2, mid + 2, oy + 2, 1);
+    if (a->fb == 5) {                           /* ring: operator 1 back to 4, on the left */
+        int x = COL(ox, 1) - 2;
+        sp_vline(bm, x, ROW(oy, 0) + 4, ROW(oy, 3) + 4, 1);
+        sp_hline(bm, x, x + 1, ROW(oy, 0) + 4, 1);
+        sp_hline(bm, x, x + 1, ROW(oy, 3) + 4, 1);
+    } else if (a->fb) {                         /* feedback: a hook from under the box back into its left side */
+        int x = COL(ox, a->at[a->fb - 1][0]), y = ROW(oy, a->at[a->fb - 1][1]);
+        sp_vline(bm, x - 2, y + 4, y + 11, 1);
+        sp_hline(bm, x - 2, x + 4, y + 11, 1);
+        sp_vline(bm, x + 4, y + BOX, y + 11, 1);
+        sp_hline(bm, x - 2, x - 1, y + 4, 1);
+    }
+}
+
+/* the ALGO box: the algorithm's number, large (knob graphic: std::function(value, bitmap, x, y); the graphic
+ * is 26 x 16 with its bottom left corner at x, y counted from the bottom of the screen) */
+static void algo_gfx(const void *fn, int32_t value, void *bm, int32_t x, int32_t y) {
+    (void)fn;
+    u32 n = (u32)(value + 0x80) >> 8;
+    n = n > 11 ? 11 : n;
+    int top = *(int32_t *)((uint8_t *)bm + 8) - 16 - y;
+    number(bm, x + (n >= 10 ? 6 : 10), top + 3, n, 2);
+}
+
+static int nothing(void *dst, const void *src, int op) {
+    (void)dst;
+    (void)src;
+    (void)op;
+    return 0;
+}
+
+static const void *const algo_gfx_proto[4] __attribute__((aligned(4))) = {0, 0, (const void *)nothing,
+                                                                          (const void *)algo_gfx};
 
 static int ready;
 
@@ -107,81 +230,39 @@ static void init_once(void) {
         for (int k = 0; k < INFO_LONGS; k++)
             dst[k] = src[k];
     }
+    for (int k = 0; k < 4; k++)                 /* +36: the knob graphic */
+        REC_INFO(R_ALGO)[9 + k] = (u32)algo_gfx_proto[k];
     ready = 1;
 }
 
-/* SY FM4's page (machine 4's page object) answers SY TONE's TUNE on knob A,
- * whichever sound the view shows (the track's, or a held trig's). */
-static int is_fm4(void *view) {
-    return ORIG_SRC_BC(view, 0) == R_TUNE;
-}
-
-/* Give the view two pages while it shows SY FM4, one otherwise. */
-static void fit_pages(void *view, int fm4) {
-    u32 *begin = (u32 *)V(view, PAGES_BEGIN);
-    u32 n = (V(view, PAGES_END) - (u32)begin) / 4;
-    if (begin == 0 || n == 0)
-        return;
-    if (fm4 && n == 1) {
-        if (V(view, PAGES_CAP) - (u32)begin < 8) {
-            u32 *b = (u32 *)FW_MALLOC(8);
-            if (b == 0)
-                return;
-            b[0] = begin[0];
-            FW_FREE(begin);
-            begin = b;
-            V(view, PAGES_BEGIN) = (u32)b;
-            V(view, PAGES_CAP) = (u32)(b + 2);
-        }
-        begin[1] = begin[0];
-        V(view, PAGES_END) = (u32)(begin + 2);
-    } else if (!fm4 && n == 2) {
-        V(view, PAGES_END) = (u32)(begin + 1);
-        V(view, PAGE_INDEX) = 0;
-    }
-}
-
-/* SourcePageView vtable slot 47: knob (0..8) -> descriptor. */
-u32 fm4m_src_record(void *view, u32 knob) {
+static u32 fm4_record(void *view, u32 page, u32 knob) {
     init_once();
-    int fm4 = is_fm4(view);
-    fit_pages(view, fm4);
-    if (fm4 && V(view, PAGE_INDEX) == 1 && knob < 9)
-        return page2[knob];
+    if (knob < 9)
+        return page == 1 ? page2[knob] : page1[knob];
     return ORIG_SRC_BC(view, knob);
 }
 
-/* SourcePageView vtable slot 19: the page's name (the toast on a page key), returned as a std::string by
- * value: the caller passes the string to construct in a0 and gets it back in d0 (0x40044894 builds it with
- * the constructor 0x401bf31e(string, text, allocator)). fm4m_src_title wraps fm4m_title_text: SY FM4's name,
- * or 0 for the stock function. */
-const char *fm4m_title_text(void *view) {
-    if (is_fm4(view))
-        return V(view, PAGE_INDEX) == 1 ? "SY FM4 2/2" : "SY FM4 1/2";
-    return 0;
+static const char *fm4_title(void *view, u32 page) {
+    (void)view;
+    return page == 1 ? "SY FM4 2/2" : "SY FM4 1/2";
 }
 
-void fm4m_src_title(void);
-__asm__(
-    "    .text\n"
-    "    .globl fm4m_src_title\n"
-    "fm4m_src_title:\n"
-    "    move.l %a0,-(%sp)\n"           /* string to construct */
-    "    move.l 8(%sp),-(%sp)\n"        /* view */
-    "    jsr fm4m_title_text\n"
-    "    addq.l #4,%sp\n"
-    "    movea.l (%sp)+,%a0\n"
-    "    tst.l %d0\n"
-    "    bne.s 1f\n"
-    "    jmp 0x40044894\n"              /* stock title: a0 and the stack as on entry */
-    "1:  move.l %a0,-(%sp)\n"
-    "    pea (%sp)\n"                   /* allocator (empty) */
-    "    move.l %d0,-(%sp)\n"
-    "    move.l %a0,-(%sp)\n"
-    "    jsr 0x401bf31e\n"
-    "    lea 12(%sp),%sp\n"
-    "    move.l (%sp)+,%d0\n"
-    "    rts\n");
+/* Turning ALGO (knob A on page 2/2): the algorithm at full size over columns A and B. */
+#define SEQ_VALUES ((volatile uint16_t *)0x800021b0)
+#define ACTIVE_TRACK ((int32_t (*)(void *))0x4001ff74)
+static void fm4_draw(void *view, void *bm, u32 page) {
+    if (page != 1 || SP_HIGHLIGHT(view, 0) == 0)
+        return;
+    int32_t t = ACTIVE_TRACK((void *)SP_V(view, 116));
+    if (t < 0 || t > 7)
+        return;
+    u32 n = (u32)(SEQ_VALUES[0xe + t * 0x47 + PAGE2_FIRST] + 0x80) >> 8;
+    sp_clear(bm, 16, 0, 72, 64);
+    draw_algo(bm, 22, 3, n > 11 ? 11 : n);
+    number(bm, 17, 2, n > 11 ? 11 : n, 1);
+}
+
+static const sp_machine_t fm4_pages = {R_TUNE, 2, fm4_record, fm4_title, fm4_draw};
 
 /* ---- storage: logical index <-> storage slot ------------------------------
  *
@@ -206,6 +287,7 @@ u32 fm4m_sound_p2l[ALL_LIX];
 u32 fm4m_lane_of_lix[ALL_LIX];
 
 void fm4m_boot(void) {
+    sp_register(&fm4_pages);
     for (int i = 0; i < ALL_LIX; i++) {
         int stock = i < STOCK_LIX;
         fm4m_sound_l2p[i] = stock ? LIX2PHYS[i] : (u32)i;
@@ -296,7 +378,7 @@ __asm__(
 #define DMA_PENDING (*(volatile uint8_t *)0x43bde73c)
 #define TCD47_CSR (*(volatile uint16_t *)0xfc0455fe)
 
-void fm4m_dma_wait(void) {
+__attribute__((optimize("O2"))) void fm4m_dma_wait(void) {
     if (DMA_PENDING) {
         while (!(TCD47_CSR & 0x80))     /* DONE */
             ;
@@ -308,4 +390,4 @@ void fm4m_dma_wait(void) {
 }
 
 __attribute__((section(".entries"), used))
-void *const fm4m_entries[2] = {(void *)fm4m_src_record, (void *)fm4m_src_title};
+const void *const fm4m_entries[2] = {(const void *)fm4m_records, (const void *)fm4m_names};

@@ -1,0 +1,51 @@
+{
+  "name": "syn-pages",
+  "os": "1.42",
+  "requires": [
+    "modarea"
+  ],
+  "description": "Pagine SYN proprie per una machine: la vista SRC chiede alla machine registrata quante pagine ha, il descrittore di ogni manopola, il titolo e cosa disegnare.",
+  "generated_by": "mods/syn-pages/make_patch.py",
+  "symbols": {
+    "sp_draw": "0x444ebf3a",
+    "sp_machines": "0x444ebcf0",
+    "sp_record": "0x444ebd70",
+    "sp_title": "0x444ebd40",
+    "sp_title_text": "0x444ebece"
+  },
+  "patches": [
+    {
+      "section": 3,
+      "addr": "0X40350420",
+      "len": 708,
+      "append": true,
+      "hex": "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002f082f2f00084eb9444ebece588f205f4a8066064ef9400448942f0848572f002f084eb9401bf31e4fef000c201f4e754fefffe848d73c0c266f001c42a7242f00242f0b4eb940044c54508f41f9444ebcf04281225041e800144a896704b3c0673c52817604b68166ea222b007c202b00804a81671290817603b680640ae48855804a80670000c82f4200202f4b001c4cd73c0c4fef00184ef940044c5470144c001800206b007c202b00802441d5fc444ebcf0222a00044a88671890887603b6806410e48828487601b681640000a0b6806720206a00084a8867ac202b00902f022f002f0b4e904cef3c0c000c4fef00244e75202b008472079088b2806540487800084eb94010394c588f2a404a8067c22a942f0c4eb940103958274d007c588f284d200d5080274000842954000427400080206a00084a8866a06000ff4a20085080295400042740008060e658812741008042ab00902f4200202f4b001c4cd73c0c4fef00184ef940044c5455804a806600ff60588827480080206a000842ab00904a886600ff546000fefc4feffff448d70c04246f001042a747f9444ebcf02f0a4eb940044c54508f4281204b225041e800144a896704b3c0671652817404b48166ea91c84cd70c0420084fef000c4e7570144c0018002073180c4a8867e6202a00902f002f0a4e90508f4cd70c0420084fef000c4e754feffff048d70c0c242f0018246f001447f9444ebcf02f022f0a4eb940030b8442a72f0a4eb940044c544fef00104281204b225041e800144a896704b3c0671252817604b68166ea4cd70c0c4fef00104e7570144c001800207318104a8867e8202a00902f002f022f0a4e904fef000c4cd70c0c4fef00104e75",
+      "ram": "0x444ebcf0",
+      "what": "(area mod) synpages.c: tabella delle machine, vista SRC"
+    },
+    {
+      "section": 3,
+      "addr": "0X401CA38C",
+      "len": 4,
+      "expect_sha256": "00fd9d80effeb46f16a3614dedb10bf6656d16a1f1a6ac22fd9b198656dec41c",
+      "hex": "444ebf3a",
+      "what": "SourcePageView slot 4: disegno: pagina stock, poi quello della machine"
+    },
+    {
+      "section": 3,
+      "addr": "0X401CA3C8",
+      "len": 4,
+      "expect_sha256": "c5ea822778b77d8b60a7312f9d535262415631d55185f16e88e02979ddfdbcc5",
+      "hex": "444ebd40",
+      "what": "SourcePageView slot 19: titolo della pagina (std::string)"
+    },
+    {
+      "section": 3,
+      "addr": "0X401CA438",
+      "len": 4,
+      "expect_sha256": "c1f6dcda443196eb444056c85b20d7cd337ff236b34d957097bcd6b93a69ab7e",
+      "hex": "444ebd70",
+      "what": "SourcePageView slot 47: manopola -> descrittore, pagine della machine"
+    }
+  ]
+}

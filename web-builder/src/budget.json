@@ -9,7 +9,7 @@
   "mods": {
     "dual-mono": {
       "cpu": 457,
-      "modarea": 8192,
+      "modarea": 2048,
       "kit": 3,
       "project": 0,
       "sec7": 0
@@ -79,10 +79,10 @@
     },
     "sampler": {
       "cpu": 8,
-      "modarea": 2816,
+      "modarea": 7808,
       "kit": 0,
       "project": 0,
-      "sec7": 11292
+      "sec7": 11740
     },
     "splash": {
       "cpu": 0,
@@ -93,10 +93,17 @@
     },
     "sy-fm4": {
       "cpu": 410,
-      "modarea": 2944,
+      "modarea": 6144,
       "kit": 0,
       "project": 0,
       "sec7": 7524
+    },
+    "syn-pages": {
+      "cpu": 0,
+      "modarea": 2528,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
     },
     "vparams": {
       "cpu": 0,

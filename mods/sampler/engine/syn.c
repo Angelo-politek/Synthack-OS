@@ -8,7 +8,9 @@
  *
  * Per block, like the Digitakt: the part to play from the machine's position function; a window of
  * samples (loop or silence past the end); 64 points at 96 kHz (sm_interp); the Syntakt's half-band
- * filter down to 32; then the Syntakt's DEC and VCA, as SP TWINSHOT ends.
+ * filter down to 32; LEV; then the Syntakt's DEC and VCA, as SP TWINSHOT ends.
+ *
+ * For the main CPU's SYN page 2/2 the engine also draws up the waveform of the slot the page shows (wave_step).
  */
 #include "sampler.h"
 
@@ -38,8 +40,22 @@
 #define WIN 160
 
 /* output scale: one sample at the level of SP TWINSHOT playing one sample (MIX at one end), Q30
- * (tests/test_sampler.py) */
+ * (tests/test_sampler.py), at LEV 100 */
 #define OUT_GAIN 0x272fdfe2
+#define LEV_UNITY 0x6400
+
+/* Waveform for the main CPU (main/smp_main.c), in shared RAM: it asks for slot + 1 at 0x5B0 (0 = none); here the
+ * slot + 1 being drawn (0x5B4), how many of WAVE_COLS columns are ready (0x5B6), the sample's length and address
+ * (0x5B8, 0x5BC: a new sample in the slot starts again), the peak of each column 0..127 (0x5C0). */
+#define WAVE_REQ (*(volatile const uint16_t *)0x5b0)
+#define WAVE_SLOT (*(volatile uint16_t *)0x5b4)
+#define WAVE_DONE (*(volatile uint16_t *)0x5b6)
+#define WAVE_LEN (*(volatile uint32_t *)0x5b8)
+#define WAVE_PTR (*(volatile uint32_t *)0x5bc)
+#define WAVE ((volatile uint8_t *)0x5c0)
+#define WAVE_COLS 112
+#define WAVE_STEP 2                  /* columns per call */
+#define WAVE_READS 48                /* samples read per column at most */
 
 typedef struct {
     const int16_t *data;
@@ -62,6 +78,7 @@ static int32_t hb_in[8 + 2 * BLOCK];
 static int32_t hb_out[BLOCK];
 static const sm_par_t *pars[VOICES];
 static int32_t pitches[VOICES];
+static int types[VOICES];
 
 extern const uint32_t sm_exp2_q30[257];
 
@@ -177,6 +194,33 @@ static int loops(const sm_par_t *p, int mode) {
     return (uint32_t)((play - 1) & 0xffff) <= 1;
 }
 
+static void wave_step(void) {
+    uint32_t req = WAVE_REQ;
+    if (req == 0 || req > SLOTS)
+        return;
+    uint32_t len = SAMPLES[2 * (req - 1)], ptr = SAMPLES[2 * (req - 1) + 1];
+    if (len > MAX_LEN)
+        len = MAX_LEN;
+    if (WAVE_SLOT != req || WAVE_LEN != len || WAVE_PTR != ptr) {
+        WAVE_DONE = 0;
+        WAVE_LEN = len;
+        WAVE_PTR = ptr;
+        WAVE_SLOT = (uint16_t)req;
+    }
+    uint32_t c = WAVE_DONE;
+    const int16_t *d = (const int16_t *)ptr;
+    for (int n = 0; n < WAVE_STEP && c < WAVE_COLS; n++, c++) {
+        uint32_t a = len * c / WAVE_COLS, b = len * (c + 1) / WAVE_COLS, step = (b - a) / WAVE_READS + 1;
+        int32_t peak = 0;
+        for (uint32_t i = a; d && i < b; i += step) {
+            int32_t x = d[i] < 0 ? -d[i] : d[i];
+            peak = x > peak ? x : peak;
+        }
+        WAVE[c] = (uint8_t)(peak >> 8 > 127 ? 127 : peak >> 8);
+    }
+    WAVE_DONE = (uint16_t)c;
+}
+
 static void start_part(voice_t *v) {
     v->ipos = v->a;
     v->frac = 0;
@@ -188,8 +232,11 @@ void syn_smp_prep(int32_t pitch, uint8_t *st, uint8_t *params) {
     const sm_par_t *p = (const sm_par_t *)(params + 2 * LIX_TUNE);
     pars[vi] = p;
     pitches[vi] = pitch;
-    /* no knob for OVER on this machine: the overdrive after the engines (0x4000112C) reads this word */
-    *(volatile int16_t *)(params + 2 * LIX_OVER) = 0;
+    /* TYPE travels in the overdrive's word, which the overdrive after the engines (0x4000112C) reads: no
+     * overdrive on this machine */
+    types[vi] = clamp((int8_t)params[2 * LIX_TYPE], 0, 3);
+    *(volatile int16_t *)(params + 2 * LIX_TYPE) = 0;
+    wave_step();
 
     /* SP TWINSHOT's DEC1 left at its end: no decay of the machine's own */
     S32(st, 1000) = (int32_t)0x80000000;
@@ -211,7 +258,7 @@ void syn_smp_prep(int32_t pitch, uint8_t *st, uint8_t *params) {
                 v->len = (int32_t)len;
             }
         }
-        v->mode = clamp(SM_BYTE(p, 7), 0, 3);
+        v->mode = types[vi];
         v->trig = 1;
         v->elapsed = 0;
         v->seg = 0;
@@ -341,8 +388,10 @@ void syn_smp_render(int32_t *out, uint8_t *st) {
     }
 
     FW_HALFBAND((uint8_t *)&hb_ptr[vi] - HB_STATE_AT, hb_in, hb_out);
+    int32_t lev = clamp(p->w[7], 0, 0x7f00);
+    int32_t gain = lev == LEV_UNITY ? OUT_GAIN : (OUT_GAIN / LEV_UNITY) * lev;
     for (int k = 0; k < BLOCK; k++)
-        out[k] = sm_fmul(hb_out[k], OUT_GAIN) << 1;
+        out[k] = sm_fmul(hb_out[k], gain) << 1;
     v->trig = 0;
     FW_DEC(st);
     FW_VCA(out, st);

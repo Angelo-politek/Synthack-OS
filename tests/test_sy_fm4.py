@@ -31,6 +31,7 @@ pytestmark = pytest.mark.skipif(not STOCK.exists(), reason="firmware stock assen
 SPEC = json.loads((ROOT / "mods" / "sy-fm4" / "patch.json").read_text(encoding="utf-8"))
 SYM = {k: int(v, 16) for k, v in SPEC["symbols"].items()}
 LOAD = 0x4000_0400
+DESC = 0x4022_D83C                       # descrittori, 52 B per id
 TO_140A = {0x4023_441C: 0x4022_067C, 0x4023_4344: 0x4022_05A4, 0x43BD_E73C: 0x43BC_65E4, 0x43BD_F44C: 0x43BC_72F4}
 # (sito 1.42, lunghezza, impronta dei byte stock della 1.40A nel patcher di Rxuting: patch/s3patch.py)
 RXUTING = [(0x400A_706A, 34, "05940b0d2349f1f1c2ab4128a080a7a1663c0ed93299b900b0c038eb396ea31b"),
@@ -75,7 +76,7 @@ def test_sites_are_the_ones_of_the_original_patcher(stock):
 
 def test_page2_descriptors_replace_midi_track_cc_values(stock):
     sec3, _ = stock
-    rows = [p for p in SPEC["patches"] if p["what"].startswith("descrittore ")]
+    rows = [p for p in SPEC["patches"] if p["what"].startswith("descrittore ") and "2/2" in p["what"]]
     assert [int(p["addr"], 16) for p in rows] == [0x4022_D83C + 52 * i for i in range(254, 262)]
     for k, p in enumerate(rows):
         owner, lix, mn, mx, de, _r5, cc, nrpn, rid = struct.unpack(">9I", bytes.fromhex(p["hex"])[:36])
@@ -157,40 +158,50 @@ def test_cpu1_cost_per_block(built):
 
 
 def test_syn_page_on_an_fm4_track():
-    """Pagina SYN di una traccia SY FM4 (OS 1.42 nell'emulatore dell'interfaccia, machine del suono = 4): la prima
-    apertura porta l'elenco delle pagine da 1 a 2 in un blocco nuovo dell'heap, la 2/2 risponde con i descrittori
-    254..261, il titolo e' una std::string costruita in a0 ("SY FM4 2/2"), la vista si disegna; nessuna
-    scrittura nel codice dell'OS. Prima delle correzioni, due eccezioni sulla macchina: il puntatore del malloc
-    dell'OS (d0) letto da a0, e il titolo restituito come char * invece della std::string."""
-    import screens
-    from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
-    from unicorn.m68k_const import UC_M68K_REG_A7, UC_M68K_REG_D0, UC_M68K_REG_PC
-    ui = screens.UI(["sy-fm4"])
-    uc = ui.uc
-
-    def machine4(uc, _a, _s, _d):                       # 0x400249CE (suono) -> machine: SY TONE, cioe' SY FM4
-        sp = uc.reg_read(UC_M68K_REG_A7)
-        uc.reg_write(UC_M68K_REG_D0, 4)
-        uc.reg_write(UC_M68K_REG_A7, sp + 4)
-        uc.reg_write(UC_M68K_REG_PC, struct.unpack(">I", uc.mem_read(sp, 4))[0])
-    uc.hook_add(UC_HOOK_CODE, machine4, begin=0x4002_49CE, end=0x4002_49CE)
+    """Pagina SYN di una traccia SY FM4 (vista SRC nell'emulatore dell'interfaccia, machine del suono = 4), dalle
+    pagine di syn-pages: la prima apertura porta l'elenco delle pagine da 1 a 2 in un blocco nuovo dell'heap; la
+    1/2 ha i descrittori di SY TONE in colonne come la 2/2 (rapporto, livello, decay), con i nomi di SY FM4; la 2/2
+    i descrittori 254..261; il titolo e' una std::string costruita in a0; la vista si disegna; nessuna scrittura
+    nel codice dell'OS. Prima delle correzioni, due eccezioni sulla macchina: il puntatore del malloc dell'OS (d0)
+    letto da a0, e il titolo restituito come char * invece della std::string."""
+    from syn_view import SynView
+    from unicorn import UC_HOOK_MEM_WRITE
+    v = SynView(["sy-fm4"], machine=4)
+    ui = v.ui
     bad = []
-    uc.hook_add(UC_HOOK_MEM_WRITE, lambda _uc, _k, a, *_: bad.append(a) if a < 0x401C_0000 else None)
-    src = ui.tab("SRC")
-    record, title = (ui.long(ui.long(src) + 4 * n) for n in (47, 19))
-    assert record == SYM["fm4m_src_record"]
-    old = ui.long(src + 0x7C)
-    assert [ui.call(record, [src, k]) for k in range(9)] == [190, 191, 195, 197, 193, 192, 194, 196, 10]
-    begin = ui.long(src + 0x7C)
-    assert begin != old and ui.long(src + 0x80) == ui.long(src + 0x84) == begin + 8
+    ui.uc.hook_add(UC_HOOK_MEM_WRITE, lambda _uc, _k, a, *_: bad.append(a) if a < 0x401C_0000 else None)
+    sp = json.loads((ROOT / "mods" / "syn-pages" / "patch.json").read_text(encoding="utf-8"))["symbols"]
+    assert v.slot(47) == int(sp["sp_record"], 16) and v.slot(19) == int(sp["sp_title"], 16)
+    old = ui.long(v.view + 0x7C)
+    assert v.knobs() == [190, 191, 192, 194, 195, 193, 196, 197, 10]
+    begin = ui.long(v.view + 0x7C)
+    assert begin != old and ui.long(v.view + 0x80) == ui.long(v.view + 0x84) == begin + 8
     assert ui.long(begin) == ui.long(begin + 4)
-    ui.put(src + 0x90, ">I", 1)
-    assert [ui.call(record, [src, k]) for k in range(9)] == [254, 255, 256, 257, 261, 258, 259, 260, 10]
-    assert text(ui, title, src) == b"SY FM4 2/2"
-    ui.put(src + 0x90, ">I", 0)
-    assert text(ui, title, src) == b"SY FM4 1/2"
-    ui.draw(src)
+    short = [bytes(ui.uc.mem_read(ui.long(DESC + 52 * i + 48), 5)).split(b"\0")[0] for i in range(190, 198)]
+    assert short == [b"TUNE", b"RAT2", b"LEV2", b"FDBK", b"DEC2", b"PNCH", b"OVER", b"DEC1"]
+    assert v.title() == b"SY FM4 1/2"
+    v.page(1)
+    assert v.knobs() == [254, 255, 256, 257, 261, 258, 259, 260, 10]
+    assert v.title() == b"SY FM4 2/2"
+    plain = v.frame()
     assert bad == []
+
+
+def test_turning_algo_draws_the_algorithm():
+    """Pagina 2/2, ALGO in evidenza (appena girato): lo schema dell'algoritmo sopra le colonne A e B, diverso per
+    ogni algoritmo; senza evidenza la pagina e' quella stock. La casella di ALGO mostra il numero."""
+    from syn_view import SynView
+    v = SynView(["sy-fm4"], machine=4)
+    v.page(1)
+    plain = v.frame()
+    frames = []
+    for n in range(12):
+        v.set_value(0, 0x36, n << 8)
+        v.highlight(0)
+        frames.append(v.frame())
+    v.highlight(None)
+    assert v.frame() == plain
+    assert len(set(frames)) == 12 and plain not in frames
 
 
 def text(ui, fn: int, view: int) -> bytes:

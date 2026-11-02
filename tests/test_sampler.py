@@ -299,12 +299,13 @@ def engines(built):
     return e, ref
 
 
-def frame(words, machine=44, note=60, over=0):
+def frame(words, machine=44, note=60, typ=0):
+    """words: indici 0x12..0x19 (TUNE PLAY BR SAMP, i tre del tipo, LEV); typ: TYPE, nella parola 0x1A (OVER)."""
     import cli
     p = cli.make_params(machine, note)
     for k, w in enumerate(words):                      # indici 0x12.. dalla parola 1 del blocco della traccia
         struct.pack_into(">h", p, 2 + 2 * k, w)
-    struct.pack_into(">h", p, 2 + 2 * (0x1A - 0x12), over)
+    struct.pack_into(">h", p, 2 + 2 * (0x1A - 0x12), typ)
     return p
 
 
@@ -331,7 +332,7 @@ def peak(x):
     return max(abs(v) for v in x)
 
 
-ONESHOT = [0x4000, 0x300, 0, 0, 0, 0x7800, 0, 0]       # TUNE PLAY BR SAMP STRT LEN LOOP TYPE
+ONESHOT = [0x4000, 0x300, 0, 0, 0, 0x7800, 0, 0x6400]  # TUNE PLAY BR SAMP STRT LEN LOOP LEV (100)
 TAIL = 32 * 8                                          # dopo l'attacco dell'inviluppo
 
 
@@ -361,7 +362,7 @@ def test_tune_reverse_start_length_loop(engines):
     assert freq(late[TAIL:TAIL + 1024]) > 1.5 * freq(base[TAIL:TAIL + 1024])
     short = play(e, ONESHOT[:5] + [0x0200] + ONESHOT[6:], blocks=60)   # LEN 2/120 = 400 campioni
     assert peak(short[-512:]) == 0 and peak(short[TAIL:TAIL + 256]) > 0
-    looped = play(e, [0x4000, 0x200, 0, 0, 0, 0x0200, 0, 0], blocks=60)   # FWD.L: continua
+    looped = play(e, [0x4000, 0x200, 0, 0, 0, 0x0200, 0, 0x6400], blocks=60)   # FWD.L: continua
     assert peak(looped[-512:]) > 0
 
 
@@ -371,24 +372,64 @@ def test_slice_and_repitch(engines):
     data = [int(12000 * math.sin(2 * math.pi * f * i / SR)) for f in (500, 1000, 2000, 4000) for i in range(n // 4)]
     load_sample(e, data)
     for sel, f in ((1, 500), (2, 1000), (4, 4000)):    # GRID 0 = 4 slice
-        out = play(e, [0x4000, 0x300, 0, 0, sel << 8, 0, 0, 0x300], blocks=40)
+        out = play(e, [0x4000, 0x300, 0, 0, sel << 8, 0, 0, 0x6400], blocks=40, typ=0x300)
         assert abs(freq(out[TAIL:TAIL + 2048]) - f) < f * 0.08, sel
     load_sample(e, sine(48000))                        # 1 s a 120 BPM, BARS 0 = 1 battuta (2 s): meta' velocita'
-    out = play(e, [0x4000, 0x300, 0, 0, 0, 0x7800, 0x000, 0x200], blocks=40)
+    out = play(e, [0x4000, 0x300, 0, 0, 0, 0x7800, 0x000, 0x6400], blocks=40, typ=0x200)
     assert abs(freq(out[TAIL:]) - 500) < 30
 
 
-def test_over_has_no_effect(built):
-    """OVER (0x1A) non ha manopola: il motore lo azzera prima della saturazione comune, dal primo blocco in cui
-    gira (il blocco del primo trig e' ancora della machine precedente)."""
+def test_type_word_does_not_reach_the_overdrive(built):
+    """TYPE viaggia nella parola 0x1A, quella che l'overdrive comune (0x4000112C) legge dopo i motori: il prep la
+    legge e la azzera. Con SLICE (0x300) la parola e' 0 quando gira l'overdrive."""
     import engine as eng
-    outs = []
-    for over in (0, 0x7F00):
-        e = eng.Engine(image=built[1])
-        e.boot(cold=True)
-        load_sample(e, sine(48000))
-        outs.append(play(e, ONESHOT, blocks=20, over=over))
-    assert outs[0][-32 * 8:] == outs[1][-32 * 8:]
+    from unicorn import UC_HOOK_CODE
+    from unicorn.m68k_const import UC_M68K_REG_A7
+    e = eng.Engine(image=built[1])
+    e.boot(cold=True)
+    load_sample(e, sine(48000))
+    seen = []
+
+    def at_over(uc, _a, _s, _d):
+        params[0] and seen.append(struct.unpack(">h", uc.mem_read(params[0] + 2 * 0x1A, 2))[0])
+    params = [0]
+
+    def at_prep(uc, _a, _s, _d):
+        params[0] = struct.unpack(">I", uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 12, 4))[0]
+    e.uc.hook_add(UC_HOOK_CODE, at_prep, begin=SYM["syn_smp_prep"], end=SYM["syn_smp_prep"])
+    e.uc.hook_add(UC_HOOK_CODE, at_over, begin=0x4000_112C, end=0x4000_112C)
+    out = play(e, [0x4000, 0x300, 0, 0, 0x100, 0, 0, 0x6400], blocks=8, typ=0x300)
+    assert peak(out) > 0 and seen and set(seen[2:]) == {0}
+
+
+def test_lev_scales_the_level(engines):
+    e, _ = engines
+    load_sample(e, sine(48000))
+    full = play(e, ONESHOT)
+    half = play(e, ONESHOT[:7] + [0x3200])
+    assert abs(20 * math.log10(peak(half[TAIL:]) / peak(full[TAIL:])) + 6.02) < 0.2
+    assert peak(play(e, ONESHOT[:7] + [0])[TAIL:]) == 0
+
+
+def test_waveform_for_the_main_cpu(built):
+    """La CPU #1 chiede il profilo di uno slot a 0x5B0 (slot + 1); la CPU #2 lo calcola a colonne durante i
+    prep: 112 picchi 0..127 a 0x5C0, pronti quando 0x5B6 = 112 (0x5B4 = slot + 1)."""
+    import engine as eng
+    e = eng.Engine(image=built[1])
+    e.boot(cold=True)
+    data = [int(16000 * (i / 48000)) * (1 if i % 2 else -1) for i in range(48000)]   # rampa: picchi crescenti
+    load_sample(e, data, slot=2)
+    load_sample(e, sine(4800), slot=0)
+    e.uc.mem_write(0x5B0, struct.pack(">H", 3))
+    play(e, ONESHOT, blocks=80)
+    slot, done = struct.unpack(">HH", e.uc.mem_read(0x5B4, 4))
+    assert (slot, done) == (3, 112)
+    w = list(e.uc.mem_read(0x5C0, 112))
+    assert w == sorted(w) and w[0] < 5 and w[-1] >= 60
+    load_sample(e, sine(9600), slot=2)                 # sample nuovo nello stesso slot: si ricomincia
+    play(e, ONESHOT, blocks=80)
+    w = list(e.uc.mem_read(0x5C0, 112))
+    assert min(w) >= 60                                # 16000 >> 8: picchi uguali dall'inizio
 
 
 def test_other_machines_unchanged(built):
@@ -404,7 +445,7 @@ def test_other_machines_unchanged(built):
 def test_werp_plays_segments(engines):
     e, _ = engines
     load_sample(e, sine(96000, 700))
-    out = play(e, [0x4000, 0x300, 0, 0, 0x100, 0x300, 0x200, 0x100], blocks=40)   # SEG 1/16, MODE FWD, 4 bars
+    out = play(e, [0x4000, 0x300, 0, 0, 0x100, 0x300, 0x200, 0x6400], blocks=40, typ=0x100)   # SEG 1/16, 4 bars
     assert peak(out[TAIL:]) > 0
     assert abs(freq(out[TAIL:]) - 700) < 60               # tono invariato: si allunga il tempo, non l'altezza
 
@@ -440,19 +481,20 @@ def test_page_names_and_values(ui):
     tab = ui.tab("SRC")
     ids = [ui.param(tab, e) for e in "ABCDEFGH"]
     lix = [struct.unpack(">I", ui.uc.mem_read(DESC + 52 * i + 4, 4))[0] for i in ids]
-    assert lix == list(range(0x12, 0x1A))                        # A..H = indici 0x12..0x19, 0x1A (OVER) fuori
-    assert [short(ui, i) for i in ids[:4]] + [short(ui, ids[7])] == ["TUNE", "PLAY", "BR", "SAMP", "TYPE"]
-    for i in ids[1:]:                                            # TUNE tiene il formattatore dell'OS
-        f = struct.unpack(">4I", ui.uc.mem_read(OBJS + 84 * i + 20, 16))
-        assert f[2:] == (ui.sym["sm_mgr"], ui.sym["sm_invoke"])
+    assert lix == list(range(0x12, 0x1A))                        # A..H = indici 0x12..0x19 (TYPE in 0x1A, 2/2)
+    assert [short(ui, i) for i in ids[:4]] + [short(ui, ids[7])] == ["TUNE", "PLAY", "BR", "SAMP", "LEV"]
+    for i in ids[1:]:                                            # TUNE tiene formattatore e grafica dell'OS
+        f = struct.unpack(">8I", ui.uc.mem_read(OBJS + 84 * i + 20, 32))
+        assert f[2:4] == (ui.sym["sm_mgr"], ui.sym["sm_invoke"]) and f[6:] == (ui.sym["sm_mgr"], ui.sym["sm_gfx"])
     assert [text(ui, ids[1], v << 8) for v in range(4)] == ["REV", "REV.L", "FWD.L", "FWD"]
     assert text(ui, ids[3], 0) == "1" and text(ui, ids[3], 0x3F00) == "64"
-    seq = 0x8000_21B0 + 2 * (0xE + 0x19)                         # TYPE della traccia 1 nei valori del sequencer
-    expect = {0: (["STRT", "LEN", "LOOP"], "ONE"), 1: (["SEG", "SMOD", "BARS"], "WERP"),
-              2: (["STRT", "LEN", "BARS"], "PTCH"), 3: (["SLIC", "LEN", "GRID"], "SLIC")}
-    for t, (names, name) in expect.items():
+    assert text(ui, ids[7], 100 << 8) == "100"                   # LEV
+    seq = 0x8000_21B0 + 2 * (0xE + 0x1A)                         # TYPE della traccia 1 nei valori del sequencer
+    expect = {0: ["STRT", "LEN", "LOOP"], 1: ["SEG", "SMOD", "BARS"], 2: ["STRT", "LEN", "BARS"],
+              3: ["SLIC", "LEN", "GRID"]}
+    for t, names in expect.items():
         ui.put(seq, ">h", t << 8)
-        assert text(ui, ids[7], t << 8) == name
+        text(ui, ids[1], 0)
         assert [short(ui, i) for i in ids[4:7]] == names
     ui.put(seq, ">h", 3 << 8)
     assert [text(ui, ids[6], v << 8) for v in range(5)] == ["4", "8", "16", "32", "64"]
@@ -480,3 +522,41 @@ def test_main_cpu_cost_per_block(ui):
     ui.call(ui.sym["sm_block"], [0])
     ui.uc.hook_del(h)
     assert n[0] - orig <= budget.AUDIO_CPU["sampler"], n[0] - orig
+
+
+def test_syn_pages():
+    """Pagine SYN da syn-pages (vista SRC, machine del suono = 44). 1/2: la pagina della Digitakt, H = LEV
+    (indice 0x19). 2/2: niente manopole sotto la forma d'onda, i tre del tipo, H = TYPE (descrittore 503 riscritto
+    sull'indice 0x1A). La 2/2 chiede alla CPU #2 il profilo dello slot della traccia e lo disegna quando e' pronto;
+    sm_block chiede un ridisegno quando ne arriva dell'altro."""
+    from syn_view import SynView
+    v = SynView(["sampler"], machine=44)
+    ui = v.ui
+    lix = lambda: struct.unpack(">I", ui.uc.mem_read(DESC + 52 * 503 + 4, 4))[0]   # noqa: E731
+    assert v.knobs() == [497, 498, 499, 504, 501, 502, 500, 503, 10] and v.pages() == 2
+    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLER 1/2"
+    v.set_value(0, 0x15, 5 << 8)                                   # SAMP 6
+    v.page(1)
+    assert v.knobs() == [0, 0, 0, 0, 501, 502, 500, 503, 10]
+    assert lix() == 0x1A and short(ui, 503) == "TYPE" and v.title() == b"SAMPLER 2/2"
+    waiting = v.frame()
+    assert struct.unpack(">H", ui.uc.mem_read(0x1000_05B0, 2))[0] == 6
+    ui.put(0x1000_05B4, ">HH", 6, 112)
+    ui.uc.mem_write(0x1000_05C0, bytes(range(0, 112)))
+    drawn = v.frame()
+    assert drawn != waiting
+    rows = screens_pixels(drawn)
+    assert sum(rows[y][x] for y in range(0, 37) for x in range(16, 128)) > 400      # la forma d'onda
+    v.page(0)
+    v.record(0)
+    assert lix() == 0x19
+    ui.put(0x444E_2334, ">I", 0x4FE0_4000)                         # ViewController finto: flag a +96
+    ui.uc.mem_write(0x4FE0_4000 + 96, b"\0")
+    ui.put(0x1000_05B6, ">H", 50)
+    ui.call(ui.sym["sm_block"], [0])
+    assert ui.uc.mem_read(0x4FE0_4000 + 96, 1) == b"\x01"
+
+
+def screens_pixels(frame):
+    import screens
+    return screens.pixels(frame)
