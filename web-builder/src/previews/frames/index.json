@@ -10,5 +10,9 @@
  "perf-fx/moda": "Mod A page: one effect per key",
  "perf-fx/retrig": "Retrig page with QNT",
  "dual-mono/inr": "IN L and the new IN R page",
- "splash/boot": "SyntHack logo after the official intro"
+ "splash/boot": "SyntHack logo after the official intro",
+ "sy-fm4/pages": "SY FM4 SYN pages 1/3 to 3/3",
+ "sy-fm4/algo": "ALGO 1-11 with the algorithm drawing",
+ "sampler/page": "SAMPLER page 1/2, as the Digitakt's",
+ "sampler/wave": "Waveform page: TYPE, slices, start, length"
 }

@@ -484,6 +484,120 @@ def sp_boot(r: Recorder) -> None:
     r.frames += [r.frames[-1]] * 8
 
 
+# ---------------------------------------------------------------------- machine (syn-pages)
+TRACK_SOUND = 0x4000_F04C                       # (progetto + 304, traccia) -> suono della traccia
+SET_MACHINE = 0x4002_5594                       # (suono, machine, 0, 1): la machine del suono, come dal menu
+SHARED = 0x1000_0000                            # RAM condivisa con la CPU #2, vista dalla CPU #1
+
+
+def machine(n: int):
+    """Impostazione prima della vista: la traccia 1 suona la machine n (4 = SY FM4, 44 = SAMPLER)."""
+    def setup(ui: UI) -> None:
+        sound = ui.call(TRACK_SOUND, [ui.project + 304, 0])
+        ui.call(SET_MACHINE, [sound, n, 0, 1], count=400_000_000)
+    return setup
+
+
+def syn_page(ui: UI, tab: int, n: int) -> None:
+    """Pagina SYN n della machine: la vista chiede i descrittori delle manopole (vtable +188 -> slot 47 di
+    syn-pages), come l'OS prima di disegnare; alla prima richiesta syn-pages crea l'elenco delle pagine."""
+    ui.call(ui.long(ui.long(tab) + 4 * 47), [tab, 0])
+    ui.page(tab, n)
+    for k in range(9):
+        ui.call(ui.long(ui.long(tab) + 4 * 47), [tab, k])
+
+
+def fm4_pages(r: Recorder) -> None:
+    ui = r.ui
+    src = ui.tab("SRC")
+    syn_page(ui, src, 0)                                    # 1/3: TUNE PNCH DEC1 OVER / FDBK RAT2 LEV2 DEC2
+    r.preset(src, {"A": 64, "C": 70, "D": 20, "E": 40, "F": 24, "G": 60, "H": 50})
+    r.hold(src, 6)
+    r.sweep(src, "G", steps(60, 100, 6))
+    r.hold(src, 5, show="G")
+    syn_page(ui, src, 1)                                    # 2/3: RAT3 LEV3 DEC3 DET / RAT4 LEV4 DEC4 ALGO
+    r.preset(src, {"A": 16, "B": 50, "C": 60, "D": 64, "E": 8, "F": 30, "G": 40, "H": 1})
+    r.hold(src, 6)
+    r.sweep(src, "B", steps(50, 90, 5))
+    r.hold(src, 4, show="B")
+    r.sweep(src, "D", steps(64, 80, 5))
+    r.hold(src, 6, show="D")
+    syn_page(ui, src, 2)                                    # 3/3: ALGO e lo schema
+    r.hold(src, 8)
+
+
+def fm4_algo(r: Recorder) -> None:
+    ui = r.ui
+    src = ui.tab("SRC")
+    syn_page(ui, src, 2)
+    r.sweep(src, "A", range(1, 12), 6)                      # ALGO 1..11: uno schema per algoritmo
+    ui.set(src, "A", 1)
+    r.hold(src, 6)
+
+
+def sample_peaks(n: int = 24000) -> bytes:
+    """Picchi delle 112 colonne come li calcola la CPU #2 (mods/sampler/engine/syn.c) per un colpo sintetico:
+    seno da 180 a 50 Hz, decadimento in 0.15 s, coda con rumore. Il sample vero sta sulla CPU #2."""
+    import math
+    import random
+    rnd = random.Random(1)
+    d = []
+    for i in range(n):
+        t = i / 48000
+        env = math.exp(-t / 0.15)
+        x = 30000 * env * math.sin(2 * math.pi * (50 * t + 130 * 0.04 * (1 - math.exp(-t / 0.04))))
+        d.append(int(x + 2500 * env * (rnd.random() - 0.5)))
+    out = bytearray()
+    for c in range(112):
+        a, b = n * c // 112, n * (c + 1) // 112
+        peak = max(abs(d[i]) for i in range(a, b, (b - a) // 48 + 1))
+        out.append(min(127, peak >> 8))
+    return bytes(out)
+
+
+def smp_wave(ui: UI, tab: int) -> None:
+    """Il profilo chiesto dalla pagina 2/2 (slot + 1 a 0x5B0), pronto come dopo i prep della CPU #2."""
+    ui.draw(tab)
+    want = struct.unpack(">H", ui.uc.mem_read(SHARED + 0x5B0, 2))[0]
+    ui.put(SHARED + 0x5B4, ">HH", want, 112)
+    ui.uc.mem_write(SHARED + 0x5C0, sample_peaks())
+
+
+def smp_page(r: Recorder) -> None:
+    ui = r.ui
+    src = ui.tab("SRC")
+    syn_page(ui, src, 1)
+    smp_wave(ui, src)                                       # SAMP e le parti disegnate col sample
+    syn_page(ui, src, 0)                                    # 1/2: TUNE PLAY BR SAMP / STRT LEN LOOP LEV
+    r.preset(src, {"A": 60, "B": 3, "C": 0, "E": 0, "F": 120, "G": 0, "H": 100})
+    r.hold(src, 6)
+    r.sweep(src, "A", steps(60, 72, 5))
+    r.hold(src, 4, show="A")
+    r.sweep(src, "B", [2, 1, 0, 3], 4)                      # PLAY
+    r.sweep(src, "E", steps(0, 40, 5))
+    r.hold(src, 4, show="E")
+    r.sweep(src, "C", steps(0, 60, 5))
+    r.hold(src, 6, show="C")
+
+
+def smp_wave_page(r: Recorder) -> None:
+    ui = r.ui
+    src = ui.tab("SRC")
+    syn_page(ui, src, 1)                                    # 2/2: forma d'onda, E F G TYPE
+    smp_wave(ui, src)
+    r.preset(src, {"E": 10, "F": 90, "G": 30})
+    r.hold(src, 8)
+    r.sweep(src, "F", steps(90, 50, 5))
+    r.hold(src, 4, show="F")
+    for t in (3, 1, 2, 0):                                  # TYPE: SLIC, WERP, PTCH, ONE
+        ui.set(src, "H", t)
+        r.hold(src, 6, show="H")
+        if t == 3:                                          # SLIC: griglia e fetta scelta
+            r.sweep(src, "G", [1, 2], 5)
+            r.sweep(src, "E", [3, 6], 5)
+        r.hold(src, 4)
+
+
 # mod del sito -> (mod applicate, impostazioni prima della vista, [(scena, didascalia, funzione)])
 SCENES = {
     "readable-values": (["readable-values"], None, [
@@ -504,6 +618,12 @@ SCENES = {
         ("inr", "IN L and the new IN R page", dm_inr)]),
     "splash": (["splash"], None, [
         ("boot", "SyntHack logo after the official intro", sp_boot)]),
+    "sy-fm4": (["sy-fm4"], machine(4), [
+        ("pages", "SY FM4 SYN pages 1/3 to 3/3", fm4_pages),
+        ("algo", "ALGO 1-11 with the algorithm drawing", fm4_algo)]),
+    "sampler": (["sampler"], machine(44), [
+        ("page", "SAMPLER page 1/2, as the Digitakt's", smp_page),
+        ("wave", "Waveform page: TYPE, slices, start, length", smp_wave_page)]),
 }
 
 
