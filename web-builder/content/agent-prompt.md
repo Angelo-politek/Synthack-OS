@@ -23,13 +23,20 @@ https://github.com/Angelo-politek/Synthack-OS. Target: Syntakt OS 1.42. Follow t
      original bytes, and our bytes.
    - Never touch sections 2 (bootstrap) or 6 (boot). Don't make the boot longer.
    - Claim every shared resource in tools/build/registry.py before using it: mod-area range,
-     section 3 bytes, vparams slots, parameter ids, pages, kit or project storage.
+     boot-list slot, engine area, shared RAM, section 3 bytes, vparams slots, parameter ids,
+     pages, kit or project storage.
      Then run python tools/build/registry.py.
    - Zero bytes are not free space. Put code in the mod area: "requires": ["modarea"],
      "append": true, linked at modarea_layout.RAM + the claimed offset.
    - Never use RAM above the BSS (0x45566490-0x48000000 on 1.42).
    - No .bss, no libgcc. ColdFire: no exg; movem only with (An) or d16(An); muls.l without
      absolute addresses; short branches within +-127 bytes.
+   - OS functions return pointers in d0; m68k-linux-gnu-gcc reads pointer results from a0.
+     Declare OS functions with an integer return, then cast (tests/test_os_abi.py checks it).
+     A std::string returned by value is built at the address passed in a0: write that call in
+     assembly, as the wrapper in mods/syn-pages/synpages.c.
+   - Setup at boot: a short function in the mod area's boot list (claimed slot in BOOT_SLOTS),
+     never anything that makes the boot longer.
    - Hooks replay the instructions they replace and save every register they use.
    - Stored data survives the OS save -> reload. Files saved with the mod load safely on the stock
      OS and on builds without it (zero = default).
@@ -53,7 +60,7 @@ https://github.com/Angelo-politek/Synthack-OS. Target: Syntakt OS 1.42. Follow t
 
 9. Build with all other mods:
    python tools/build/build.py --stock firmware/<stock>.syx mods/<name> mods/splash mods/dual-mono \
-     mods/master-comp mods/readable-values mods/perf-fx mods/fx3 -o out/test.syx
+     mods/master-comp mods/readable-values mods/perf-fx mods/fx3 mods/sy-fm4 mods/sampler -o out/test.syx
 
 10. Run until everything passes:
     python -m pytest

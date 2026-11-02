@@ -88,6 +88,14 @@ def test_engine_area_and_boot_slots():
     assert set(R.BOOT_SLOTS.values()) | {w for *_, w, _ in R.ENGINE} <= set(specs())
 
 
+def test_shared_ram_disjoint():
+    """RAM condivisa tra le CPU: intervalli disgiunti dentro i 4 KB in uso, di mod esistenti o dell'OS."""
+    rows = sorted(R.SHARED_RAM)
+    assert all(0 <= a < b <= 0x1000 for a, b, _, _ in rows)
+    assert all(x[1] <= y[0] for x, y in zip(rows, rows[1:]))
+    assert {w for *_, w, _ in rows} - {"OS"} <= set(specs())
+
+
 def test_vparams_slots_all_used_as_registered():
     used = {}
     for name, p, ram, n in patches(fixed=False):

@@ -40,7 +40,7 @@ The canonical rules list. Guides: [modders](web-builder/content/modders.md), [cr
 - `mods/<name>/make_patch.py` compiles (`m68k-linux-gnu-as` or `-gcc`, `-mcpu=54418`) and writes `patch.json`.
 - Code over a few hundred bytes goes in the mod area: link at `tools/build/modarea_layout.py` RAM + your offset, add `"requires": ["modarea"]`. The section 3 free fill is nearly full.
 - `mods/<name>/mod.json`: exactly `{"title", "kind", "summary"}`. Summary: ASCII English, ≤ 140 characters. `kind`: `feature` (users pick it), `machine` (synth machine on CPU #2), `infra` (required by other mods).
-- New machines need `modarea7`, the shared CPU #2 code area. `[wip]` [#1](https://github.com/Angelo-politek/Synthack-OS/issues/1).
+- New machines put their CPU #2 code in `modarea7` and their own SYN pages in `syn-pages`. Examples: `mods/sy-fm4`, `mods/sampler`. See [docs/modding-guide.md](docs/modding-guide.md#7-machines).
 - ColdFire: no `exg`. `movem` only with `(An)` / `d16(An)`. `muls.l` takes no absolute address. Short branches: ±127 B. No `.bss`, no libgcc.
 - New findings go in [docs/](docs), briefly.
 

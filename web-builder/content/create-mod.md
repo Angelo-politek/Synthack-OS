@@ -5,7 +5,7 @@ A merged mod is checked against all the others and reaches every user of this si
 ## Before you start
 
 1. Open a [mod proposal](https://github.com/Angelo-politek/Synthack-OS/issues/new?template=mod_proposal.md): what the mod does, which OS parts it touches.
-2. Check the [registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md): mod-area space, parameter ids, pages, vparams slots, kit storage already taken.
+2. Check the [registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md): mod-area space, boot-list slots, engine area, shared RAM, parameter ids, pages, vparams slots, kit storage already taken.
 3. Read the [modding guide](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/modding-guide.md) and [CONTRIBUTING.md](https://github.com/Angelo-politek/Synthack-OS/blob/dev/CONTRIBUTING.md).
 
 ## Build it
@@ -91,16 +91,24 @@ Your README keeps your name. Third-party code keeps its license and notice.
 
 Synth machines run on CPU #2, the voice engine (section 7). The stock OS has 12 engines.
 
-| Topic | Status |
+A machine replaces a stock engine: SY FM4 replaces SY TONE (engine 4), SAMPLER replaces SP TWINSHOT (engine 11).
+
+| Part | Where |
 |---|---|
-| `modarea7` | Shared CPU #2 code area for every machine. `[wip]` [#1](https://github.com/Angelo-politek/Synthack-OS/issues/1). |
-| Section 7 | In-place patches work. Appended code is refused until `modarea7` lands. |
+| Sound | CPU #2: the engine's prep and render, in the [`modarea7`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/modarea7/README.md) engine area (`0x47000000` + claimed offset) |
+| Parameters | CPU #1: the descriptors of the replaced machine, renamed; extra ones from free ids |
+| SYN pages | CPU #1: [`syn-pages`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/syn-pages/README.md), up to 4 pages with names and drawing |
+| Setup at boot | CPU #1: a function in the mod area's boot list. `syn-pages` registration goes here. |
+| Data between CPUs | Shared RAM, at a claimed offset. Map: [memory-map.md](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/memory-map.md#shared-ram) |
 | Target | OS 1.42 |
 | Related research | [#7](https://github.com/Angelo-politek/Synthack-OS/issues/7): adding a machine without replacing one |
 
+Start from [`sy-fm4`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/sy-fm4/README.md) or [`sampler`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/sampler/README.md).
+
 1. Open a [machine proposal](https://github.com/Angelo-politek/Synthack-OS/issues/new?template=machine_proposal.md): sound, parameters, storage, CPU #2 cost, hardware status.
 2. Settle these early:
-   - Parameter ids: stay inside the 505-entry descriptor table. Unclaimed ids 254–261 carry MIDI CCs; clear them.
+   - Parameter ids: stay inside the 505-entry descriptor table. Check the [registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md): free-looking ids are often aliases or carry MIDI CCs.
    - P-locks and held-trig editing: don't route sound parameters through vparams. It sends edits to the kit path.
    - Files: a kit or pattern saved with the machine must load on the stock OS, and on builds without the mod, without crashing.
+   - CPU #2 cost per block: count it with 8 voices, against the stock engine you replace.
 3. Submit like any mod: one machine per PR against `dev`, `"requires": ["modarea7", ...]`, `kind: "machine"`, emulator tests, registry claims, CI green.

@@ -9,6 +9,7 @@ Blocks of **32 frames at 48 kHz** (0.67 ms).
 - 12 engines: tables at `0x400148F0` (render), `0x40014920` (update), `0x40014950` (machine ID → engine).
   0 BD MODERN · 1 SD BASIC · 2 CY ALLOY · 3 PC CARBON · 4 SY TONE · 5 SY CHORD · 6 SD VINTAGE · 7 CP VINTAGE · 8 SY TOY · 9 SY BITS · 10 SY SWARM · 11 SP TWINSHOT.
 - SY CHORD reads a 512 × int32 single-cycle wave at `0x4001A300`.
+- Mod machines replace an engine's prep (update table) and render: [sy-fm4](../mods/sy-fm4) engine 4, [sampler](../mods/sampler) engine 11. Their code runs from the [modarea7](../mods/modarea7) engine area. Extra values from CPU #1 come through [shared RAM](memory-map.md#shared-ram).
 
 ## CPU #1 — mix and output (section 3)
 

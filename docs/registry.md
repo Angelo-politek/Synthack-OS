@@ -31,6 +31,17 @@ Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 
 | `0x0000` | `0x4000` | sy-fm4 | voice engine (engine 4) and its state |
 | `0x4000` | `0x00020000` | sampler | voice engine (engine 11), interpolation table, zero-crossing grids |
 
+## Shared RAM (CPU #1 at `0x10000000` + offset, CPU #2 at offset)
+
+| From | To | Owner | Use |
+|---|---|---|---|
+| `0x0000` | `0x01b0` | OS | voice frames: 0x1B0 B from 0x80002000 every block (eDMA ch. 47) |
+| `0x01b0` | `0x05b0` | OS | voice output: 8 x 32 x int32 back to CPU #1 |
+| `0x05b0` | `0x0630` | sampler | waveform: request +0x5B0, slot +0x5B4, columns done +0x5B6, length +0x5B8, address +0x5BC, 112 peaks +0x5C0 |
+| `0x0700` | `0x0780` | sy-fm4 | pages 2/3 and 3/3: 8 words per track, locks applied |
+| `0x07f0` | `0x07f4` | sampler | tempo, BPM x 120 |
+| `0x0800` | `0x1000` | OS | boot-time upload window |
+
 ## Section 3 free fill (`0x40339740–0x4033a000`)
 
 | From | To | Mod | Use |
@@ -84,14 +95,14 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 125 | dual-mono | IN R: alias of BAL |
 | 129 | dual-mono | DEL: R side while the IN R page is open |
 | 130 | dual-mono | REV: R side while the IN R page is open |
-| 190 | sy-fm4 | SYN page 1/2 TUNE (SY TONE's TUNE, renamed) |
-| 191 | sy-fm4 | SYN page 1/2 RAT2 (SY TONE's RATIO, renamed) |
-| 192 | sy-fm4 | SYN page 1/2 LEV2 (SY TONE's MOD, renamed) |
-| 193 | sy-fm4 | SYN page 1/2 FDBK (SY TONE's FDBK, renamed) |
-| 194 | sy-fm4 | SYN page 1/2 DEC2 (SY TONE's MENV, renamed) |
-| 195 | sy-fm4 | SYN page 1/2 PNCH (SY TONE's PNCH, renamed) |
-| 196 | sy-fm4 | SYN page 1/2 OVER (SY TONE's OVER, renamed) |
-| 197 | sy-fm4 | SYN page 1/2 DEC1 (SY TONE's DEC, renamed) |
+| 190 | sy-fm4 | SYN page 1/3 TUNE (SY TONE's TUNE, renamed) |
+| 191 | sy-fm4 | SYN page 1/3 RAT2 (SY TONE's RATIO, renamed) |
+| 192 | sy-fm4 | SYN page 1/3 LEV2 (SY TONE's MOD, renamed) |
+| 193 | sy-fm4 | SYN page 1/3 FDBK (SY TONE's FDBK, renamed) |
+| 194 | sy-fm4 | SYN page 1/3 DEC2 (SY TONE's MENV, renamed) |
+| 195 | sy-fm4 | SYN page 1/3 PNCH (SY TONE's PNCH, renamed) |
+| 196 | sy-fm4 | SYN page 1/3 OVER (SY TONE's OVER, renamed) |
+| 197 | sy-fm4 | SYN page 1/3 DEC1 (SY TONE's DEC, renamed) |
 | 246 | fx3 | FX3 page |
 | 247 | fx3 | FX3 page |
 | 248 | fx3 | FX3 page |
@@ -100,14 +111,14 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 251 | fx3 | FX3 page |
 | 252 | fx3 | FX3 page |
 | 253 | fx3 | FX3 page |
-| 254 | sy-fm4 | SYN page 2/2 ALGO (was Digitakt MIDI CC1 Value) |
-| 255 | sy-fm4 | SYN page 2/2 RAT3 (was Digitakt MIDI CC2 Value) |
-| 256 | sy-fm4 | SYN page 2/2 LEV3 (was Digitakt MIDI CC3 Value) |
-| 257 | sy-fm4 | SYN page 2/2 DEC3 (was Digitakt MIDI CC4 Value) |
-| 258 | sy-fm4 | SYN page 2/2 RAT4 (was Digitakt MIDI CC5 Value) |
-| 259 | sy-fm4 | SYN page 2/2 LEV4 (was Digitakt MIDI CC6 Value) |
-| 260 | sy-fm4 | SYN page 2/2 DEC4 (was Digitakt MIDI CC7 Value) |
-| 261 | sy-fm4 | SYN page 2/2 DET (was Digitakt MIDI CC8 Value) |
+| 254 | sy-fm4 | SYN pages 2/3 and 3/3 ALGO (was Digitakt MIDI CC1 Value, MIDI CC cleared) |
+| 255 | sy-fm4 | SYN page 2/3 RAT3 (was Digitakt MIDI CC2 Value, MIDI CC cleared) |
+| 256 | sy-fm4 | SYN page 2/3 LEV3 (was Digitakt MIDI CC3 Value, MIDI CC cleared) |
+| 257 | sy-fm4 | SYN page 2/3 DEC3 (was Digitakt MIDI CC4 Value, MIDI CC cleared) |
+| 258 | sy-fm4 | SYN page 2/3 RAT4 (was Digitakt MIDI CC5 Value, MIDI CC cleared) |
+| 259 | sy-fm4 | SYN page 2/3 LEV4 (was Digitakt MIDI CC6 Value, MIDI CC cleared) |
+| 260 | sy-fm4 | SYN page 2/3 DEC4 (was Digitakt MIDI CC7 Value, MIDI CC cleared) |
+| 261 | sy-fm4 | SYN page 2/3 DET (was Digitakt MIDI CC8 Value, MIDI CC cleared) |
 | 262 | master-comp | compressor |
 | 263 | master-comp | compressor |
 | 264 | master-comp | compressor |
@@ -125,7 +136,7 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 503 | sampler | SAMPLER knob H LEV, lix 0x19 (TYPE, lix 0x1A, on page 2/2) (was SP TWINSHOT OVER) |
 | 504 | sampler | SAMPLER knob D SAMP, lix 0x15 (was SP TWINSHOT DEC1) |
 
-Ids 254–261 (Digitakt MIDI CC values) are free but have MIDI CCs; ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).
+Ids without a page often carry a MIDI CC or are aliases: clear the CC, check aliases. Ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).
 
 ## Pages
 
