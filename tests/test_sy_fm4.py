@@ -154,3 +154,60 @@ def test_cpu1_cost_per_block(built):
     got = struct.unpack(">64H", uc.mem_read(0x1000_0700, 128))
     seq = struct.unpack(">1024H", uc.mem_read(0x8000_21B0, 2048))
     assert got == tuple(seq[0xE + t * 0x47 + 0x36 + k] for t in range(8) for k in range(8))
+
+
+def test_syn_page_on_an_fm4_track():
+    """Pagina SYN di una traccia SY FM4 (OS 1.42 nell'emulatore dell'interfaccia, machine del suono = 4): la prima
+    apertura porta l'elenco delle pagine da 1 a 2 in un blocco nuovo dell'heap, la 2/2 risponde con i descrittori
+    254..261, il titolo e' una std::string costruita in a0 ("SY FM4 2/2"), la vista si disegna; nessuna
+    scrittura nel codice dell'OS. Prima delle correzioni, due eccezioni sulla macchina: il puntatore del malloc
+    dell'OS (d0) letto da a0, e il titolo restituito come char * invece della std::string."""
+    import screens
+    from unicorn import UC_HOOK_CODE, UC_HOOK_MEM_WRITE
+    from unicorn.m68k_const import UC_M68K_REG_A7, UC_M68K_REG_D0, UC_M68K_REG_PC
+    ui = screens.UI(["sy-fm4"])
+    uc = ui.uc
+
+    def machine4(uc, _a, _s, _d):                       # 0x400249CE (suono) -> machine: SY TONE, cioe' SY FM4
+        sp = uc.reg_read(UC_M68K_REG_A7)
+        uc.reg_write(UC_M68K_REG_D0, 4)
+        uc.reg_write(UC_M68K_REG_A7, sp + 4)
+        uc.reg_write(UC_M68K_REG_PC, struct.unpack(">I", uc.mem_read(sp, 4))[0])
+    uc.hook_add(UC_HOOK_CODE, machine4, begin=0x4002_49CE, end=0x4002_49CE)
+    bad = []
+    uc.hook_add(UC_HOOK_MEM_WRITE, lambda _uc, _k, a, *_: bad.append(a) if a < 0x401C_0000 else None)
+    src = ui.tab("SRC")
+    record, title = (ui.long(ui.long(src) + 4 * n) for n in (47, 19))
+    assert record == SYM["fm4m_src_record"]
+    old = ui.long(src + 0x7C)
+    assert [ui.call(record, [src, k]) for k in range(9)] == [190, 191, 195, 197, 193, 192, 194, 196, 10]
+    begin = ui.long(src + 0x7C)
+    assert begin != old and ui.long(src + 0x80) == ui.long(src + 0x84) == begin + 8
+    assert ui.long(begin) == ui.long(begin + 4)
+    ui.put(src + 0x90, ">I", 1)
+    assert [ui.call(record, [src, k]) for k in range(9)] == [254, 255, 256, 257, 261, 258, 259, 260, 10]
+    assert text(ui, title, src) == b"SY FM4 2/2"
+    ui.put(src + 0x90, ">I", 0)
+    assert text(ui, title, src) == b"SY FM4 1/2"
+    ui.draw(src)
+    assert bad == []
+
+
+def text(ui, fn: int, view: int) -> bytes:
+    """Slot 19 (titolo): std::string per valore, costruita all'indirizzo in a0 e restituita in d0; la stringa
+    (GCC) e' un puntatore ai caratteri."""
+    from unicorn.m68k_const import UC_M68K_REG_A0
+    out = 0x4FE0_3000
+    ui.put(out, ">I", 0)
+    ui.uc.reg_write(UC_M68K_REG_A0, out)
+    assert ui.call(fn, [view]) == out
+    return bytes(ui.uc.mem_read(ui.long(out), 32)).split(b"\0")[0]
+
+
+def test_title_of_other_machines_is_the_stock_one():
+    """Senza SY FM4 il titolo e' quello della funzione stock (0x40044894), stessa stringa."""
+    import screens
+    ui = screens.UI(["sy-fm4"])
+    src = ui.tab("SRC")
+    ours = text(ui, ui.long(ui.long(src) + 4 * 19), src)
+    assert ours and ours == text(ui, 0x4004_4894, src)

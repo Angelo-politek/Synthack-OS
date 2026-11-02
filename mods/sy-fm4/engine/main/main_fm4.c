@@ -30,8 +30,8 @@
 typedef uint32_t u32;
 
 #define ORIG_SRC_BC    ((u32 (*)(void *, u32))0x40044c54)
-#define ORIG_SRC_TITLE ((u32 (*)(void *))0x40044894)
-#define FW_MALLOC      ((u32 *(*)(u32))0x4010394c)
+/* The OS returns pointers in d0; this compiler (m68k-linux ABI) reads a pointer result from a0. */
+#define FW_MALLOC      ((u32 (*)(u32))0x4010394c)
 #define FW_FREE        ((void (*)(void *))0x40103958)
 #define REC_INFO(r)    ((u32 *)(0x41ba0a24 + (r) * 0x54))
 #define INFO_LONGS     (0x54 / 4)
@@ -124,7 +124,7 @@ static void fit_pages(void *view, int fm4) {
         return;
     if (fm4 && n == 1) {
         if (V(view, PAGES_CAP) - (u32)begin < 8) {
-            u32 *b = FW_MALLOC(8);
+            u32 *b = (u32 *)FW_MALLOC(8);
             if (b == 0)
                 return;
             b[0] = begin[0];
@@ -151,12 +151,37 @@ u32 fm4m_src_record(void *view, u32 knob) {
     return ORIG_SRC_BC(view, knob);
 }
 
-/* SourcePageView vtable slot 19: the page's name (the toast on a page key). */
-u32 fm4m_src_title(void *view) {
+/* SourcePageView vtable slot 19: the page's name (the toast on a page key), returned as a std::string by
+ * value: the caller passes the string to construct in a0 and gets it back in d0 (0x40044894 builds it with
+ * the constructor 0x401bf31e(string, text, allocator)). fm4m_src_title wraps fm4m_title_text: SY FM4's name,
+ * or 0 for the stock function. */
+const char *fm4m_title_text(void *view) {
     if (is_fm4(view))
-        return (u32)(V(view, PAGE_INDEX) == 1 ? "SY FM4 2/2" : "SY FM4 1/2");
-    return ORIG_SRC_TITLE(view);
+        return V(view, PAGE_INDEX) == 1 ? "SY FM4 2/2" : "SY FM4 1/2";
+    return 0;
 }
+
+void fm4m_src_title(void);
+__asm__(
+    "    .text\n"
+    "    .globl fm4m_src_title\n"
+    "fm4m_src_title:\n"
+    "    move.l %a0,-(%sp)\n"           /* string to construct */
+    "    move.l 8(%sp),-(%sp)\n"        /* view */
+    "    jsr fm4m_title_text\n"
+    "    addq.l #4,%sp\n"
+    "    movea.l (%sp)+,%a0\n"
+    "    tst.l %d0\n"
+    "    bne.s 1f\n"
+    "    jmp 0x40044894\n"              /* stock title: a0 and the stack as on entry */
+    "1:  move.l %a0,-(%sp)\n"
+    "    pea (%sp)\n"                   /* allocator (empty) */
+    "    move.l %d0,-(%sp)\n"
+    "    move.l %a0,-(%sp)\n"
+    "    jsr 0x401bf31e\n"
+    "    lea 12(%sp),%sp\n"
+    "    move.l (%sp)+,%d0\n"
+    "    rts\n");
 
 /* ---- storage: logical index <-> storage slot ------------------------------
  *
