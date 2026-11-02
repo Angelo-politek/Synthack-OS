@@ -28,6 +28,7 @@ Slots are read at draw time: changing them at runtime changes the page (0 = empt
 
 - Page elements: array of 37 at `0x41B9F3C8` (44 B each), index → element `0x4007B9D0`. Page 25 ("OB8 / Outbox 8") is a Digitakt leftover, always empty: fx3 uses it.
 - **Tabs** are page widgets built from constant arrays of page indices + count (`0x4017DA3A`), e.g. DELAY `{20}` at `0x401C7FAC`, REVERB `{21}` at `0x401C7FA8` (built at `0x40035890`), generic class `0x40042B58`. A tab with N pages cycles them on its key; widget +124 = page vector, +144 = current position. The page's virtual +188 returns the id under an encoder.
+- **SRC tab** (SYN page of a track, SourcePageView, vtable `0x401CA0DC`): slot 47 = knob (0–8, 8 = LEV) → descriptor of the sound's machine (`0x40044C54`), slot 19 = page name as a `std::string` returned by value (`0x40044894`), slot 4 = draw; `+0x7C` page list, `+0x90` page index. [syn-pages](../mods/syn-pages) takes over the three slots to give a machine its own pages.
 - Per-object fields before the prototypes: +0 type (0 = plain value, others change the encoder step: MIDI-track ids use 4/5, toggles 12), +4 value prototype (`d3` = discrete/standard, as in LFO MODE).
 
 ## Drawing
@@ -52,6 +53,7 @@ Slots are read at draw time: changing them at runtime changes the page (0 = empt
 | 269 | Digitakt MIDI-track "CC8 Select" | fx3: SND3 of the external input (virtual), External Mixer slot C |
 | 48–51 | Trig modifier Mod A, M1–M4 | perf-fx: effect of keys 13–16 (native storage in the kit, text formatter) |
 | 246–253 | Digitakt MIDI-track parameters (no MIDI tracks on Syntakt) | fx3 page (virtual) |
+| 254–261 | Digitakt MIDI-track "CC1–CC8 Value" (no page, MIDI CCs) | sy-fm4: SYN pages 2/3 and 3/3, MIDI CC cleared, own storage slots |
 
 Ids 1–5 and 11–18 are tied to MIDI CCs (bank select, data entry, all notes off…): not reusable.
 

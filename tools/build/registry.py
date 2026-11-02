@@ -59,6 +59,17 @@ ENGINE = [
 # ---- lista di avvio dell'area mod: posto -> mod (modarea_layout.boot_slot)
 BOOT_SLOTS = {0: "sy-fm4", 1: "sampler"}
 
+# ---- RAM condivisa tra le CPU: offset (CPU #1 a 0x10000000 + offset, CPU #2 a offset). Fine esclusa.
+SHARED_RAM = [
+    (0x000, 0x1B0, "OS", "voice frames: 0x1B0 B from 0x80002000 every block (eDMA ch. 47)"),
+    (0x1B0, 0x5B0, "OS", "voice output: 8 x 32 x int32 back to CPU #1"),
+    (0x5B0, 0x630, "sampler", "waveform: request +0x5B0, slot +0x5B4, columns done +0x5B6, length +0x5B8, "
+                              "address +0x5BC, 112 peaks +0x5C0"),
+    (0x700, 0x780, "sy-fm4", "pages 2/3 and 3/3: 8 words per track, locks applied"),
+    (0x7F0, 0x7F4, "sampler", "tempo, BPM x 120"),
+    (0x800, 0x1000, "OS", "boot-time upload window"),
+]
+
 # ---- vparams: posto nella tabella -> (mod, id)
 VPARAMS_SLOTS = {
     **{s: ("master-comp", 262 + s) for s in range(7)},
@@ -79,11 +90,12 @@ IDS = {
     **{i: ("fx3", "FX3 page") for i in range(246, 254)},
     **{i: ("master-comp", "compressor") for i in range(262, 269)},
     269: ("fx3", "external input SND3"),
-    **{190 + k: ("sy-fm4", f"SYN page 1/2 {n} (SY TONE's {w}, renamed)") for k, (n, w) in enumerate(
+    **{190 + k: ("sy-fm4", f"SYN page 1/3 {n} (SY TONE's {w}, renamed)") for k, (n, w) in enumerate(
         (("TUNE", "TUNE"), ("RAT2", "RATIO"), ("LEV2", "MOD"), ("FDBK", "FDBK"), ("DEC2", "MENV"), ("PNCH", "PNCH"),
          ("OVER", "OVER"), ("DEC1", "DEC")))},
-    **{254 + k: ("sy-fm4", f"SYN page 2/2 {n} (was Digitakt MIDI CC{k + 1} Value)")
-       for k, n in enumerate(("ALGO", "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))},
+    **{254 + k: ("sy-fm4", f"SYN {p} {n} (was Digitakt MIDI CC{k + 1} Value, MIDI CC cleared)")
+       for k, (n, p) in enumerate((("ALGO", "pages 2/3 and 3/3"), *((n, "page 2/3") for n in (
+           "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))))},
     **{497 + k: ("sampler", f"SAMPLER knob {n} (was SP TWINSHOT {w})") for k, (n, w) in enumerate(
         (("A TUNE", "TUN1"), ("B PLAY", "SMP1"), ("C BR", "FLT1"), ("G LOOP/BARS/GRID, lix 0x18", "MIX"),
          ("E STRT/SEG/SLICE", "TUN2"), ("F LEN/MODE", "SMP2"), ("H LEV, lix 0x19 (TYPE, lix 0x1A, on page 2/2)", "OVER"),
@@ -130,6 +142,9 @@ def markdown() -> str:
           "", "## Engine area (CPU #2, `mods/modarea7`, RAM `0x47000000`, offsets)", "",
           "| From | To | Mod | Use |", "|---|---|---|---|"]
     L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in sorted(ENGINE)]
+    L += ["", "## Shared RAM (CPU #1 at `0x10000000` + offset, CPU #2 at offset)", "",
+          "| From | To | Owner | Use |", "|---|---|---|---|"]
+    L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in sorted(SHARED_RAM)]
     L += ["", f"## Section 3 free fill (`{SEC3_FREE[0]:#010x}–{SEC3_FREE[1]:#010x}`)", "",
           "| From | To | Mod | Use |", "|---|---|---|---|"]
     L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in SEC3_FILL]
@@ -143,7 +158,8 @@ def markdown() -> str:
     L += [f"| {', '.join(map(str, free_slots))} | **free** | |", "", "## Parameter ids", "",
           "| Id | Mod | Use |", "|---|---|---|"]
     L += [f"| {i} | {who} | {use} |" for i, (who, use) in sorted(IDS.items())]
-    L += ["", "Ids 254–261 (Digitakt MIDI CC values) are free but have MIDI CCs; ids above 504 do not exist. "
+    L += ["", "Ids without a page often carry a MIDI CC or are aliases: clear the CC, check aliases. Ids above 504 do "
+          "not exist. "
           "See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).", "", "## Pages", "",
           "| Page | Mod | Use |", "|---|---|---|"]
     L += [f"| {p} | {who} | {use} |" for p, (who, use) in sorted(PAGES.items())]

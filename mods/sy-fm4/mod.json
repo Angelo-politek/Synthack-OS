@@ -1,5 +1,5 @@
 {
   "title": "SY FM4",
   "kind": "machine",
-  "summary": "SY TONE becomes a 4-operator FM machine. ALGO 0 is SY TONE as before. ALGO 1-11 are FM algorithms on a second SYN page. By Rxuting."
+  "summary": "SY TONE becomes a 4-operator FM machine on three SYN pages, with the algorithm drawn on page 3. ALGO 0 sounds as SY TONE. By Rxuting."
 }

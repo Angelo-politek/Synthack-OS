@@ -211,6 +211,96 @@ Dry signal: IN L on the left output, IN R on the right. Delay, reverb, FX3 and t
 
 `[!]` Kits from older versions start with the IN R sends at 0.
 
+## SY FM4
+
+A 4-operator FM machine in place of SY TONE. `ALGO` 0 is SY TONE. By Rxuting.
+
+<!-- @screen:sy-fm4/pages -->
+<!-- @screen:sy-fm4/algo -->
+
+1. Select a digital track. Pick **SY FM4** as its machine. It replaces SY TONE in the list.
+2. Open the **SYN** page: page 1/3.
+3. Press **SYN** again for page 2/3, again for page 3/3.
+4. Turn `ALGO` above 0. Operators 3 and 4 join in.
+
+| Page | Knobs A–D | Knobs E–H |
+|---|---|---|
+| 1/3 | `TUNE` `PNCH` `DEC1` `OVER` | `FDBK` `RAT2` `LEV2` `DEC2` |
+| 2/3 | `RAT3` `LEV3` `DEC3` `DET` | `RAT4` `LEV4` `DEC4` `ALGO` |
+| 3/3 | `ALGO`; the algorithm drawn on the right | — |
+
+| Control | Values |
+|---|---|
+| `TUNE`, `PNCH`, `OVER`, `FDBK` | as on SY TONE |
+| `DEC1` | decay of operator 1, the carrier (SY TONE's DEC) |
+| `RAT2`, `LEV2`, `DEC2` | operator 2: SY TONE's RATIO, MOD, MENV |
+| `RAT3`, `LEV3`, `DEC3` / `RAT4`, `LEV4`, `DEC4` | ratio, level and decay of operators 3 and 4 |
+| `DET` | detune of operators 2–4, ±16 semitones, fine steps |
+| `ALGO` | 0 = SY TONE, 1–8 classic 4-operator set, 9 tree, 10 diamond, 11 ring |
+
+The drawing: operators in boxes, modulation as lines, carriers dotted up to the output, feedback as a loop.
+
+Saved with the sound. Every parameter is p-lockable.
+
+`[!]` Sounds and projects made with SY TONE open as SY FM4, `ALGO` 0. They sound the same.
+
+`[!]` Pages 2/3 and 3/3 have no MIDI CC. Their p-locks are lost on a stock OS.
+
+`[!]` Not tested yet on a Syntakt with OS 1.42.
+
+## SAMPLER
+
+The Digitakt's sample machines in place of SP TWINSHOT: ONESHOT, WERP, REPITCH and SLICE.
+
+<!-- @screen:sampler/page -->
+<!-- @screen:sampler/wave -->
+
+1. Load samples as for SP TWINSHOT. 64 slots.
+2. Select a digital track. Pick **SAMPLER** as its machine. It replaces SP TWINSHOT in the list.
+3. Open the **SYN** page: page 1/2, laid out as the Digitakt's.
+4. Press **SYN** again for page 2/2: the sample's waveform.
+5. Turn **H** (`TYPE`) to pick the machine. Knobs E, F, G follow it.
+
+| Page | Knobs A–D | Knobs E–H |
+|---|---|---|
+| 1/2 | `TUNE` `PLAY` `BR` `SAMP` | E F G by `TYPE`, `LEV` |
+| 2/2 | waveform | E F G by `TYPE`, `TYPE` |
+
+| `TYPE` | E | F | G |
+|---|---|---|---|
+| `ONE` (ONESHOT) | `STRT` 0–120 | `LEN` 0–120 | `LOOP` (`STRT` = loop from the start) |
+| `WERP` | `SEG` 1/32, 1/16, 1/8 | `SMOD` segment play mode | `BARS` 1, 2, 4, 8 |
+| `PTCH` (REPITCH) | `STRT` | `LEN` | `BARS` 1, 2, 4, 8 |
+| `SLIC` (SLICE) | `SLIC`: `KEY`, 1–64 | `LEN` 1–64 slices | `GRID` 4, 8, 16, 32, 64 |
+
+| Control | Values |
+|---|---|
+| `TUNE` | −60 … +24 semitones |
+| `PLAY` | `FWD`, `REV`, `FWD.L`, `REV.L` (loop) |
+| `BR` | bit reduction, 0–127 |
+| `SAMP` | slot 1–64 |
+| `LEV` | sample level 0–127; 100 = the level of SP TWINSHOT |
+
+On page 2/2:
+
+- The part that plays is solid, the rest dotted. A line marks each end.
+- `ONE`: the loop point is a dashed line.
+- `SLIC`: the grid's slices are dotted, the slice picked is solid.
+
+| `TYPE` | How it plays |
+|---|---|
+| `WERP` | the sample spans `BARS` bars at the tempo; each segment starts on time, at its pitch |
+| `PTCH` | the part plays in `BARS` bars at the tempo; `TUNE` and the note don't transpose it |
+| `SLIC` | slices start on the nearest zero crossing; with `SLIC` at `KEY` the note picks the slice |
+
+With `SLIC` at `KEY`, slice = (note − 12) modulo the number of slices. Up to 16 slices, C4 plays slice 1. The note doesn't transpose. Play the slices from the keyboard in chromatic mode.
+
+Saved with the sound. Every parameter is p-lockable.
+
+`[!]` Sounds made with SP TWINSHOT open as SAMPLER and sound different.
+
+`[!]` No `OVER` on this machine: `TYPE` takes its place.
+
 ## Boot splash
 
 The SyntHack logo, version and your name after the official intro. Part of every build.

@@ -1,6 +1,6 @@
 # Modding guide
 
-How the mods in this repository are built, and how to do the common things: hook code, add a page or a parameter, give it a name, a text and an icon, save its value, add audio processing without slowing the UI down. Addresses are for Syntakt OS 1.41, CPU #1 (section 3). Reference material: [memory-map](memory-map.md), [ui-parameters](ui-parameters.md), [audio-path](audio-path.md), [emulation](emulation.md), [firmware-format](firmware-format.md).
+How the mods in this repository are built, and how to do the common things: hook code, add a page or a parameter, give it a name, a text and an icon, save its value, add audio processing without slowing the UI down, replace a machine. Addresses are for Syntakt OS 1.41, CPU #1 (section 3). Reference material: [memory-map](memory-map.md), [ui-parameters](ui-parameters.md), [audio-path](audio-path.md), [emulation](emulation.md), [firmware-format](firmware-format.md).
 
 ## 1. Workflow
 
@@ -9,7 +9,7 @@ How the mods in this repository are built, and how to do the common things: hook
 3. `tools/build/build.py` checks every hash, overlaps and the boot decompression margin, and writes the `.syx`.
 4. Flash, test on the device, only then publish.
 
-Mod area: first 64 KB block of the OS heap, from `modarea_layout.RAM`, unpacked at boot and zeroed beyond the code. Who uses which offsets, the section 3 free fill, vparams slots, parameter ids and pages: **[registry.md](registry.md)**. A new mod claims its space in `tools/build/registry.py` first; `tests/test_registry.py` checks every `patch.json` against it.
+Mod area: first 64 KB block of the OS heap, from `modarea_layout.RAM`, unpacked at boot and zeroed beyond the code. Who uses which offsets, boot-list slots, the engine area, shared RAM, the section 3 free fill, vparams slots, parameter ids and pages: **[registry.md](registry.md)**. A new mod claims its space in `tools/build/registry.py` first; `tests/test_registry.py` checks every `patch.json` against it.
 
 **Rules learned the hard way**
 
@@ -19,6 +19,8 @@ Mod area: first 64 KB block of the OS heap, from `modarea_layout.RAM`, unpacked 
 - No `.bss` in mod code: put variables in `.data` (`__attribute__((section(".data")))`). The mod area is zeroed anyway, but the build checks.
 - No libgcc: `nm -u` must be empty. ColdFire has `divu.l`/`remu.l`, `ff1`, `mvs`/`mvz`, `sats` — GCC uses them.
 - ColdFire limits: `muls.l` takes no absolute address (use `d16(An)`), no `exg`, `movem` only with `(An)`/`d16(An)`, short branches reach ±127 B.
+- **OS calls from C**: the OS returns every result in `d0`, pointers included; `m68k-linux-gnu-gcc` (SVR4 ABI) reads a pointer result from `a0`. Declare OS functions with an integer return and cast: `((u32 (*)(u32))addr)`, not `((u32 *(*)(u32))addr)`. `tests/test_os_abi.py` rejects the pointer form. SY FM4 crashed on the device from this: the page list went where `a0` pointed.
+- **`std::string` by value** (e.g. a page name, vtable slot 19 of the SRC view): the caller passes the string to construct in `a0` and gets it back in `d0`. Build it with the OS constructor (`0x401BF082`, `(string, text, allocator)`) at that address. GCC can't express this: use an assembly wrapper (`mods/syn-pages/synpages.c`).
 
 ## 2. Hooking code
 
@@ -29,6 +31,7 @@ A hook replaces ≥ 6 bytes of OS code with `jsr ours` (padded with `nop`), and 
 - Replaced `jsr f`: do your work, then `jmp f` with the stack untouched (`fx3_del_hook`).
 - Replaced EMAC instructions: replay them first (`fx3_trk_hook`). If your code uses EMAC, set `MACSR` yourself and leave `ACC0` at 0 (the OS sum routines start from it).
 - One-time setup at boot: hook an instruction of the page initializer (`0x401885D2…`), e.g. a `clr.l` that empties a page slot (`fx3_page_stub`, `comp_page_stub`). Objects built earlier in that initializer are ready.
+- Setup before the OS starts: a slot in the mod area's **boot list** (`+0x7400`, 8 pointers, `BOOT_SLOTS` in `tools/build/registry.py`). The loader calls it after unpacking, before the static constructors: fill tables the OS reads early, register with [syn-pages](../mods/syn-pages). No OS objects exist yet. See [memory-map](memory-map.md#mod-area).
 
 ## 3. Parameters
 
@@ -99,7 +102,23 @@ Everything runs in the audio interrupt (`0x400A3856`), once per 32-sample block 
 - **Bounded reads**: a modulated delay line read without wrap checks must limit how far the delay moves per block (fx3: 8 samples, a sudden TIME change glides).
 - **Not idle time**: the DSPI wait at the start of the interrupt (`0x40102066`) is ~0 in practice (the transfer of the previous block is already over).
 
-## 7. Testing on the device
+## 7. Machines
+
+A machine replaces a stock engine on CPU #2: [sy-fm4](../mods/sy-fm4) replaces SY TONE (engine 4), [sampler](../mods/sampler) SP TWINSHOT (engine 11). Engines are listed in [audio-path](audio-path.md#cpu-2--voice-engine-section-7).
+
+| Part | CPU | How |
+|---|---|---|
+| Sound | #2 | New prep and render for the engine, in the [modarea7](../mods/modarea7) engine area (`0x47000000` + offset, `ENGINE` in the registry). CPU #1 stages section 7 in a buffer with ~9 KB left: modarea7 sends it compressed to make room. |
+| Parameters | #1 | Rewrite the descriptors of the replaced machine (names, ranges, defaults; sampler: 497–504). Extra parameters need free ids (sy-fm4: 254–261, MIDI CC cleared) and storage slots in the sound. |
+| SYN pages | #1 | [syn-pages](../mods/syn-pages): register `{key, pages, record, title, draw}` from the boot list. Key = descriptor of knob A on the machine's stock page. Up to 4 pages; `record` gives the descriptor under each knob, `title` the page name, `draw` draws after the stock page. |
+| Data to CPU #2 | #1 → #2 | Values that are not in the voice frame go through [shared RAM](memory-map.md#shared-ram): sy-fm4 copies its extra page values (locks applied) once per block, sampler the tempo. |
+| Data from CPU #2 | #2 → #1 | Same RAM, the other way: the sampler's waveform. CPU #1 asks, CPU #2 answers over several blocks; CPU #1 redraws when more is ready. |
+
+- The CPU #2 budget is separate from CPU #1's: count instructions per block with 8 voices in the section 7 emulator (`tests/test_sampler.py`: 8 SAMPLER voices ~84 000, 8 SP TWINSHOT ~64 000).
+- Files: sounds made with the stock machine open with the new one. Make the default sound the same (sy-fm4: `ALGO` 0 = SY TONE) or say it in the README.
+- Test the UI side with `tests/syn_view.py`: the SRC view of a track with your machine in the main CPU emulator (pages, titles, drawing).
+
+## 8. Testing on the device
 
 - Keep a test build only when the emulator cannot answer (timing, analog parts). Measurements done so far: interrupt load with DTIM0 (`0xFC07000C`) at entry/exit; analog curves recorded through an audio interface (`tools/measure`).
 - Check save/reload, pattern change and power cycle for anything stored in the kit.
