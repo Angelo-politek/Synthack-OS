@@ -28,7 +28,8 @@ A hook replaces ≥ 6 bytes of OS code with `jsr ours` (padded with `nop`), and 
 
 - Save every register you use; the OS keeps values in registers across the hook point.
 - Replaced `pea` pairs (arguments of the next call): pop the return address, push the arguments, `jmp` back (`fx3_mix_hook`).
-- Replaced `jsr f`: do your work, then `jmp f` with the stack untouched (`fx3_del_hook`).
+- Replaced `jsr f`: do your work, then call `f` with its arguments untouched (`sm_block` in [sampler](../mods/sampler)).
+- Replaced OS loop: `jsr ours ; jmp <end of the loop>`, using only the registers the loop itself clobbers (`fx3_del_hook`, `fx3_rev_hook`: same result as the OS loop, checked against the stock bytes in `tests/test_fx3.py`).
 - Replaced EMAC instructions: replay them first (`fx3_trk_hook`). If your code uses EMAC, set `MACSR` yourself and leave `ACC0` at 0 (the OS sum routines start from it).
 - One-time setup at boot: hook an instruction of the page initializer (`0x401885D2…`), e.g. a `clr.l` that empties a page slot (`fx3_page_stub`, `comp_page_stub`). Objects built earlier in that initializer are ready.
 - Setup before the OS starts: a slot in the mod area's **boot list** (`+0x7400`, 8 pointers, `BOOT_SLOTS` in `tools/build/registry.py`). The loader calls it after unpacking, before the static constructors: fill tables the OS reads early, register with [syn-pages](../mods/syn-pages). No OS objects exist yet. See [memory-map](memory-map.md#mod-area).

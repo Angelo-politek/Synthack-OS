@@ -46,8 +46,6 @@ VP_SLOT = 9                             # posti 9..15 della tabella di vparams
 
 HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
     (0x4008_F418, "ae000900ae810900", "fx3_trk_hook", "ciclo per traccia: jsr fx3_trk_hook ; nop"),
-    (0x4008_F8A0, "4eb940096908", "fx3_del_hook", "delay: jsr fx3_del_hook (mandata del chorus al delay)"),
-    (0x4008_F9CA, "4eb940096eb4", "fx3_rev_hook", "riverbero: jsr fx3_rev_hook (mandata dell'effetto al riverbero)"),
     (0x4008_FB7C, "486efed848798000e0f0", "fx3_mix_hook",
      "somme del master: jsr fx3_mix_hook (bus 3, chorus, ritorno) ; nop ; nop"),
     (0x4019_4FEE, "42b941ba083c", "fx3_page_stub", "pagina 25 (FX3): caselle all'avvio"),
@@ -55,6 +53,12 @@ HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
     (0x4008_F53C, "588f342a0714", "fx3_in_hook", "mandate dell'ingresso: jsr fx3_in_hook (SND3 dell'ingresso)"),
     (0x4019_4F88, "42b941ba07f8", "fx3_in_page", "pagina External Mixer: SND3 dell'ingresso (269) nella casella C"),
 ]
+# cicli dell'OS che completano i bus d'ingresso di delay e riverbero (bus += analogiche, saturato):
+# jsr al nostro (stesso lavoro, meno istruzioni, piu' la mandata DEL / REV di FX3) ; jmp oltre il ciclo
+BUS_LOOPS = [(0x4008_F852, "43f98000dbd441f98000dbd0", "fx3_del_hook", 0x4008_F882,
+              "ingresso del delay: jsr fx3_del_hook (ciclo dell'OS + mandata DEL) ; jmp 0x4008F882"),
+             (0x4008_F98A, "43f98000dbd441f98000dbd0", "fx3_rev_hook", 0x4008_F9BA,
+              "ingresso del riverbero: jsr fx3_rev_hook (ciclo dell'OS + mandata REV) ; jmp 0x4008F9BA")]
 # tab REVERB: vettore delle pagine {21} -> {21, 25}; nomi della pagina 25
 REVERB_COUNT, REVERB_ARRAY = 0x4003_588C, 0x4003_5892
 PAGE_NAMES = [(0x4019_4F5A, "4024ec67", "fx3_page_s", "pagina 25: nome breve"),
@@ -215,6 +219,8 @@ def main() -> None:
         code = struct.pack(">HI", 0x4EB9, syms[sym])
         code += b"\x4e\x71" * ((len(orig) // 2 - len(code)) // 2)
         patches.append(fixed(addr, code, what, orig))
+    for addr, orig, sym, back, what in BUS_LOOPS:
+        patches.append(fixed(addr, struct.pack(">HIHI", 0x4EB9, syms[sym], 0x4EF9, back), what, orig))
     patches.append(fixed(REVERB_COUNT, bytes.fromhex("7202"), "tab REVERB: 2 pagine", "7201"))
     patches.append(fixed(REVERB_ARRAY, long(syms["fx3_reverb_pages"]), "tab REVERB: pagine {21, 25}", "401c8248"))
     for addr, orig, sym, what in PAGE_NAMES:
@@ -272,7 +278,7 @@ def main() -> None:
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
-            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rsnd", "fx3_rev_hook", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set",
+            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rsnd", "fx3_rev_hook", "fx3_addsat", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set",
             "fx3_route", "fx3_rt_key", "fx3_rt_get", "fx3_rt_draw")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,

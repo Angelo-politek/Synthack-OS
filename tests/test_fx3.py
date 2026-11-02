@@ -267,9 +267,21 @@ def loud(m):
     m.put(SRC_ANA, [((n * 7907) % 65536 - 32768) << 14 for n in range(256)])
 
 
+def os_bus_loop(m):
+    """Istruzioni del ciclo stock che fx3_del_hook / fx3_rev_hook sostituiscono (0x4008F852, 0x4008F98A)."""
+    if not hasattr(m, "bus_loop"):
+        sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
+        stock = 0x5000_E100
+        m.uc.mem_write(stock, sec3[0x4008_F852 - LOAD:0x4008_F852 - LOAD + 0x30] + b"\x4e\x75")
+        m.bus_loop = count(m, lambda: m.call(stock)) - 1
+    return m.bus_loop
+
+
 def block_cost(m):
-    """Istruzioni di un blocco nei due trampolini (le chiamate dei test hanno un rts in piu' ciascuna)."""
-    return count(m, lambda: run_block(m)) - 3
+    """Istruzioni in piu' di un blocco nei due trampolini (le chiamate dei test hanno un rts in piu' ciascuna),
+    meno il ciclo dell'OS che fx3_del_hook sostituisce."""
+    base = os_bus_loop(m)
+    return count(m, lambda: run_block(m)) - 3 - base
 
 
 def test_cost_per_block(m):
@@ -316,6 +328,49 @@ def test_sends_on_but_inputs_silent(m):
     loud(m)                                                     # riparte subito
     run_block(m)
     assert m.longs(m.sym["fx3_idle"], 1) == [0]
+
+
+@pytest.mark.parametrize("gain", [0, -32767, -9000, 20000])
+def test_bus_loop_replacement_is_the_os_loop_then_the_send(m, gain):
+    """fx3_addsat al posto dei cicli dell'OS a 0x4008F852 / 0x4008F98A: stesso risultato del ciclo originale
+    (copiato dallo stock) seguito da fx3_ret, saturazioni comprese; con guadagno 0 solo il ciclo."""
+    sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
+    for loop in (0x4008_F852, 0x4008_F98A):
+        assert m.uc.mem_read(loop, 6) == b"\x4e\xb9" + struct.pack(">I", m.sym["fx3_" + ("del" if loop < 0x4008_F900
+                                                                                         else "rev") + "_hook"])
+        stock = 0x5000_E100                                     # il ciclo stock, rilocabile, con un rts
+        m.uc.mem_write(stock, sec3[loop - LOAD:loop - LOAD + 0x30] + b"\x4e\x75")
+        rnd = random.Random(loop + gain)
+        big = [2 ** 31 - 1, -2 ** 31, 2 ** 30 + 5, -2 ** 30 - 7]
+        bus = [rnd.choice(big) if rnd.random() < 0.2 else rnd.randrange(-2 ** 31, 2 ** 31) for _ in range(64)]
+        ana = [rnd.choice(big) if rnd.random() < 0.2 else rnd.randrange(-2 ** 30, 2 ** 30) for _ in range(64)]
+        wet = [rnd.randrange(-32768, 32768) for _ in range(32)]
+        h0 = [rnd.randrange(-2 ** 28, 2 ** 28), rnd.randrange(-2 ** 28, 2 ** 28)]
+        st = 0x5000_3800
+        m.put(m.sym["fx3_wet"], wet)
+        m.put(DLY_IN + 0x300, ana)
+        m.put(DLY_IN, bus)
+        m.put(st, h0)
+        m.call(stock)
+        if gain:
+            m.call(m.sym["fx3_ret"], [m.sym["fx3_wet"], gain, DLY_IN, st])
+        want, hw = m.longs(DLY_IN, 64), m.longs(st, 2)
+        m.put(DLY_IN, bus)
+        m.put(st, h0)
+        m.call(m.sym["fx3_addsat"], [DLY_IN, gain, st])
+        assert m.longs(DLY_IN, 64) == want
+        assert m.longs(st, 2) == hw
+        assert m.longs(DLY_IN + 0x300, 64) == ana
+
+
+def test_bus_loop_replacement_is_cheaper_than_the_os_loop(m):
+    sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
+    stock = 0x5000_E100
+    m.uc.mem_write(stock, sec3[0x4008_F852 - LOAD:0x4008_F852 - LOAD + 0x30] + b"\x4e\x75")
+    os_loop = count(m, lambda: m.call(stock)) - 1
+    ours = count(m, lambda: m.call(m.sym["fx3_addsat"], [DLY_IN, 0, 0x5000_3800])) - 1
+    send = count(m, lambda: m.call(m.sym["fx3_addsat"], [DLY_IN, -20000, 0x5000_3800])) - 1
+    assert os_loop > 350 and ours < 230 and send < 530, (os_loop, ours, send)   # 386, 218, 512
 
 
 def test_return_added_with_os_sign(m):

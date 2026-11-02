@@ -22,9 +22,9 @@ sys.path.insert(0, str(ROOT))
 SY = ROOT.parent / "firmware" / "Syntakt_OS1.42.syx"
 pytestmark = pytest.mark.skipif(not SY.exists(), reason="OS stock assente")
 
-# tetti (istruzioni per blocco): misurati il 2026-10-30 su OS 1.42 dopo le ottimizzazioni di fx3 (prima: fx3 3555, totale 4590)
-CEILING = {"fx3": 3250, "master-comp": 650, "dual-mono v2": 340, "dual-mono v1": 140}
-TOTAL = 4300
+# tetti (istruzioni per blocco): misurati il 2026-11-03 su OS 1.42 (fx3: 3555 -> 3197 -> 2743 con le mandate DEL/REV nei cicli dell'OS)
+CEILING = {"fx3": 2770, "master-comp": 650, "dual-mono v2": 340, "dual-mono v1": 140}
+TOTAL = 3800
 
 
 def counted(uc, fn):
@@ -55,7 +55,7 @@ def fx3_worst():
             T.run_block(m)
         m.uc.mem_write(T.REVERB, b"\x4e\x75")
         mix = T.block_cost(m)
-        rev = counted(m.uc, lambda: m.call(m.sym["fx3_rev_hook"], [0x1111, 0x2222, 0x3333])) - 1
+        rev = counted(m.uc, lambda: m.call(m.sym["fx3_rev_hook"], [0x1111, 0x2222, 0x3333])) - 1 - T.os_bus_loop(m)
         trk = counted(m.uc, lambda: T.track(m, 4, 0x6000_0000, 0x6000_0000, 0x7F00)) - 1
         inp = counted(m.uc, lambda: T.in_hook(m, -0x5000_0000, -0x2000_0000)) - 1
         worst = max(worst, mix + rev + 12 * trk + inp)

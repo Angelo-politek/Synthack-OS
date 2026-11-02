@@ -48,7 +48,7 @@ FX3 page: A `TYPE`; B–F change name and range with TYPE; G `DEL`; H `REV`.
 | Send gains | Hook in the per-track loop of the mix function (`0x4008F418`). Reads SND3 (engine word +106) and the track's level/pan gain, as the OS does for DEL/REV, mute included. SND3 = 0: returns after a few instructions. |
 | Bus, effect, return | After the master sums (`0x4008FB7C`), at **24 kHz**. Sample pairs averaged into the mono bus (EMAC, one pass over sending tracks) → effect → linear interpolation to 48 kHz, added to `0x8000DAD0`. Band ends ~11 kHz, like a BBD chorus. |
 | Chorus / flanger | One modulated delay line, two interpolated taps (L/R). TIME changes glide: at most 8 samples per block. |
-| DEL send | Previous block's output goes into the delay bus right before the delay (`0x4008F8A0`), 0.67 ms later. |
+| DEL / REV sends | Previous block's output goes into the delay and reverb input buses (0.67 ms later), inside our replacement of the OS loops that finish those buses (`0x4008F852`, `0x4008F98A`): same result as the OS loop, fewer instructions. |
 | Routing | Hooks on the ROUTING key handler (`0x4004C5E2`), entry state (`0x4004BF86`), drawing of entry 13 (`0x4004C242`), its LED (`0x4004C480`). Return goes to the direct bus, or to the FX track (analog FX block, bus compressor). |
 | UI | Page 25 (unused "OB8") becomes REVERB page 2, drawn as 8 plain slots. Controls: hidden ids 246–253 via [vparams](../vparams). Names are RAM strings rewritten with the icons and slots when TYPE changes, from UI code only ([modding guide](../../docs/modding-guide.md#5-text-icons-and-styles)). The AMP tab is patched to give SND3 its own graphic. |
 | Idle | Nothing runs without sends, or once the inputs are silent (sequencer stopped) and the tail has died out. |
@@ -61,7 +61,7 @@ Instructions per 32-sample block, emulator. The stock OS uses ~89 % of the CPU a
 |---|---|
 | Idle | ~60 |
 | One track: CHOR / FLNG / PHSR / CRSH | ~1,300 / ~1,500 / ~1,700 / ~850 |
-| Worst case: 12 tracks and the input sending, maximum feedback and sends | ceiling 3,250 in `tests/test_cpu_budget.py` |
+| Worst case: 12 tracks and the input sending, maximum feedback and sends | ~2,740 (ceiling 2,770 in `tests/test_cpu_budget.py`) |
 
 ## Build and test
 
