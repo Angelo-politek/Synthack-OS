@@ -308,7 +308,10 @@ void syn_smp_render(int32_t *out, uint8_t *st) {
 
     /* the part, with this block's parameters (the Digitakt recomputes it every block) */
     int32_t tune = p->w[0];
-    int32_t semis = pitch - (60 << 16) + ((tune - 0x4000) << 8);
+    int32_t note = pitch;
+    if (v->mode == M_SLICE && SM_BYTE(p, 4) <= 0)       /* SLIC KEY: the note picks the slice, no transposing */
+        note = 60 << 16;
+    int32_t semis = note - (60 << 16) + ((tune - 0x4000) << 8);
     int32_t rate = pitch_rate(semis);
     if (v->mode == M_WERP) {
         int32_t segno;

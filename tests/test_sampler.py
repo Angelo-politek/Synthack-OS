@@ -374,7 +374,12 @@ def test_slice_and_repitch(engines):
     for sel, f in ((1, 500), (2, 1000), (4, 4000)):    # GRID 0 = 4 slice
         out = play(e, [0x4000, 0x300, 0, 0, sel << 8, 0, 0, 0x6400], blocks=40, typ=0x300)
         assert abs(freq(out[TAIL:TAIL + 2048]) - f) < f * 0.08, sel
-    load_sample(e, sine(48000))                        # 1 s a 120 BPM, BARS 0 = 1 battuta (2 s): meta' velocita'
+    # SLIC KEY: la nota sceglie la slice ((nota - 12) & 3 con 4 slice: C4 = 1, E4 = 1, D#4 = 4) e non traspone,
+    # come la Digitakt (0x4007576A: nota 60 per l'intonazione)
+    for note, f in ((60, 500), (61, 1000), (63, 4000), (64, 500)):
+        out = play(e, [0x4000, 0x300, 0, 0, 0, 0, 0, 0x6400], blocks=40, typ=0x300, note=note)
+        assert abs(freq(out[TAIL:TAIL + 2048]) - f) < f * 0.08, note
+    load_sample(e, sine(48000))                      # 1 s a 120 BPM, BARS 0 = 1 battuta (2 s): meta' velocita'
     out = play(e, [0x4000, 0x300, 0, 0, 0, 0x7800, 0x000, 0x6400], blocks=40, typ=0x200)
     assert abs(freq(out[TAIL:]) - 500) < 30
 
@@ -546,7 +551,8 @@ def test_syn_pages():
     drawn = v.frame()
     assert drawn != waiting
     rows = screens_pixels(drawn)
-    assert sum(rows[y][x] for y in range(0, 37) for x in range(16, 128)) > 400      # la forma d'onda
+    assert sum(rows[y][x] for y in range(13, 37) for x in range(16, 128)) > 400     # la forma d'onda
+    assert not any(rows[y][x] for y in range(13) for x in range(16, 128))         # sopra: il valore girato
     v.page(0)
     v.record(0)
     assert lix() == 0x19

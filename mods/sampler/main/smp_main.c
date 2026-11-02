@@ -86,6 +86,9 @@ static const knob_t type = {"Machine Type", "TYPE", 0, 0x300, 0};
 #define ID_P6 502
 #define ID_H 503
 #define ID_SAMP 504
+/* stock parameters whose knob graphics BR and LEV take */
+#define ID_STOCK_BR 235                     /* SY BITS "Bit Redux" */
+#define ID_STOCK_LEV 456                    /* SY RAW "Osc 2 Level" */
 __attribute__((used)) const desc_t sm_rows[8] = {
     {44, 0x12, 0x0400, 0x5800, 0x4000, 1, 0, 0, 0, 0xE00, "Tune", group, "TUNE"},           /* 497, A */
     {44, 0x13, 0, 0x300, 0x300, 1, 0, 0, 0, 0xE00, "Play Mode", group, "PLAY"},             /* 498, B */
@@ -242,24 +245,25 @@ static int peak(u32 c0, u32 c1) {
     return p;
 }
 
-/* The part of the sample the knobs pick, in 1/0x7800 of the sample (0x7800 = all): played from a to b, loop
- * back to l (-1 none); for SLICE the grid's slices too. */
+/* The part of the sample the knobs pick, in 1/0x7800 of the sample (0x7800 = all): played from a to b, the loop
+ * point l (-1 none); for SLICE the grid's slices, and key = 1 when the note picks the slice. */
 typedef struct {
-    s32 a, b, l, slices;
+    s32 a, b, l, slices, key;
 } part_t;
 
 static part_t part_of(s32 t) {
-    part_t p = {0, 0x7800, -1, 0};
+    part_t p = {0, 0x7800, -1, 0, 0};
     int ty = (int)clampi(value(t, LIX_TYPE) >> 8, 3);
     s32 p5 = value(t, LIX_P5), p6 = value(t, LIX_P6), p7 = value(t, LIX_P7);
     if (ty == M_ONESHOT || ty == M_REPITCH) {
         p.a = (s32)clampi(p5, 0x7800);
         p.b = (s32)clampi(p.a + p6, 0x7800);
-        if (ty == M_ONESHOT && (value(t, LIX_PLAY) >> 8) % 3 != 0)       /* REV.L, FWD.L */
+        if (ty == M_ONESHOT)                    /* shown in every PLAY mode, used by REV.L and FWD.L */
             p.l = p7 ? (s32)clampi(p7 - 1, 0x7800) : p.a;
     } else if (ty == M_SLICE) {
         s32 n = 4 << clampi(p7 >> 8, 4), sel = (s32)clampi(p5 >> 8, n), len = (s32)clampi(p6 >> 8, 63) + 1;
         p.slices = n;
+        p.key = sel == 0;
         if (sel > 0) {
             p.a = 0x7800 * (sel - 1) / n;
             p.b = (s32)clampi(0x7800 * (sel - 1 + len) / n, 0x7800);
@@ -268,8 +272,9 @@ static part_t part_of(s32 t) {
     return p;
 }
 
-/* waveform over w columns from (x, top), h rows high (odd): the part played solid, the rest dotted, a line at
- * each end of the part, a dashed line at the loop point, ticks under the slices */
+/* waveform over w columns from (x, top), h rows high (odd): the part played solid, the rest dotted; a line at
+ * each end of the part, flagged at the top; the loop point dashed, flagged at the bottom; the slices' bounds
+ * dotted across (with 32 or 64 slices, every 16th of the sample; ticks at the bottom for the others) */
 static void draw_wave(void *bm, int x, int top, int w, int h, const part_t *p, int marks) {
     int mid = top + h / 2, half = h / 2;
     for (int c = 0; c < w; c++) {
@@ -282,15 +287,30 @@ static void draw_wave(void *bm, int x, int top, int w, int h, const part_t *p, i
     }
     if (!marks)
         return;
-    int xa = x + p->a * (w - 1) / 0x7800, xb = x + p->b * (w - 1) / 0x7800;
-    sp_vline(bm, xa, top, top + h - 1, 1);
-    sp_vline(bm, xb, top, top + h - 1, 1);
-    sp_hline(bm, xa, xa + 2, top, 1);
-    sp_hline(bm, xb - 2, xb, top, 1);
-    if (p->l >= 0)
-        sp_vline(bm, x + p->l * (w - 1) / 0x7800, top, top + h - 1, 2);
-    for (s32 k = 1; k < p->slices; k++)
-        sp_vline(bm, x + w * k / p->slices, top + h - 3, top + h - 1, 1);
+    int bot = top + h - 1;
+    for (s32 k = 1; k < p->slices; k++) {
+        int xs = x + w * k / p->slices;
+        if (k * 16 % p->slices == 0) {          /* across: every slice up to 16, else every 16th of the sample */
+            for (int y = top; y <= bot; y++)
+                sp_px(bm, xs, y, (y - top) % 2 == 0);
+        } else {                                /* the others: a tick at the bottom */
+            sp_px(bm, xs, bot, 1);
+        }
+    }
+    if (!p->key) {
+        int xa = x + p->a * (w - 1) / 0x7800, xb = x + p->b * (w - 1) / 0x7800;
+        sp_vline(bm, xa, top, bot, 1);
+        sp_vline(bm, xb, top, bot, 1);
+        sp_hline(bm, xa, xa + 2, top, 1);
+        sp_hline(bm, xb - 2, xb, top, 1);
+    }
+    if (p->l >= 0) {
+        int xl = x + p->l * (w - 1) / 0x7800;
+        for (int y = top; y <= bot; y++)
+            sp_px(bm, xl, y, (y - top) % 3 != 2);
+        sp_hline(bm, xl, xl + 3, bot, 1);
+        sp_hline(bm, xl, xl + 2, bot - 1, 1);
+    }
 }
 
 /* ---- knob graphics: std::function(value, bitmap, x, y); 26 x 16 with the bottom left corner at x, y counted
@@ -313,23 +333,11 @@ static void gfx_play(void *bm, int x, int top, u32 i) {
     }
 }
 
-static void gfx_br(void *bm, int x, int top, u32 i) {
-    int steps = 8 - (int)(i * 7 / 127);         /* more reduction, fewer and coarser steps */
-    for (int s = 0; s < steps; s++) {
-        int x0 = x + 3 + s * 20 / steps, x1 = x + 3 + (s + 1) * 20 / steps, y = top + 14 - (s + 1) * 12 / steps;
-        sp_hline(bm, x0, x1, y, 1);
-        sp_vline(bm, x1, y, top + 14 - s * 12 / steps, 1);
-    }
-}
-
-static void gfx_lev(void *bm, int x, int top, u32 i) {
-    int h = (int)(i * 13 / 127);
-    sp_hline(bm, x + 10, x + 15, top + 1, 1);
-    sp_hline(bm, x + 10, x + 15, top + 15, 1);
-    sp_vline(bm, x + 10, top + 1, top + 15, 1);
-    sp_vline(bm, x + 15, top + 1, top + 15, 1);
-    for (int y = top + 14 - h; y < top + 15; y++)
-        sp_hline(bm, x + 11, x + 14, y, 1);
+/* the knob graphic of a stock parameter (its std::function at +36) */
+static void stock_gfx(u32 id, s32 val, void *bm, s32 x, s32 y) {
+    const u32 *f = (const u32 *)(OBJS + OBJ_SIZE * id + 36);
+    if (f[3])
+        ((void (*)(const void *, s32, void *, s32, s32))f[3])(f, val, bm, x, y);
 }
 
 void sm_gfx(const void *fn, s32 val, void *bm, s32 x, s32 y) {
@@ -343,11 +351,11 @@ void sm_gfx(const void *fn, s32 val, void *bm, s32 x, s32 y) {
         gfx_play(bm, x, top, clampi((s32)i, 3));
         return;
     case ID_BR:
-        gfx_br(bm, x, top, i);
+        stock_gfx(ID_STOCK_BR, val, bm, x, y);
         return;
     case ID_SAMP:
         if (wave_ready(i)) {
-            part_t all = {0, 0x7800, -1, 0};
+            part_t all = {0, 0x7800, -1, 0, 0};
             draw_wave(bm, x + 1, top + 1, 24, 15, &all, 0);
             return;
         }
@@ -366,7 +374,7 @@ void sm_gfx(const void *fn, s32 val, void *bm, s32 x, s32 y) {
         break;
     case ID_H:
         if (ROW(ID_H)->lix != LIX_TYPE) {
-            gfx_lev(bm, x, top, i);
+            stock_gfx(ID_STOCK_LEV, val, bm, x, y);
             return;
         }
         break;
@@ -399,18 +407,21 @@ static const char *sm_title(void *view, u32 page) {
     return page == 1 ? "SAMPLER 2/2" : "SAMPLER 1/2";
 }
 
-/* page 2/2: the waveform over the top row (x 16..127, rows 0..36) */
+/* page 2/2: the waveform over the top row (x 16..127, rows 13..35: the stock knob graphics' rows, under the line
+ * the OS writes a turned value on) */
+#define WAVE_TOP 13
+#define WAVE_H 23
 static void sm_draw(void *view, void *bm, u32 page) {
     (void)view;
     s32 t = active_track();
     if (page != 1 || t < 0)
         return;
-    sp_clear(bm, 16, 0, 128, 37);
+    sp_clear(bm, 16, WAVE_TOP, 128, 37);
     if (wave_ready(clampi(value(t, LIX_SAMP) >> 8, 63))) {
         part_t p = part_of(t);
-        draw_wave(bm, 16, 2, 112, 33, &p, 1);
+        draw_wave(bm, 16, WAVE_TOP, 112, WAVE_H, &p, 1);
     } else {
-        sp_hline(bm, 16, 127, 18, 2);
+        sp_hline(bm, 16, 127, WAVE_TOP + WAVE_H / 2, 2);
     }
 }
 

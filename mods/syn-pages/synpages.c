@@ -32,28 +32,32 @@ static const sp_machine_t *find(void *view) {
     return 0;
 }
 
-/* One page or two in the view's page list (the second a copy of the first: the page key cycles the index). */
+/* As many pages in the view's page list as the machine has (copies of the first: the page key cycles the index). */
 static void fit_pages(void *view, u32 want) {
     u32 *begin = (u32 *)SP_V(view, PAGES_BEGIN);
     u32 n = (SP_V(view, PAGES_END) - (u32)begin) / 4;
     if (begin == 0 || n == 0)
         return;
-    if (want >= 2 && n == 1) {
-        if (SP_V(view, PAGES_CAP) - (u32)begin < 8) {
-            u32 *b = (u32 *)FW_MALLOC(8);
+    want = want < 1 ? 1 : want > SP_PAGES_MAX ? SP_PAGES_MAX : want;
+    if (want > n) {
+        if (SP_V(view, PAGES_CAP) - (u32)begin < 4 * want) {
+            u32 *b = (u32 *)FW_MALLOC(4 * SP_PAGES_MAX);
             if (b == 0)
                 return;
-            b[0] = begin[0];
+            for (u32 i = 0; i < n; i++)
+                b[i] = begin[i];
             FW_FREE(begin);
             begin = b;
             SP_V(view, PAGES_BEGIN) = (u32)b;
-            SP_V(view, PAGES_CAP) = (u32)(b + 2);
+            SP_V(view, PAGES_CAP) = (u32)(b + SP_PAGES_MAX);
         }
-        begin[1] = begin[0];
-        SP_V(view, PAGES_END) = (u32)(begin + 2);
-    } else if (want < 2 && n == 2) {
-        SP_V(view, PAGES_END) = (u32)(begin + 1);
-        SP_V(view, PAGE_INDEX) = 0;
+        for (u32 i = n; i < want; i++)
+            begin[i] = begin[0];
+        SP_V(view, PAGES_END) = (u32)(begin + want);
+    } else if (want < n) {
+        SP_V(view, PAGES_END) = (u32)(begin + want);
+        if (SP_V(view, PAGE_INDEX) >= want)
+            SP_V(view, PAGE_INDEX) = 0;
     }
 }
 

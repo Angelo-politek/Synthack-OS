@@ -159,9 +159,9 @@ def test_cpu1_cost_per_block(built):
 
 def test_syn_page_on_an_fm4_track():
     """Pagina SYN di una traccia SY FM4 (vista SRC nell'emulatore dell'interfaccia, machine del suono = 4), dalle
-    pagine di syn-pages: la prima apertura porta l'elenco delle pagine da 1 a 2 in un blocco nuovo dell'heap; la
-    1/2 ha i descrittori di SY TONE in colonne come la 2/2 (rapporto, livello, decay), con i nomi di SY FM4; la 2/2
-    i descrittori 254..261; il titolo e' una std::string costruita in a0; la vista si disegna; nessuna scrittura
+    pagine di syn-pages: la prima apertura porta l'elenco delle pagine da 1 a 3 in un blocco nuovo dell'heap; la
+    1/3 ha i descrittori di SY TONE in colonne come la 2/3 (rapporto, livello, decay), con i nomi di SY FM4; la 2/3
+    i descrittori 255..261; la 3/3 ALGO e LEV; il titolo e' una std::string costruita in a0; la vista si disegna; nessuna scrittura
     nel codice dell'OS. Prima delle correzioni, due eccezioni sulla macchina: il puntatore del malloc dell'OS (d0)
     letto da a0, e il titolo restituito come char * invece della std::string."""
     from syn_view import SynView
@@ -175,33 +175,49 @@ def test_syn_page_on_an_fm4_track():
     old = ui.long(v.view + 0x7C)
     assert v.knobs() == [190, 191, 192, 194, 195, 193, 196, 197, 10]
     begin = ui.long(v.view + 0x7C)
-    assert begin != old and ui.long(v.view + 0x80) == ui.long(v.view + 0x84) == begin + 8
-    assert ui.long(begin) == ui.long(begin + 4)
+    assert begin != old and ui.long(v.view + 0x80) == begin + 12 and ui.long(v.view + 0x84) == begin + 16
+    assert ui.long(begin) == ui.long(begin + 4) == ui.long(begin + 8)
     short = [bytes(ui.uc.mem_read(ui.long(DESC + 52 * i + 48), 5)).split(b"\0")[0] for i in range(190, 198)]
     assert short == [b"TUNE", b"RAT2", b"LEV2", b"FDBK", b"DEC2", b"PNCH", b"OVER", b"DEC1"]
-    assert v.title() == b"SY FM4 1/2"
+    assert v.title() == b"SY FM4 1/3"
     v.page(1)
-    assert v.knobs() == [254, 255, 256, 257, 261, 258, 259, 260, 10]
-    assert v.title() == b"SY FM4 2/2"
-    plain = v.frame()
+    assert v.knobs() == [0, 255, 256, 257, 261, 258, 259, 260, 10]           # ALGO solo sulla 3/3
+    assert v.title() == b"SY FM4 2/3"
+    v.frame()
+    v.page(2)
+    assert v.knobs() == [254, 0, 0, 0, 0, 0, 0, 0, 10]
+    assert v.title() == b"SY FM4 3/3"
+    v.frame()
     assert bad == []
 
 
-def test_turning_algo_draws_the_algorithm():
-    """Pagina 2/2, ALGO in evidenza (appena girato): lo schema dell'algoritmo sopra le colonne A e B, diverso per
-    ogni algoritmo; senza evidenza la pagina e' quella stock. La casella di ALGO mostra il numero."""
+def test_algorithm_page():
+    """Pagina 3/3: lo schema dell'algoritmo della traccia sulle colonne B..D, diverso per ogni algoritmo, sotto la
+    riga 13 (sopra l'OS scrive il valore girato). Girando ALGO il numero e' solo nell'icona: sotto resta il nome
+    (l'evidenza della manopola A spenta). La 2/3 non disegna niente sopra le icone."""
+    import screens
     from syn_view import SynView
     v = SynView(["sy-fm4"], machine=4)
     v.page(1)
     plain = v.frame()
+    v.set_value(0, 0x36, 5 << 8)
+    v.highlight(4)
+    cols = lambda f: [r[44:] for r in screens.pixels(f)]                   # noqa: E731
+    assert cols(v.frame()) == cols(plain)                               # E (DET) mostra il valore, B..D intatte
+    v.highlight(None)
+    v.page(2)
+    still = v.frame()
+    v.highlight(0)
+    assert v.frame() == still
+    v.highlight(None)
     frames = []
     for n in range(12):
         v.set_value(0, 0x36, n << 8)
-        v.highlight(0)
         frames.append(v.frame())
-    v.highlight(None)
-    assert v.frame() == plain
-    assert len(set(frames)) == 12 and plain not in frames
+        rows = screens.pixels(frames[-1])
+        assert not any(rows[y][x] for y in range(13) for x in range(44, 128))
+        assert sum(rows[y][x] for y in range(13, 64) for x in range(44, 128)) > 60
+    assert len(set(frames)) == 12
 
 
 def text(ui, fn: int, view: int) -> bytes:

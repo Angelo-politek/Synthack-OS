@@ -27,13 +27,14 @@ SP TWINSHOT becomes **SAMPLER**: the Digitakt's sample machines ONESHOT, WERP, R
 | Page 2/2 | Shows |
 |---|---|
 | Waveform | The part that plays solid, the rest dotted. A line at each end of the part. |
-| `ONE` with `FWD.L`/`REV.L` | The loop point, dashed. |
-| `SLIC` | A tick under each slice of the grid; the slice picked solid (`KEY`: the whole sample). |
-| Knob boxes | `PLAY` an arrow (a loop over it), `BR` steps, `SAMP` the waveform, `STRT`/`LEN`/`LOOP` the waveform with the part, `LEV` a bar. |
+| `ONE` | The loop point, dashed, flagged at the bottom (the ends are flagged at the top). |
+| `SLIC` | The bounds of the grid's slices dotted across (32 and 64: every 16th of the sample, a tick for the others); the slice picked solid with a line at each end (`KEY`: the whole sample). |
+| Knob boxes | `PLAY` an arrow (a loop over it), `SAMP` the waveform, `STRT`/`LEN`/`LOOP` the waveform with the part. `BR` and `LEV` the OS's own graphics (SY BITS `BR`, SY RAW `LEV2`). |
+| Position | Rows 13–35, the rows of the stock knob graphics: above them the OS writes the value being turned. |
 
 - REPITCH plays the part in `BARS` bars at the tempo; `TUNE` and the note transpose it.
 - WERP: the sample spans `BARS` bars; each segment starts on time, at its pitch.
-- SLICE: slices start on the nearest zero crossing, as on the Digitakt. `SLIC KEY` picks the slice from the trig note.
+- SLICE: slices start on the nearest zero crossing, as on the Digitakt. `SLIC KEY`: the note picks the slice, (note − 12) modulo the slices (C4 = slice 1 up to 16 slices), and does not transpose, as on the Digitakt (`0x4007576A`). Play them from the keyboard (chromatic mode).
 - Saved with the sound and p-lockable, like any machine's parameters.
 
 `[!]` Sounds made with SP TWINSHOT open as SAMPLER and sound different.

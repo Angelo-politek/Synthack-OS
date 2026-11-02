@@ -20,6 +20,7 @@ typedef struct {
 } sp_machine_t;
 
 #define SP_N 4
+#define SP_PAGES_MAX 4
 #ifdef SP_TABLE
 static inline void sp_register(const sp_machine_t *m) {
     volatile sp_machine_t *t = (volatile sp_machine_t *)SP_TABLE;

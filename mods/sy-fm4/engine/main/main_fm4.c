@@ -12,8 +12,8 @@
  * the sequencer's per-track values are 0x47 wide; tracks use 0..0x35).
  *
  * The SYN pages come from syn-pages (mods/syn-pages): fm4m_boot registers machine 4 (key: SY TONE's TUNE on
- * knob A) with two pages. Page 1/2 is SY TONE's parameters, renamed and ordered as page 2/2 (ratio, level,
- * decay per column); page 2/2 answers with its own descriptors; turning ALGO draws the algorithm.
+ * knob A) with three pages. Page 1/3 is SY TONE's parameters, renamed and ordered as page 2/3 (ratio, level,
+ * decay per column); page 2/3 answers with its own descriptors; page 3/3 is ALGO and the algorithm drawn.
  *
  * The descriptors are eight of the table's unused "Error" placeholders
  * (0x4022d83c, 0x34 bytes each), rewritten by patch/s3patch.py from
@@ -86,18 +86,20 @@ __attribute__((used)) const char *const fm4m_names[8][2] = {
     {"Tune", "TUNE"}, {"Op2 Ratio", "RAT2"}, {"Op2 Level", "LEV2"}, {"Feedback", "FDBK"},
     {"Op2 Decay", "DEC2"}, {"Pitch Punch", "PNCH"}, {"Overdrive", "OVER"}, {"Op1 Decay", "DEC1"}};
 
-/* Knobs A..H and LEVEL. Page 1/2: operator 2 on the top row; page 2/2: operator 3 on the top row, operator 4
- * under it; on both, a column is one kind (ratio, level, decay). */
+/* Knobs A..H and LEVEL. Page 1/3: operator 2 on the top row; page 2/3: operator 3 on the top row, operator 4
+ * under it; on both, a column is one kind (ratio, level, decay). Page 3/3: ALGO, its drawing over knobs B..H.
+ * ALGO is on page 3/3 only: knob A of page 2/3 is empty. */
 static const u32 page1[9] = {R_TUNE, R_RATIO, R_MOD, R_MENV,
                              R_PNCH, R_FDBK, R_OVER, R_DEC, R_LEVEL};
-static const u32 page2[9] = {R_ALGO, R_RAT3, R_LEV3, R_DEC3,
+static const u32 page2[9] = {0,      R_RAT3, R_LEV3, R_DEC3,
                              R_DET,  R_RAT4, R_LEV4, R_DEC4, R_LEVEL};
+static const u32 page3[9] = {R_ALGO, 0, 0, 0, 0, 0, 0, 0, R_LEVEL};
 /* Where each new descriptor takes its knob/formatter/icon info from. */
 static const u32 info_from[PAGE2_N] = {R_MOD, R_RATIO, R_MOD, R_MENV,
                                        R_RATIO, R_MOD, R_MENV, R_DUAL_DET};
 
 /* ---- algorithms, drawn as SY FM4 routes them (engine/fm4.c): operators in boxes, modulation as lines into
- * the box modulated, carriers dotted up to the output, feedback as a hook under the box. */
+ * the box modulated, carriers dotted up to the output, feedback as a hook on the right of the box. */
 typedef struct {
     uint8_t ops;            /* operators shown: 2 (SY TONE) or 4 */
     uint8_t at[4][2];       /* operator 1..4: column, row (row 0 at the top) */
@@ -146,7 +148,7 @@ static void number(void *bm, int x, int y, u32 n, int scale) {
 
 #define BOX 9
 #define COL(ox, i) ((ox) + 2 + (i) * 11)
-#define ROW(oy, j) ((oy) + 8 + (j) * 12)
+#define ROW(oy, j) ((oy) + 5 + (j) * 12)
 
 static void draw_algo(void *bm, int ox, int oy, u32 n) {
     const algo_t *a = &algos[n < 12 ? n : 0];
@@ -159,7 +161,7 @@ static void draw_algo(void *bm, int ox, int oy, u32 n) {
         sp_vline(bm, x + BOX - 1, y + 1, y + BOX - 2, 1);
         glyph(bm, x + 3, y + 2, k + 1, 1);
         if (a->carriers >> k & 1) {
-            sp_vline(bm, x + 4, oy + 4, y - 1, 2);
+            sp_vline(bm, x + 4, oy + 3, y - 1, 2);
             lo = x + 4 < lo ? x + 4 : lo;
             hi = x + 4 > hi ? x + 4 : hi;
         }
@@ -179,8 +181,8 @@ static void draw_algo(void *bm, int ox, int oy, u32 n) {
     }
     int mid = (lo + hi) / 2;                    /* output: an arrow up, over the carriers */
     if (hi > lo) {
-        sp_hline(bm, lo, hi, oy + 4, 1);
-        sp_vline(bm, mid, oy + 1, oy + 4, 1);
+        sp_hline(bm, lo, hi, oy + 3, 1);
+        sp_vline(bm, mid, oy + 1, oy + 3, 1);
     }
     sp_px(bm, mid, oy, 1);
     sp_hline(bm, mid - 1, mid + 1, oy + 1, 1);
@@ -190,12 +192,11 @@ static void draw_algo(void *bm, int ox, int oy, u32 n) {
         sp_vline(bm, x, ROW(oy, 0) + 4, ROW(oy, 3) + 4, 1);
         sp_hline(bm, x, x + 1, ROW(oy, 0) + 4, 1);
         sp_hline(bm, x, x + 1, ROW(oy, 3) + 4, 1);
-    } else if (a->fb) {                         /* feedback: a hook from under the box back into its left side */
-        int x = COL(ox, a->at[a->fb - 1][0]), y = ROW(oy, a->at[a->fb - 1][1]);
-        sp_vline(bm, x - 2, y + 4, y + 11, 1);
-        sp_hline(bm, x - 2, x + 4, y + 11, 1);
-        sp_vline(bm, x + 4, y + BOX, y + 11, 1);
-        sp_hline(bm, x - 2, x - 1, y + 4, 1);
+    } else if (a->fb) {                         /* feedback: a loop out of the right side and back in */
+        int x = COL(ox, a->at[a->fb - 1][0]) + BOX, y = ROW(oy, a->at[a->fb - 1][1]);
+        sp_hline(bm, x, x + 1, y + 2, 1);
+        sp_vline(bm, x + 1, y + 2, y + 6, 1);
+        sp_hline(bm, x, x + 1, y + 6, 1);
     }
 }
 
@@ -237,32 +238,39 @@ static void init_once(void) {
 
 static u32 fm4_record(void *view, u32 page, u32 knob) {
     init_once();
+    if (page == 2 && knob == 0)                 /* ALGO: its number is the icon, the name stays under it */
+        SP_HIGHLIGHT(view, 0) = 0;
     if (knob < 9)
-        return page == 1 ? page2[knob] : page1[knob];
+        return page == 2 ? page3[knob] : page == 1 ? page2[knob] : page1[knob];
     return ORIG_SRC_BC(view, knob);
 }
 
 static const char *fm4_title(void *view, u32 page) {
     (void)view;
-    return page == 1 ? "SY FM4 2/2" : "SY FM4 1/2";
+    return page == 2 ? "SY FM4 3/3" : page == 1 ? "SY FM4 2/3" : "SY FM4 1/3";
 }
 
-/* Turning ALGO (knob A on page 2/2): the algorithm at full size over columns A and B. */
+/* Page 3/3: the track's algorithm over knobs B..H (empty there), under the line the OS writes a turned value on;
+ * knob E's empty box cleared. */
 #define SEQ_VALUES ((volatile uint16_t *)0x800021b0)
 #define ACTIVE_TRACK ((int32_t (*)(void *))0x4001ff74)
 static void fm4_draw(void *view, void *bm, u32 page) {
-    if (page != 1 || SP_HIGHLIGHT(view, 0) == 0)
+    if (page == 1) {
+        sp_clear(bm, 16, 13, 44, 37);           /* knob A's empty box */
+        return;
+    }
+    if (page != 2)
         return;
     int32_t t = ACTIVE_TRACK((void *)SP_V(view, 116));
     if (t < 0 || t > 7)
         return;
     u32 n = (u32)(SEQ_VALUES[0xe + t * 0x47 + PAGE2_FIRST] + 0x80) >> 8;
-    sp_clear(bm, 16, 0, 72, 64);
-    draw_algo(bm, 22, 3, n > 11 ? 11 : n);
-    number(bm, 17, 2, n > 11 ? 11 : n, 1);
+    sp_clear(bm, 44, 13, 128, 64);
+    sp_clear(bm, 16, 38, 44, 64);               /* knob E's empty box */
+    draw_algo(bm, 62, 13, n > 11 ? 11 : n);
 }
 
-static const sp_machine_t fm4_pages = {R_TUNE, 2, fm4_record, fm4_title, fm4_draw};
+static const sp_machine_t fm4_pages = {R_TUNE, 3, fm4_record, fm4_title, fm4_draw};
 
 /* ---- storage: logical index <-> storage slot ------------------------------
  *
