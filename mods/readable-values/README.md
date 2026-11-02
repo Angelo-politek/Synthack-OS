@@ -9,7 +9,7 @@ Parameters in real units instead of 0–127. Every value comes from the same OS 
 | Filter FREQ (tracks 1–8) | `4.9Hz` … `20.3k` | pole frequency of the engine biquad: 4.918 Hz · e^(0.065542·FREQ), measured in emulation (< 0.1 %) |
 | Filter BASE / WDTH (tracks 1–8) | `5.0Hz` … `24.0k` | one-pole HP/LP, OS table `0x4029C34C`; WDTH starts at BASE |
 | Filter env DEL / ATK / DEC / REL (tracks 1–8) | `0.7ms` … `10.0s`, `INF` | OS tables; ATK = full ramp, DEC/REL = time to −60 dB |
-| Amp ATK / DEC / REL (tracks 1–8), HOLD (all) | `0.1ms` … `30.0s`, `INF` | engine tables (identical copy in CPU #1 memory) |
+| Amp ATK / DEC / REL (tracks 1–8), HOLD (all) | `0.1ms` … `30.0s`, `INF`; HOLD 127 `NOTE` (held for the trig's length, as stock) | engine tables (identical copy in CPU #1 memory) |
 | SUS (filter, amp) | `0%` … `100%` | |
 | LEV, VOL, IN | `-inf` … `0.0dB` | gain (v/127)² |
 | Sends DEL / REV (tracks, FX track, external in) | `-inf` … `-0.1dB` | gain (v/32768)² |

@@ -381,12 +381,13 @@ def test_analog_amp_times_match_measurements(m):
             for pid in (pid_d, pid_d + 2):         # REL come DEC
                 assert abs(tilde_time(m.fmt(pid, v << 8)) / ms - 1) < 0.03, (pid, v, m.fmt(pid, v << 8))
         assert m.fmt(pid_d, 0x7F00) == "INF"
-    assert m.fmt(146, 0x7F00) == "INF" and m.fmt(146, 0x4000) == m.fmt(74, 0x4000)
+    assert m.fmt(146, 0x7F00) == "NOTE" and m.fmt(146, 0x4000) == m.fmt(74, 0x4000)
     assert m.fmt(148, 0x4000) == "50%" and m.fmt(140, 0x7F00) == "100%"
 
 
 def test_hold_and_sustain(m):
-    assert m.fmt(74, 0x7F00) == "INF"
+    """HOLD 127 = NOTE, come lo stock: il hold dura quanto il trig (LEN), non per sempre."""
+    assert m.fmt(74, 0x7F00) == "NOTE"
     assert m.fmt(74, 0) == "0.0ms"
     assert m.fmt(66, 0x7F00) == "100%" and m.fmt(76, 0) == "0%" and m.fmt(76, 0x4000) == "50%"
 

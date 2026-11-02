@@ -64,10 +64,10 @@ static const char group[] = "SMPL";
 
 static const knob_t knobs[4][3] = {
     {{"Start", "STRT", 0, 0x7800, 0}, {"Length", "LEN", 0, 0x7800, 0x7800}, {"Loop Pos", "LOOP", 0, 0x7802, 0}},
-    {{"Segment Size", "SEG", 0, 0x200, 0x100}, {"Segment Mode", "SMOD", 0, 0x300, 0x300},
+    {{"Segment Size", "SEG", 0, 0x200, 0x100}, {"Segment Mode", "MODE", 0, 0x300, 0x300},
      {"Bars", "BARS", 0, 0x300, 0x200}},
     {{"Start", "STRT", 0, 0x7800, 0}, {"Length", "LEN", 0, 0x7800, 0x7800}, {"Bars", "BARS", 0, 0x300, 0x200}},
-    {{"Slice Select", "SLIC", 0, 0x4000, 0}, {"Slice Length", "LEN", 0, 0x3F00, 0},
+    {{"Slice Select", "SLICE", 0, 0x4000, 0}, {"Slice Length", "LEN", 0, 0x3F00, 0},
      {"Slice Grid", "GRID", 0, 0x400, 0}},
 };
 
@@ -183,8 +183,8 @@ static void format(u32 id, s32 value, char *buf, int t) {
     case ID_P5:                                 /* STRT | SEG | STRT | SLICE */
         if (t == M_WERP)
             b = put_s(b, seg_names[clampi((s32)i, 2)]);
-        else if (t == M_SLICE && i == 0)
-            b = put_s(b, "KEY");
+        else if (t == M_SLICE && i == 0)        /* the note picks the slice */
+            b = put_s(b, "NOTE");
         else
             b = put_u(b, i);
         break;
@@ -196,7 +196,7 @@ static void format(u32 id, s32 value, char *buf, int t) {
         break;
     case ID_P7:                                 /* LOOP | BARS | BARS | GRID */
         if (t == M_ONESHOT)
-            b = v ? put_u(b, (v - 1) >> 8) : put_s(b, "STRT");
+            b = v ? put_u(b, (v - 1) >> 8) : put_s(b, "OFF");      /* the Digitakt's text: loop from STRT */
         else if (t == M_SLICE)
             b = put_u(b, 4u << clampi((s32)i, 4));
         else
@@ -402,9 +402,13 @@ static u32 sm_record(void *view, u32 page, u32 knob) {
     return SP_ORIG_RECORD(view, knob);
 }
 
+/* the Digitakt's machine names, then the page */
+static const char *const titles[4][2] = {
+    {"SAMPLE 1/2", "SAMPLE 2/2"}, {"WERP 1/2", "WERP 2/2"}, {"REPITCH 1/2", "REPITCH 2/2"}, {"SLICE 1/2", "SLICE 2/2"}};
+
 static const char *sm_title(void *view, u32 page) {
     (void)view;
-    return page == 1 ? "SAMPLER 2/2" : "SAMPLER 1/2";
+    return titles[track_type()][page == 1];
 }
 
 /* page 2/2: the waveform over the top row (x 16..127, rows 13..35: the stock knob graphics' rows, under the line

@@ -507,8 +507,12 @@ void rv_invoke(const void *fn, s32 value, char *buf)
         percent(buf, v);
         break;
     case 146:                           /* FX track: stesse tabelle */
-    case 74:                            /* HOLD: stessa durata per tracce digitali e analogiche */
-        put_time(buf, (v >> 8) == 127 ? 0xFFFFFFFFu : (u32)A_HOLD[v >> 8]);
+    case 74:                            /* HOLD: stessa durata per tracce digitali e analogiche; 127 = NOTE, */
+        if ((v >> 8) >= 127) {          /* come lo stock: il hold dura quanto il trig */
+            put_s(buf, "NOTE")[0] = 0;
+            break;
+        }
+        put_time(buf, (u32)A_HOLD[v >> 8]);
         break;
     case 145:                           /* FX track: ampiezza (generatore hardware) */
     case 147:

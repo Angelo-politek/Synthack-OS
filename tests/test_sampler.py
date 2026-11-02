@@ -374,7 +374,7 @@ def test_slice_and_repitch(engines):
     for sel, f in ((1, 500), (2, 1000), (4, 4000)):    # GRID 0 = 4 slice
         out = play(e, [0x4000, 0x300, 0, 0, sel << 8, 0, 0, 0x6400], blocks=40, typ=0x300)
         assert abs(freq(out[TAIL:TAIL + 2048]) - f) < f * 0.08, sel
-    # SLIC KEY: la nota sceglie la slice ((nota - 12) & 3 con 4 slice: C4 = 1, E4 = 1, D#4 = 4) e non traspone,
+    # SLICE NOTE: la nota sceglie la slice ((nota - 12) & 3 con 4 slice: C4 = 1, E4 = 1, D#4 = 4) e non traspone,
     # come la Digitakt (0x4007576A: nota 60 per l'intonazione)
     for note, f in ((60, 500), (61, 1000), (63, 4000), (64, 500)):
         out = play(e, [0x4000, 0x300, 0, 0, 0, 0, 0, 0x6400], blocks=40, typ=0x300, note=note)
@@ -500,15 +500,15 @@ def test_page_names_and_values(ui):
     assert text(ui, ids[3], 0) == "1" and text(ui, ids[3], 0x3F00) == "64"
     assert text(ui, ids[7], 100 << 8) == "100"                   # LEV
     seq = 0x8000_21B0 + 2 * (0xE + 0x1A)                         # TYPE della traccia 1 nei valori del sequencer
-    expect = {0: ["STRT", "LEN", "LOOP"], 1: ["SEG", "SMOD", "BARS"], 2: ["STRT", "LEN", "BARS"],
-              3: ["SLIC", "LEN", "GRID"]}
+    expect = {0: ["STRT", "LEN", "LOOP"], 1: ["SEG", "MODE", "BARS"], 2: ["STRT", "LEN", "BARS"],
+              3: ["SLICE", "LEN", "GRID"]}
     for t, names in expect.items():
         ui.put(seq, ">h", t << 8)
         text(ui, ids[1], 0)
         assert [short(ui, i) for i in ids[4:7]] == names
     ui.put(seq, ">h", 3 << 8)
     assert [text(ui, ids[6], v << 8) for v in range(5)] == ["4", "8", "16", "32", "64"]
-    assert text(ui, ids[4], 0) == "KEY"
+    assert text(ui, ids[4], 0) == "NOTE"                          # testi della Digitakt
     ui.put(seq, ">h", 1 << 8)
     assert [text(ui, ids[4], v << 8) for v in range(3)] == ["1/32", "1/16", "1/8"]
     assert [text(ui, ids[6], v << 8) for v in range(4)] == ["1", "2", "4", "8"]
@@ -544,11 +544,11 @@ def test_syn_pages():
     ui = v.ui
     lix = lambda: struct.unpack(">I", ui.uc.mem_read(DESC + 52 * 503 + 4, 4))[0]   # noqa: E731
     assert v.knobs() == [497, 498, 499, 504, 501, 502, 500, 503, 10] and v.pages() == 2
-    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLER 1/2"
+    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 1/2"
     v.set_value(0, 0x15, 5 << 8)                                   # SAMP 6
     v.page(1)
     assert v.knobs() == [0, 0, 0, 0, 501, 502, 500, 503, 10]
-    assert lix() == 0x1A and short(ui, 503) == "TYPE" and v.title() == b"SAMPLER 2/2"
+    assert lix() == 0x1A and short(ui, 503) == "TYPE" and v.title() == b"SAMPLE 2/2"
     waiting = v.frame()
     assert struct.unpack(">H", ui.uc.mem_read(0x1000_05B0, 2))[0] == 6
     ui.put(0x1000_05B4, ">HH", 6, 112)
