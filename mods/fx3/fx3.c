@@ -9,8 +9,9 @@
  *   mediate, EMAC: un passaggio per traccia se mandano una o due tracce, se no uno solo per tutte), lo
  *   passa all'effetto (a 24 kHz) e aggiunge il ritorno, scalato da VOL e riportato a 48 kHz per
  *   interpolazione lineare, al bus diretto (0x8000DAD0), con la convenzione di segno dell'OS;
- * - prima del delay del blocco seguente (0x4008F8A0) fx3_dsnd aggiunge l'uscita dell'effetto, scalata
- *   dalla mandata DEL, al bus d'ingresso del delay (0x8000DBD0): un blocco di ritardo (0,67 ms).
+ * - nel blocco seguente fx3_dsnd / fx3_rsnd prendono il posto dei cicli dell'OS che completano i bus
+ *   d'ingresso di delay e riverbero (0x4008F852, 0x4008F98A) e nello stesso passaggio aggiungono l'uscita
+ *   dell'effetto, scalata dalle mandate DEL e REV (0x8000DBD0): un blocco di ritardo (0,67 ms).
  * Il carico conta: l'OS usa gia' quasi tutta la CPU e l'interfaccia vive del resto. Senza mandate, con
  * VOL e DEL a zero o con gli ingressi muti (sequencer fermo) e la coda esaurita resta solo la somma o
  * nemmeno quella; i cicli caldi sono in assembly. Istruzioni per blocco in tests/test_fx3.py.
@@ -417,27 +418,29 @@ void fx3_run(void)
         ret_h[0] = ret_h[1] = 0;
 }
 
-/* prima del delay: l'uscita dell'effetto del blocco precedente nel suo bus d'ingresso (che ha la
- * convenzione del bus 3: si somma, quindi guadagno negativo) */
+/* Mandate DEL e REV dentro i cicli dell'OS che preparano i bus d'ingresso di delay e riverbero
+ * (0x4008F852 e 0x4008F98A: bus += parte analogica a +0x300, saturato): fx3_addsat fa lo stesso lavoro in
+ * meno istruzioni e, con la mandata alzata, toglie nello stesso passaggio l'uscita dell'effetto del blocco
+ * precedente (convenzione del bus 3: si somma, quindi guadagno negativo), come faceva fx3_ret dopo. */
+void fx3_addsat(s32 *bus, s32 gain, s32 *h);
+
 void fx3_dsnd(void)
 {
-    s32 ds = VOL_Q15[fx3_p[P_DSND]];
+    s32 ds = fx3_idle ? 0 : VOL_Q15[fx3_p[P_DSND]];
 
-    if (ds)
-        fx3_ret(fx3_wet, -ds, DLY_IN, dly_h);
-    else
+    if (!ds)
         dly_h[0] = dly_h[1] = 0;
+    fx3_addsat(DLY_IN, -ds, dly_h);
 }
 
 /* prima del riverbero (stesso bus d'ingresso del delay, riempito di nuovo per il riverbero) */
 void fx3_rsnd(void)
 {
-    s32 rs = VOL_Q15[fx3_p[P_RSND]];
+    s32 rs = fx3_idle ? 0 : VOL_Q15[fx3_p[P_RSND]];
 
-    if (rs)
-        fx3_ret(fx3_wet, -rs, DLY_IN, rev_h);
-    else
+    if (!rs)
         rev_h[0] = rev_h[1] = 0;
+    fx3_addsat(DLY_IN, -rs, rev_h);
 }
 
 /* ---- parametri della pagina (vparams): letti e scritti nel kit */
@@ -1324,25 +1327,75 @@ __asm__(
     "        lea     16(%sp),%sp\n"
     "0:      rts\n"
     "        .globl  fx3_del_hook\n"
-    "fx3_del_hook:\n"                           /* al posto di jsr 0x40096908 (delay), 0x4008F8A0 */
-    "        tst.l   fx3_idle\n"
-    "        bne.s   1f\n"
-    "        lea     -16(%sp),%sp\n"
-    "        movem.l %d0-%d1/%a0-%a1,(%sp)\n"
-    "        jsr     fx3_dsnd\n"                /* chorus del blocco precedente nel bus del delay */
-    "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
-    "        lea     16(%sp),%sp\n"
-    "1:      jmp     0x40096908\n"              /* il delay, con gli argomenti al loro posto */
+    "fx3_del_hook:\n"                           /* 0x4008F852: jsr fx3_del_hook ; jmp 0x4008F882 al posto del */
+    "        jmp     fx3_dsnd\n"                /* ciclo dell'OS (d0-d1/a0-a1 liberi: il ciclo li sporca) */
     "        .globl  fx3_rev_hook\n"
-    "fx3_rev_hook:\n"                           /* al posto di jsr 0x40096EB4 (riverbero), 0x4008F9CA */
-    "        tst.l   fx3_idle\n"
-    "        bne.s   1f\n"
-    "        lea     -16(%sp),%sp\n"
-    "        movem.l %d0-%d1/%a0-%a1,(%sp)\n"
-    "        jsr     fx3_rsnd\n"                /* effetto del blocco precedente nel bus del riverbero */
-    "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
-    "        lea     16(%sp),%sp\n"
-    "1:      jmp     0x40096EB4\n"              /* il riverbero, con gli argomenti al loro posto */
+    "fx3_rev_hook:\n"                           /* 0x4008F98A: jsr fx3_rev_hook ; jmp 0x4008F9BA */
+    "        jmp     fx3_rsnd\n"
+    "        .globl  fx3_addsat\n"
+    "fx3_addsat:\n"                             /* (bus, guadagno Q15, h[2]): bus = sats(bus + bus[+0x300]) come */
+    "        lea     -28(%sp),%sp\n"            /* l'OS; con guadagno: bus -= 2 * wet * guadagno a 48 kHz come */
+    "        movem.l %d2-%d7/%a2,(%sp)\n"       /* fx3_ret (pari: media col mezzo campione precedente h) */
+    "        movea.l 32(%sp),%a0\n"
+    "        move.l  36(%sp),%d0\n"
+    "        lea     256(%a0),%a2\n"            /* 32 coppie L/R */
+    "        tst.l   %d0\n"
+    "        bne.s   2f\n"
+    "1:      movem.l (%a0),%d4-%d7\n"
+    "        add.l   768(%a0),%d4\n"            /* parte analogica, come l'OS (add.l 768(a0)) */
+    "        sats.l  %d4\n"
+    "        add.l   772(%a0),%d5\n"
+    "        sats.l  %d5\n"
+    "        add.l   776(%a0),%d6\n"
+    "        sats.l  %d6\n"
+    "        add.l   780(%a0),%d7\n"
+    "        sats.l  %d7\n"
+    "        movem.l %d4-%d7,(%a0)\n"
+    "        lea     16(%a0),%a0\n"
+    "        cmpa.l  %a2,%a0\n"
+    "        bne.s   1b\n"
+    "        bra.s   9f\n"
+    "2:      movea.l 40(%sp),%a1\n"
+    "        move.l  (%a1),%d1\n"
+    "        move.l  4(%a1),%d2\n"
+    "        lea     fx3_wet,%a1\n"
+    "1:      movem.l (%a0),%d4-%d7\n"
+    "        add.l   768(%a0),%d4\n"
+    "        sats.l  %d4\n"
+    "        add.l   772(%a0),%d5\n"
+    "        sats.l  %d5\n"
+    "        add.l   776(%a0),%d6\n"
+    "        sats.l  %d6\n"
+    "        add.l   780(%a0),%d7\n"
+    "        sats.l  %d7\n"
+    "        move.l  (%a1)+,%d3\n"              /* L */
+    "        muls.w  %d0,%d3\n"
+    "        add.l   %d3,%d1\n"
+    "        sub.l   %d1,%d4\n"
+    "        sats.l  %d4\n"
+    "        move.l  %d3,%d1\n"
+    "        add.l   %d3,%d3\n"
+    "        sub.l   %d3,%d6\n"
+    "        sats.l  %d6\n"
+    "        move.l  (%a1)+,%d3\n"              /* R */
+    "        muls.w  %d0,%d3\n"
+    "        add.l   %d3,%d2\n"
+    "        sub.l   %d2,%d5\n"
+    "        sats.l  %d5\n"
+    "        move.l  %d3,%d2\n"
+    "        add.l   %d3,%d3\n"
+    "        sub.l   %d3,%d7\n"
+    "        sats.l  %d7\n"
+    "        movem.l %d4-%d7,(%a0)\n"
+    "        lea     16(%a0),%a0\n"
+    "        cmpa.l  %a2,%a0\n"
+    "        bne.s   1b\n"
+    "        movea.l 40(%sp),%a1\n"
+    "        move.l  %d1,(%a1)\n"
+    "        move.l  %d2,4(%a1)\n"
+    "9:      movem.l (%sp),%d2-%d7/%a2\n"
+    "        lea     28(%sp),%sp\n"
+    "        rts\n"
     "        .globl  fx3_rt_key\n"
     "fx3_rt_key:\n"                             /* 0x4004C5E2 (ROUTING, tasti): d0 = codice, d2 = evento, */
     "        moveq   #36,%d1\n"                         /* a2 = vista. Tasto 13: commuta FX3 */

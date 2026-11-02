@@ -28,12 +28,12 @@ import registry  # noqa: E402
 REPO = HERE.parents[1]
 OUT = REPO / "web-builder" / "src" / "budget.json"
 
-# istruzioni per blocco, caso peggiore (2026-10-30, OS 1.42): fx3 PHSR con 12 tracce e ingresso in mandata,
+# istruzioni per blocco, caso peggiore (2026-10-30, OS 1.42; fx3 2026-11-03): fx3 PHSR con 12 tracce e ingresso in mandata,
 # master-comp con compressione piena, dual-mono = mandate di IN R (v2) + VCA degli ingressi (v1).
 # perf-fx gira nell'interrupt del sequencer, readable-values nell'interfaccia: 0 qui.
 # sy-fm4: copia della pagina 2/2 verso la CPU #2 a ogni blocco (fm4m_dma_wait, tests/test_sy_fm4.py).
 # sampler: il tempo nella RAM condivisa (sm_block, tests/test_sampler.py); il motore gira sulla CPU #2.
-AUDIO_CPU = {"fx3": 3197, "master-comp": 578, "dual-mono": 324 + 133, "sy-fm4": 410, "sampler": 8}
+AUDIO_CPU = {"fx3": 2743, "master-comp": 578, "dual-mono": 324 + 133, "sy-fm4": 410, "sampler": 8}
 
 SEC7_ROOM = 127_695
 
