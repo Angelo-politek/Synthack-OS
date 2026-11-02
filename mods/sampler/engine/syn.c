@@ -332,14 +332,14 @@ void syn_smp_render(int32_t *out, uint8_t *st) {
         part(v, p, pitch, 0);
     }
     if (v->mode == M_REPITCH) {
-        /* the part lasts BARS (1, 2, 4, 8 bars) at the tempo, then TUNE and the note */
+        /* the part lasts BARS (1, 2, 4, 8 bars) at the tempo; TUNE and the note do not transpose it, as on the
+         * Digitakt (0x400756C0: the rate from length and bars replaces the pitch) */
         int32_t bars = clamp((int16_t)p->w[6] >> 8, 0, 3);
         int32_t n = v->b - v->a;
         n = n < 0 ? -n : n;
         uint32_t d = bar_samples(bars);
         uint32_t r = (d && (uint32_t)n < 16 * d) ? sm_udivshl((uint32_t)n, d, 27) : RATE_MAX;  /* n/d x UNITY */
-        uint32_t x = sm_umulshr(r, (uint32_t)pitch_rate(semis), 27);
-        rate = x > RATE_MAX ? RATE_MAX : (int32_t)x;
+        rate = r > RATE_MAX ? RATE_MAX : (int32_t)r;
     }
     int fwd = v->b >= v->a;
     if (!fwd)

@@ -32,7 +32,7 @@ SP TWINSHOT becomes **SAMPLER**: the Digitakt's sample machines ONESHOT, WERP, R
 | Knob boxes | `PLAY` an arrow (a loop over it), `SAMP` the waveform, `STRT`/`LEN`/`LOOP` the waveform with the part. `BR` and `LEV` the OS's own graphics (SY BITS `BR`, SY RAW `LEV2`). |
 | Position | Rows 13–35, the rows of the stock knob graphics: above them the OS writes the value being turned. |
 
-- REPITCH plays the part in `BARS` bars at the tempo; `TUNE` and the note transpose it.
+- REPITCH plays the part in `BARS` bars at the tempo; `TUNE` and the note do not transpose it, as on the Digitakt (`0x400756C0`).
 - WERP: the sample spans `BARS` bars; each segment starts on time, at its pitch.
 - SLICE: slices start on the nearest zero crossing, as on the Digitakt. `SLIC KEY`: the note picks the slice, (note − 12) modulo the slices (C4 = slice 1 up to 16 slices), and does not transpose, as on the Digitakt (`0x4007576A`). Play them from the keyboard (chromatic mode).
 - Saved with the sound and p-lockable, like any machine's parameters.
@@ -50,7 +50,7 @@ SP TWINSHOT becomes **SAMPLER**: the Digitakt's sample machines ONESHOT, WERP, R
 | CPU #1 | `main/smp_main.c`, mod area `+0x8180`. Descriptors 497–504 rewritten (names, ranges, defaults; logical indices `0x12–0x19`). Two SYN pages through [syn-pages](../syn-pages). Value texts and knob graphics, the names of knobs E, F, G by `TYPE`. The tempo to shared RAM `0x7F0` once per block. |
 | `TYPE` | Logical index `0x1A`, the word of the Syntakt's overdrive (it runs after the engines): CPU #2 reads it, then zeroes it. No descriptor is free for it: on page 2/2 descriptor 503 (`LEV`) is rewritten as `TYPE`, on 1/2 back as `LEV`. |
 | Same as the Digitakt | Start/end of each machine, the 256-point zero-crossing grid, the interpolation arithmetic. Checked against the Digitakt 1.54 code in the emulator, same inputs, same outputs. |
-| Ours | The interpolation table: two Kaiser-windowed sincs, five parameters fitted to the Digitakt's response (within 0.2 dB up to half the sample rate). `BR`, `LEV`'s curve (linear, 100 = unity) and WERP's timing (from the trig) are our own. The second page and its graphics are ours: the Digitakt 1.54 has one page per machine and picks the machine in a menu. |
+| Ours | The interpolation table: two Kaiser-windowed sincs, five parameters fitted to the Digitakt's response (within 0.2 dB up to half the sample rate). `BR`, `LEV`'s curve (linear, 100 = unity) and WERP's timing (from the trig; the Digitakt follows the sequencer's position) are our own. The second page and its graphics are ours: the Digitakt 1.54 has one page per machine and picks the machine in a menu. |
 | Level | One sample at `LEV` 100 plays at the level of SP TWINSHOT with one sample. |
 
 ## Test

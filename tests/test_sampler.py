@@ -382,6 +382,11 @@ def test_slice_and_repitch(engines):
     load_sample(e, sine(48000))                      # 1 s a 120 BPM, BARS 0 = 1 battuta (2 s): meta' velocita'
     out = play(e, [0x4000, 0x300, 0, 0, 0, 0x7800, 0x000, 0x6400], blocks=40, typ=0x200)
     assert abs(freq(out[TAIL:]) - 500) < 30
+    out = play(e, [0x4000, 0x300, 0, 0, 0, 0x7800, 0x100, 0x6400], blocks=40, typ=0x200)    # BARS 1 = 2 battute
+    assert abs(freq(out[TAIL:]) - 250) < 25
+    # TUNE +12 e la nota non traspongono, come la Digitakt (0x400756C0)
+    out = play(e, [0x4C00, 0x300, 0, 0, 0, 0x7800, 0x000, 0x6400], blocks=40, typ=0x200, note=67)
+    assert abs(freq(out[TAIL:]) - 500) < 30
 
 
 def test_type_word_does_not_reach_the_overdrive(built):
