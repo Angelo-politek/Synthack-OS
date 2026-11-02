@@ -12,8 +12,9 @@
  * the sequencer's per-track values are 0x47 wide; tracks use 0..0x35).
  *
  * The SYN pages come from syn-pages (mods/syn-pages): fm4m_boot registers machine 4 (key: SY TONE's TUNE on
- * knob A) with three pages. Page 1/3 is SY TONE's parameters, renamed and ordered as page 2/3 (ratio, level,
- * decay per column); page 2/3 answers with its own descriptors; page 3/3 is ALGO and the algorithm drawn.
+ * knob A) with three pages. Page 1/3 is SY TONE's parameters, renamed (operator 2 on the bottom row); page 2/3
+ * answers with its own descriptors (operator 3 on the top row, operator 4 under it); page 3/3 is ALGO and the
+ * algorithm drawn.
  *
  * The descriptors are eight of the table's unused "Error" placeholders
  * (0x4022d83c, 0x34 bytes each), rewritten by patch/s3patch.py from
@@ -86,13 +87,12 @@ __attribute__((used)) const char *const fm4m_names[8][2] = {
     {"Tune", "TUNE"}, {"Op2 Ratio", "RAT2"}, {"Op2 Level", "LEV2"}, {"Feedback", "FDBK"},
     {"Op2 Decay", "DEC2"}, {"Pitch Punch", "PNCH"}, {"Overdrive", "OVER"}, {"Op1 Decay", "DEC1"}};
 
-/* Knobs A..H and LEVEL. Page 1/3: operator 2 on the top row; page 2/3: operator 3 on the top row, operator 4
- * under it; on both, a column is one kind (ratio, level, decay). Page 3/3: ALGO, its drawing over knobs B..H.
- * ALGO is on page 3/3 only: knob A of page 2/3 is empty. */
-static const u32 page1[9] = {R_TUNE, R_RATIO, R_MOD, R_MENV,
-                             R_PNCH, R_FDBK, R_OVER, R_DEC, R_LEVEL};
-static const u32 page2[9] = {0,      R_RAT3, R_LEV3, R_DEC3,
-                             R_DET,  R_RAT4, R_LEV4, R_DEC4, R_LEVEL};
+/* Knobs A..H and LEVEL. Page 1/3: TUNE PNCH DEC1 OVER / FDBK and operator 2 (ratio, level, decay); page 2/3:
+ * operator 3 and DET / operator 4 and ALGO. Page 3/3: ALGO, its drawing over knobs B..H. */
+static const u32 page1[9] = {R_TUNE, R_PNCH, R_DEC,  R_OVER,
+                             R_FDBK, R_RATIO, R_MOD, R_MENV, R_LEVEL};
+static const u32 page2[9] = {R_RAT3, R_LEV3, R_DEC3, R_DET,
+                             R_RAT4, R_LEV4, R_DEC4, R_ALGO, R_LEVEL};
 static const u32 page3[9] = {R_ALGO, 0, 0, 0, 0, 0, 0, 0, R_LEVEL};
 /* Where each new descriptor takes its knob/formatter/icon info from. */
 static const u32 info_from[PAGE2_N] = {R_MOD, R_RATIO, R_MOD, R_MENV,
@@ -238,10 +238,12 @@ static void init_once(void) {
 
 static u32 fm4_record(void *view, u32 page, u32 knob) {
     init_once();
-    if (page == 2 && knob == 0)                 /* ALGO: its number is the icon, the name stays under it */
-        SP_HIGHLIGHT(view, 0) = 0;
-    if (knob < 9)
-        return page == 2 ? page3[knob] : page == 1 ? page2[knob] : page1[knob];
+    if (knob < 9) {
+        u32 id = page == 2 ? page3[knob] : page == 1 ? page2[knob] : page1[knob];
+        if (id == R_ALGO)                       /* its number is the icon, the name stays under it */
+            SP_HIGHLIGHT(view, knob) = 0;
+        return id;
+    }
     return ORIG_SRC_BC(view, knob);
 }
 
@@ -255,10 +257,6 @@ static const char *fm4_title(void *view, u32 page) {
 #define SEQ_VALUES ((volatile uint16_t *)0x800021b0)
 #define ACTIVE_TRACK ((int32_t (*)(void *))0x4001ff74)
 static void fm4_draw(void *view, void *bm, u32 page) {
-    if (page == 1) {
-        sp_clear(bm, 16, 13, 44, 37);           /* knob A's empty box */
-        return;
-    }
     if (page != 2)
         return;
     int32_t t = ACTIVE_TRACK((void *)SP_V(view, 116));

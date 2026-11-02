@@ -5,11 +5,11 @@ SY TONE becomes a 4-operator FM machine. By **Rxuting** ([Rxuting/sy-fm4](https:
 ## Use
 
 1. Pick **SY FM4** as the machine of a digital track (it replaces SY TONE in the list).
-2. **SYN 1/3**: SY TONE's parameters as FM controls: `TUNE RAT2 LEV2 DEC2` / `PNCH FDBK OVER DEC1`.
-3. Press **SYN** again for **SYN 2/3**: `RAT3 LEV3 DEC3` / `DET RAT4 LEV4 DEC4`.
-4. **SYN 3/3**: `ALGO` on knob A, its number in the box; the algorithm drawn on the right.
+2. **SYN 1/3**: SY TONE's parameters as FM controls: `TUNE PNCH DEC1 OVER` / `FDBK RAT2 LEV2 DEC2`.
+3. Press **SYN** again for **SYN 2/3**: `RAT3 LEV3 DEC3 DET` / `RAT4 LEV4 DEC4 ALGO`.
+4. **SYN 3/3**: `ALGO` on knob A, the algorithm drawn on the right. The `ALGO` box shows its number, on both pages.
 
-On pages 1/3 and 2/3 a column is one kind: ratio, level, decay. Operator 1 is the carrier, operator 2 SY TONE's modulator.
+One row per modulator: operator 2 under the common controls on 1/3, operators 3 and 4 on 2/3. Operator 1 is the carrier, operator 2 SY TONE's modulator.
 
 | Control | Values |
 |---|---|
@@ -35,7 +35,7 @@ On pages 1/3 and 2/3 a column is one kind: ratio, level, decay. Operator 1 is th
 | Part | Detail |
 |---|---|
 | CPU #2 | `engine/syn`, `engine/fm4.c`. Engine 4 (SY TONE) prep/render → SY FM4, in the [modarea7](../modarea7) engine area. SY TONE's prep always runs; ALGO 0 is SY TONE's render. Section 7 is the same in 1.40A, 1.41 and 1.42. |
-| CPU #1 | `engine/main/main_fm4.c`, mod area `+0x5800`. Three pages for machine 4 through [syn-pages](../syn-pages); descriptors 190–197 renamed; the algorithm drawn on page 3/3 under row 13 (above it the OS writes a turned value); turning `ALGO` leaves its name under the box (knob A not highlighted). |
+| CPU #1 | `engine/main/main_fm4.c`, mod area `+0x5800`. Three pages for machine 4 through [syn-pages](../syn-pages); descriptors 190–197 renamed; the algorithm drawn on page 3/3 under row 13 (above it the OS writes a turned value); turning `ALGO` leaves its name under the box (its knob not highlighted). |
 | Parameters | Descriptors 254–261 (Digitakt MIDI-track "CC1–CC8 Value", no page on the Syntakt), logical indices `0x36–0x3D`. The original uses the MIDI CC placeholders 1–5 and 12–14: on 1.42 they carry CC 1, 2, 6, 7, 10, 120, 121, 123. |
 | Storage | Sound slots `0x36–0x3D` (72 slots, 54 used). P-lock lanes `0x50–0x57`. Tables filled by `fm4m_boot` from the mod area boot list. |
 | To CPU #2 | `fm4m_dma_wait` replaces the render's eDMA 47 wait and copies the eight parameters of pages 2/3 and 3/3 (locks applied) to shared RAM `0x700`. |
