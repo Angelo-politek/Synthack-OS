@@ -3,7 +3,8 @@
   "os": "1.42",
   "requires": [
     "modarea",
-    "vparams"
+    "vparams",
+    "fastmix"
   ],
   "description": "Compressore sul master analogico (VCA del master) con l'algoritmo del compressore in stile Digitakt; manopole THR ATK REL MUP RAT (0 = OFF) e misuratore GR sulla pagina SYN della FX track; valori salvati nel kit del pattern (o globali con SYN global). Valori di partenza THR=0x4000 ATK=0x1800 REL=0x2000 MUP=0x2000 RAT=4",
   "generated_by": "mods/master-comp/make_patch.py",

@@ -297,4 +297,4 @@ def test_header_and_patched_bytes():
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig
-    assert set(sp["requires"]) == {"modarea", "vparams", "kitstore"}
+    assert set(sp["requires"]) == {"modarea", "vparams", "kitstore", "fastmix"}

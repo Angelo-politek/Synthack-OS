@@ -4,7 +4,8 @@
   "requires": [
     "modarea",
     "vparams",
-    "kitstore"
+    "kitstore",
+    "fastmix"
   ],
   "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati, ognuno con livello e mandate DEL, REV, FX3 propri. Pagina External Mixer = IN L; pagina IN R nel tab MIXER (solo in mono); in stereo tutto come l'originale.",
   "generated_by": "mods/dual-mono/make_patch.py",

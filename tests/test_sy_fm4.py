@@ -151,6 +151,7 @@ def test_cpu1_cost_per_block(built):
     uc.mem_write(MA.STACK - 4, struct.pack(">I", MA.RET))
     uc.mem_write(0x8000_21B0, bytes(range(256)) * 8)
     uc.emu_start(SYM["fm4m_dma_wait"], MA.RET, count=100_000)
+    print("fm4m_dma_wait:", n[0])
     assert n[0] <= budget.AUDIO_CPU["sy-fm4"], n[0]
     got = struct.unpack(">64H", uc.mem_read(0x1000_0700, 128))
     seq = struct.unpack(">1024H", uc.mem_read(0x8000_21B0, 2048))

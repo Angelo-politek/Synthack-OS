@@ -26,6 +26,7 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 | [Mod area](mods/modarea) | `[ok]` infra | 64 KB for mod code in a reserved block of the OS heap. |
 | [Virtual parameters](mods/vparams) | `[ok]` infra | Mods add their own parameters to OS pages. |
 | [Kit storage](mods/kitstore) | `[ok]` infra | 36 words of mod settings saved with the kit. |
+| [Faster mixing](mods/fastmix) | `[ok]` infra | OS audio routines rewritten: same sound, ~15 % less audio CPU. Added with the audio mods. |
 | [Project storage](mods/projstore) | `[ok]` infra | 256 bytes of mod settings saved with the project. |
 | [Web builder](web-builder) | `[wip]` | Build your `.syx` in the browser. Nothing uploaded. Same bytes as `build.py`. Not online yet. |
 | New machines | `[wip]` | Need `modarea7`, a shared CPU #2 code area ([#1](https://github.com/Angelo-politek/Synthack-OS/issues/1)). |
@@ -80,7 +81,7 @@ python tools/build/build.py --stock firmware/Syntakt_OS1.42.syx \
     mods/splash mods/dual-mono mods/master-comp mods/readable-values mods/perf-fx mods/fx3 -o out/synthack.syx
 ```
 
-- Required mods (`modarea`, `vparams`, `kitstore`) are added automatically.
+- Required mods (`modarea`, `vparams`, `kitstore`, `fastmix`) are added automatically.
 - Optional: `--name YOURNAME` puts your name on the boot screen.
 - Flash `out/synthack.syx` with Elektron Transfer: USB, **Drop** page.
 - Go back: flash the stock OS the same way.

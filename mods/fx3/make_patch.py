@@ -268,7 +268,7 @@ def main() -> None:
         for addr, orig, new in extra:
             patches.append(fixed(addr, bytes.fromhex(new), f"id {pid}: campo dell'oggetto come DEL (250)", orig))
     spec = {
-        "name": "fx3", "os": "1.42", "requires": ["modarea", "vparams"],
+        "name": "fx3", "os": "1.42", "requires": ["modarea", "vparams", "fastmix"],
         "description": "Terza mandata effetti: SND3 per traccia (pagina AMP 2) verso un chorus stereo; "
                        "regolazioni e livello di ritorno sulla pagina 2 del tab REVERB.",
         "generated_by": "mods/fx3/make_patch.py",

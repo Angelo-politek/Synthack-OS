@@ -215,7 +215,7 @@ def main() -> None:
                     "pagina SYN della FX track all'avvio: caselle A..G e init (jsr comp_page_stub)", PAGE_ORIG))
 
     spec = {
-        "name": "master-comp", "os": "1.42", "requires": ["modarea", "vparams"],
+        "name": "master-comp", "os": "1.42", "requires": ["modarea", "vparams", "fastmix"],
         "description": "Compressore sul master analogico (VCA del master) con l'algoritmo del "
                        "compressore in stile Digitakt; manopole THR ATK REL MUP RAT (0 = OFF) e misuratore GR "
                        "sulla pagina SYN della FX track; valori salvati nel kit del pattern (o globali con "
