@@ -14,6 +14,13 @@
       "project": 0,
       "sec7": 0
     },
+    "fastmix": {
+      "cpu": -10000,
+      "modarea": 4080,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
     "fx3": {
       "cpu": 2743,
       "modarea": 20480,
@@ -92,7 +99,7 @@
       "sec7": 0
     },
     "sy-fm4": {
-      "cpu": 410,
+      "cpu": 140,
       "modarea": 6144,
       "kit": 0,
       "project": 0,

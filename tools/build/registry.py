@@ -34,6 +34,7 @@ MODAREA = [
     (0x8180, 0xA000, "sampler", "main CPU side: pages, knob graphics, waveform, value texts, tempo to shared RAM"),
     (0xA000, 0xDFF0, "fx3", "code and data"),
     (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
+    (0xF000, 0xFFF0, "fastmix", "code and data: faster OS audio routines"),
 ]
 
 # ---- sezione 3, riempimento del linker 0x40339740..0x4033A000 (byte a zero non usati dall'OS)

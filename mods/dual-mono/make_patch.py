@@ -191,7 +191,7 @@ def main() -> None:
     t_in = struct.pack(">HIH", 0x4EB9, syms["pre_hook"], 0x4E71)        # jsr.l pre_hook ; nop
     t_out = struct.pack(">HI", 0x4EB9, syms["post_hook"])               # jsr.l post_hook
     spec = {
-        "name": "dual-mono", "os": "1.42", "requires": ["modarea", "vparams", "kitstore"],
+        "name": "dual-mono", "os": "1.42", "requires": ["modarea", "vparams", "kitstore", "fastmix"],
         "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati, ognuno "
                        "con livello e mandate DEL, REV, FX3 propri. Pagina External Mixer = IN L; pagina "
                        "IN R nel tab MIXER (solo in mono); in stereo tutto come l'originale.",

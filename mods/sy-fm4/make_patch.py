@@ -186,7 +186,7 @@ def main() -> None:
          "ram": f"{E.RAM + OFF_ENGINE:#010x}", "what": "(area motori) SY FM4 sulla CPU #2"},
     ]
     spec = {
-        "name": "sy-fm4", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages"],
+        "name": "sy-fm4", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "fastmix"],
         "description": "SY FM4 (Rxuting, MIT): SY TONE diventa una machine FM a 4 operatori. ALGO 0 = SY TONE, "
                        "ALGO 1-11 algoritmi FM; seconda pagina SYN (ALGO, RAT3, LEV3, DEC3, DET, RAT4, LEV4, DEC4), "
                        "salvata con il suono e con i p-lock.",

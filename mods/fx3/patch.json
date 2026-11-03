@@ -3,7 +3,8 @@
   "os": "1.42",
   "requires": [
     "modarea",
-    "vparams"
+    "vparams",
+    "fastmix"
   ],
   "description": "Terza mandata effetti: SND3 per traccia (pagina AMP 2) verso un chorus stereo; regolazioni e livello di ritorno sulla pagina 2 del tab REVERB.",
   "generated_by": "mods/fx3/make_patch.py",

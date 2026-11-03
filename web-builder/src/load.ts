@@ -11,7 +11,8 @@ const COSTS = budget.mods as Record<string, Cost>;
 
 const METERS: { key: Key; label: string; kb: boolean; over: string; note: string }[] = [
   { key: "cpu", label: "Audio CPU", kb: false, over: "Audio CPU above ~3 000 extra instructions per block: the UI is likely to lag.",
-    note: "Extra instructions per audio block on CPU #1, worst case. Above ~3 000 the Syntakt UI lags." },
+    note: "Extra instructions per audio block on CPU #1, worst case. Above ~3 000 the Syntakt UI lags. "
+      + "Below zero: faster than the stock OS (fastmix)." },
   { key: "modarea", label: "Mod RAM", kb: true, over: "Mod RAM full: these mods don't fit together.",
     note: "RAM reserved for mod code and data (64 KB)." },
   { key: "kit", label: "Kit words", kb: false, over: "Kit words full: these mods don't fit together.",
@@ -46,7 +47,7 @@ export function updateLoad(box: HTMLElement, names: string[], unknown: string[])
     const scale = m.key === "cpu" ? Math.max(lim * 1.5, v) : lim;   // la CPU puo' superare la soglia: si vede di quanto
     const over = v > lim;
     row.classList.toggle("over", over);
-    row.querySelector<HTMLElement>(".m-fill")!.style.width = `${Math.min(100, (100 * v) / scale)}%`;
+    row.querySelector<HTMLElement>(".m-fill")!.style.width = `${Math.max(0, Math.min(100, (100 * v) / scale))}%`;
     row.querySelector<HTMLElement>(".m-mark")!.style.left = `${(100 * lim) / scale}%`;
     row.querySelector<HTMLElement>(".m-val")!.textContent = m.kb ? `${kb(v)} / ${kb(lim)} KB` : `${fmt(v)} / ${fmt(lim)}`;
   }

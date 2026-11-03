@@ -120,7 +120,7 @@ def test_same_name_twice_refused(tmp_path):
 def test_real_mods_resolve():
     order, added = build.resolve([ROOT / "mods" / "dual-mono"])
     names = [build.read_spec(d)["name"] for d in order]
-    assert names[-1] == "dual-mono" and set(added) == {"modarea", "vparams", "kitstore"}
+    assert names[-1] == "dual-mono" and set(added) == {"modarea", "vparams", "kitstore", "fastmix"}
     assert names.index("modarea") < names.index("vparams") < names.index("dual-mono")
 
 

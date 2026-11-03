@@ -390,7 +390,10 @@ __attribute__((optimize("O2"))) void fm4m_dma_wait(void) {
             ;
         DMA_PENDING = 0;
     }
+    /* unrolled: 64 move.w with fixed offsets instead of a loop (~6 instructions a word) */
+#pragma GCC unroll 8
     for (int t = 0; t < 8; t++)
+#pragma GCC unroll 8
         for (int k = 0; k < PAGE2_N; k++)
             SHARED_MAIN[t * 8 + k] = SEQ_VALUES[0xe + t * 0x47 + PAGE2_FIRST + k];
 }

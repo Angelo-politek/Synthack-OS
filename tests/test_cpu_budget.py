@@ -105,3 +105,29 @@ def test_worst_case_load_of_all_mods():
     shown = budget.AUDIO_CPU
     assert got["fx3"] <= shown["fx3"] and got["master-comp"] <= shown["master-comp"]
     assert got["dual-mono v2"] + got["dual-mono v1"] <= shown["dual-mono"]
+
+
+# interrupt intero (tools/emu/isr.py), scena "max": tutte le mandate al massimo, FX3 phaser con retroazione e
+# mandate, compressore, ingresso mono, guadagni fermi. 2026-11-03: stock 68 484, tutte le mod 73 230 prima,
+# 61 670 con fastmix e la copia di sy-fm4 srotolata (-6 814); pesate (movem = registri) 71 729 -> 66 230.
+WHOLE_VS_STOCK = -6000
+
+
+def test_whole_interrupt_with_every_mod_is_faster_than_stock():
+    sys.path.insert(0, str(ROOT.parent / "tools" / "emu"))
+    import isr
+    every = sorted(p.parent.name for p in (ROOT.parent / "mods").glob("*/mod.json") if p.parent.name != "mod-zero")
+    got = {}
+    for name, mods in (("stock", []), ("mods", every)):
+        m = isr.Isr(mods)
+        assert name == "stock" or "fastmix" in m.mods
+        m.scene("max")
+        st = m.run()
+        got[name] = (st.n, st.w)
+    print("interrupt intero, istruzioni (pesate):", got)
+    delta = got["mods"][0] - got["stock"][0]
+    assert delta <= WHOLE_VS_STOCK, got
+    assert got["mods"][1] < got["stock"][1]
+    sys.path.insert(0, str(ROOT.parent / "tools" / "build"))
+    import budget
+    assert sum(budget.AUDIO_CPU.values()) >= delta                 # il sito non mostra meno del misurato
