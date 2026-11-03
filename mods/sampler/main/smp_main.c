@@ -98,13 +98,13 @@ static const knob_t xpar[4] = {{"Loop Crossfade", "XFAD", 0, 0x7F00, 0}, {"Rando
 #define ID_STOCK_LEV 456                    /* SY RAW "Osc 2 Level" */
 __attribute__((used)) const desc_t sm_rows[8] = {
     {44, 0x12, 0x0400, 0x5800, 0x4000, 1, 0, 0, 0, 0xE00, "Tune", group, "TUNE"},           /* 497, A */
-    {44, 0x13, 0, 0x300, 0x300, 1, 0, 0, 0, 0xE00, "Play Mode", group, "PLAY"},             /* 498, B */
+    {44, 0x13, 0, 0x300, 0x300, 0, 0, 0, 0, 0xE00, "Play Mode", group, "PLAY"},             /* 498, B */
     {44, 0x14, 0, 0x7F00, 0, 0, 0, 0, 0, 0xE00, "Bit Reduction", group, "BR"},              /* 499, C */
-    {44, 0x18, 0, 0x7802, 0, 1, 0, 0, 0, 0xE00, "Loop Pos", group, "LOOP"},                 /* 500, G */
-    {44, 0x16, 0, 0x7800, 0, 1, 0, 0, 0, 0xE00, "Start", group, "STRT"},                    /* 501, E */
-    {44, 0x17, 0, 0x7800, 0x7800, 1, 0, 0, 0, 0xE00, "Length", group, "LEN"},               /* 502, F */
-    {44, 0x19, 0, 0x7F00, 0x6400, 1, 0, 0, 0, 0xE00, "Sample Level", group, "LEV"},         /* 503, H */
-    {44, 0x15, 0, 0x3F00, 0, 1, 0, 0, 0, 0xE00, "Sample Slot", group, "SAMP"},              /* 504, D */
+    {44, 0x18, 0, 0x7802, 0, 0, 0, 0, 0, 0xE00, "Loop Pos", group, "LOOP"},                 /* 500, G */
+    {44, 0x16, 0, 0x7800, 0, 0, 0, 0, 0, 0xE00, "Start", group, "STRT"},                    /* 501, E */
+    {44, 0x17, 0, 0x7800, 0x7800, 0, 0, 0, 0, 0xE00, "Length", group, "LEN"},               /* 502, F */
+    {44, 0x19, 0, 0x7F00, 0x6400, 0, 0, 0, 0, 0xE00, "Sample Level", group, "LEV"},         /* 503, H */
+    {44, 0x15, 0, 0x3F00, 0, 0, 0, 0, 0, 0xE00, "Sample Slot", group, "SAMP"},              /* 504, D */
 };
 
 /* knobs E, F, G: descriptors */

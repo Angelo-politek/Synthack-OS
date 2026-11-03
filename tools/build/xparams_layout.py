@@ -6,5 +6,5 @@ avvio cosa scrivere negli indici 0x36..0x3d di un suono salvato da un OS stock (
 
 import modarea_layout as M
 
-OFF = 0x6800                    # xparams nell'area mod (registry.py)
+OFF = 0x6700                    # xparams nell'area mod (registry.py)
 TABLE = M.RAM + OFF             # xp_table

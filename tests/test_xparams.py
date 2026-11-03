@@ -97,3 +97,5 @@ def test_cpu1_cost_per_block(built):
     got = struct.unpack(">64H", uc.mem_read(0x1000_0700, 128))
     seq = struct.unpack(">1024H", uc.mem_read(0x8000_21B0, 2048))
     assert got == tuple(seq[0xE + t * 0x47 + 0x36 + k] for t in range(8) for k in range(8))
+    raw = struct.unpack(">80H", uc.mem_read(0x1000_0640, 160))           # le parole della machine, non smussate
+    assert raw == tuple(seq[0xE + t * 0x47 + 0x11 + k] for t in range(8) for k in range(10))

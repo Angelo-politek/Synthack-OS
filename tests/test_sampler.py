@@ -309,8 +309,15 @@ def frame(words, machine=44, note=60, typ=0):
     return p
 
 
+def raw(e, words, typ=0):
+    """Le parole della machine come impostate (xparams, 0x640: 20 B a voce dall'indice 0x11): il frame le porta
+    smussate, il motore prende da qui le scelte (PLAY, SAMP, i tre del tipo, il tipo)."""
+    e.uc.mem_write(0x640, struct.pack(">10h", 44, *(list(words) + [0] * 8)[:8], typ))
+
+
 def play(e, words, blocks=24, **kw):
     p, out = frame(words, **kw), []
+    raw(e, words, kw.get("typ", 0))
     for b in range(blocks):
         q = bytearray(p)
         if b in (0, 2):
@@ -389,6 +396,23 @@ def test_slice_and_repitch(engines):
     assert abs(freq(out[TAIL:]) - 500) < 30
 
 
+def test_choices_are_the_values_as_set(engines):
+    """Il frame porta i parametri della machine smussati dalla CPU #1 (0x400979CA: qualche percento a blocco verso
+    il valore nuovo): al trig dopo un p-lock o un cambio il valore sarebbe ancora quello vecchio. Le scelte vengono
+    da xparams (0x640), come impostate: frame con SLICE 1, impostato SLICE 4 -> suona la slice 4."""
+    e, _ = engines
+    n = 48000
+    load_sample(e, [int(12000 * math.sin(2 * math.pi * f * i / SR)) for f in (500, 1000, 2000, 4000) for i in range(n // 4)])
+    p, out = frame([0x4000, 0x300, 0, 0, 1 << 8, 0, 0, 0x6400], typ=0x300), []
+    raw(e, [0x4000, 0x300, 0, 0, 4 << 8, 0, 0, 0x6400], 0x300)
+    for b in range(40):
+        q = bytearray(p)
+        if b in (0, 2):
+            q[0x180] = 1
+        out += e.render_block(bytes(q))[0]
+    assert abs(freq(out[TAIL:TAIL + 2048]) - 4000) < 320
+
+
 def xpar(e, v):
     """Manopola H della 2/2 (indice 0x36): sy-fm4 la copia nella RAM condivisa a 0x700, 16 byte a voce."""
     e.uc.mem_write(0x700, struct.pack(">h", v << 8))
@@ -404,6 +428,7 @@ def test_knob_h_per_machine(engines):
         # SLICE ORDR NEXT: a ogni trig la slice successiva, da SLICE 2
         xpar(e, 1)
         p = frame([0x4000, 0x300, 0, 0, 2 << 8, 0, 0, 0x6400], typ=0x300)
+        raw(e, [0x4000, 0x300, 0, 0, 2 << 8, 0, 0, 0x6400], 0x300)
         got = []
         for trig in range(4):
             out = []

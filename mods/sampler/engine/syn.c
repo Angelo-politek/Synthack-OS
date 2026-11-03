@@ -60,8 +60,12 @@
 #define WAVE_COLS 112
 #define WAVE_STEP 2                  /* columns per call */
 
-/* Knob H of page 2/2 (logical index 0x36), from the main CPU (sy-fm4 copies it with this block's locks) */
+/* Knob H of page 2/2 (logical index 0x36), from the main CPU (xparams copies it with this block's locks) */
 #define XPAR(v) (*(volatile const int16_t *)(0x700 + (v) * 16))
+/* The machine words as set (xparams, 20 bytes a voice from logical index 0x11): the frame carries them smoothed by
+ * the main CPU (0x400979CA), a few percent a block towards a new value. Choices (PLAY, SAMP, the type's three, the
+ * type) come from here; TUNE, BR and LEV stay smoothed. */
+#define RAW(v, lix) (*(volatile const int16_t *)(0x640 + (v) * 20 + 2 * ((lix) - 0x11)))
 enum { ORDR_SLICE, ORDR_NEXT, ORDR_RAND };
 #define WAVE_READS 48                /* samples read per column at most */
 
@@ -88,6 +92,7 @@ static int16_t win[WIN];
 static int32_t hb_in[8 + 2 * BLOCK];
 static int32_t hb_out[BLOCK];
 static const sm_par_t *pars[VOICES];
+static sm_par_t pv[VOICES];                      /* the voice's parameters: frame (smoothed) and raw words */
 static int32_t pitches[VOICES];
 static int types[VOICES];
 static int xpars[VOICES];
@@ -253,12 +258,18 @@ static void start_part(voice_t *v) {
 void syn_smp_prep(int32_t pitch, uint8_t *st, uint8_t *params) {
     int vi = voice_index(st);
     voice_t *v = &voices[vi];
-    const sm_par_t *p = (const sm_par_t *)(params + 2 * LIX_TUNE);
+    sm_par_t *p = &pv[vi];
+    *p = *(const sm_par_t *)(params + 2 * LIX_TUNE);
+    p->w[1] = RAW(vi, LIX_PLAY);
+    p->w[3] = RAW(vi, LIX_SAMP);
+    p->w[4] = RAW(vi, LIX_P5);
+    p->w[5] = RAW(vi, LIX_P6);
+    p->w[6] = RAW(vi, LIX_P7);
     pars[vi] = p;
     pitches[vi] = pitch;
     /* TYPE travels in the overdrive's word, which the overdrive after the engines (0x4000112C) reads: no
      * overdrive on this machine */
-    types[vi] = clamp((int8_t)params[2 * LIX_TYPE], 0, 3);
+    types[vi] = clamp(RAW(vi, LIX_TYPE) >> 8, 0, 3);
     *(volatile int16_t *)(params + 2 * LIX_TYPE) = 0;
     xpars[vi] = clamp(XPAR(vi) >> 8, 0, 127);
     wave_step();

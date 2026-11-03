@@ -89,7 +89,7 @@
       "modarea": 7808,
       "kit": 0,
       "project": 0,
-      "sec7": 12452
+      "sec7": 12684
     },
     "splash": {
       "cpu": 0,
@@ -100,7 +100,7 @@
     },
     "sy-fm4": {
       "cpu": 0,
-      "modarea": 4096,
+      "modarea": 3840,
       "kit": 0,
       "project": 0,
       "sec7": 7524
@@ -120,8 +120,8 @@
       "sec7": 0
     },
     "xparams": {
-      "cpu": 140,
-      "modarea": 2048,
+      "cpu": 345,
+      "modarea": 2304,
       "kit": 0,
       "project": 0,
       "sec7": 0

@@ -32,12 +32,12 @@ OUT = REPO / "web-builder" / "src" / "budget.json"
 # master-comp con compressione piena, dual-mono = mandate di IN R (v2) + VCA degli ingressi (v1).
 # perf-fx gira nell'interrupt del sequencer, readable-values nell'interfaccia: 0 qui.
 # xparams: copia degli indici 0x36..0x3d verso la CPU #2 a ogni blocco (xp_dma_wait, tests/test_xparams.py): 131, srotolata
-# (era ~410, in sy-fm4).
+# (era ~410, in sy-fm4); piu' le parole della machine non smussate (0x11..0x1a, 8 tracce): 335 in tutto.
 # sampler: il tempo nella RAM condivisa (sm_block, tests/test_sampler.py); il motore gira sulla CPU #2.
 # fastmix (2026-11-03): credito, routine dell'OS piu' veloci. Misurato sull'interrupt intero (tools/emu/isr.py,
 # scena "max": tutte le mandate, guadagni fermi): -11 000 con o senza le altre mod. Qui -10 000. Nei blocchi in
 # cui i guadagni sono in rampa o i parametri si muovono (dopo un cambio di kit) il credito sparisce (+~400).
-AUDIO_CPU = {"fx3": 2743, "master-comp": 578, "dual-mono": 324 + 133, "xparams": 140, "sampler": 8, "fastmix": -10000}
+AUDIO_CPU = {"fx3": 2743, "master-comp": 578, "dual-mono": 324 + 133, "xparams": 345, "sampler": 8, "fastmix": -10000}
 
 SEC7_ROOM = 127_695
 

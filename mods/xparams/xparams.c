@@ -94,12 +94,14 @@ __asm__(
  * synth track's extra values, with this block's locks applied, from the
  * sequencer's per-track values (0x800021b0 + (0xe + track * 0x47 + lix) * 2,
  * where FUN_40096958 writes locks and FUN_40096804 restores them) to the
- * shared RAM at XP_SHARED: 16 bytes a voice, which the voice engines read.
+ * shared RAM at XP_SHARED: 16 bytes a voice, which the voice engines read; and the machine words
+ * at XP_RAW (20 bytes a voice).
  * 0x5b0..0x800 is past the frame (0x1b0) and the voice output (0x400) and
  * below the boot-time upload window (0x800..0x1000).
  */
 #define SEQ_VALUES ((volatile uint16_t *)0x800021b0)
 #define SHARED_MAIN ((volatile uint16_t *)(0x10000000 + XP_SHARED))
+#define SHARED_RAW ((volatile uint16_t *)(0x10000000 + XP_RAW))
 #define DMA_PENDING (*(volatile uint8_t *)0x43bde73c)
 #define TCD47_CSR (*(volatile uint16_t *)0xfc0455fe)
 
@@ -115,4 +117,12 @@ __attribute__((optimize("O2"))) void xp_dma_wait(void) {
 #pragma GCC unroll 8
         for (int k = 0; k < XP_N; k++)
             SHARED_MAIN[t * 8 + k] = SEQ_VALUES[0xe + t * 0x47 + XP_FIRST + k];
+    /* the machine words as set: the voice frames carry them smoothed (one move.w (a0)+,(a1)+ a word) */
+    volatile uint16_t *dst = SHARED_RAW;
+    for (int t = 0; t < 8; t++) {
+        volatile const uint16_t *src = SEQ_VALUES + 0xe + t * 0x47 + XP_RAW_FIRST;
+#pragma GCC unroll 10
+        for (int k = 0; k < XP_RAW_N; k++)
+            *dst++ = *src++;
+    }
 }
