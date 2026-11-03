@@ -16,6 +16,9 @@
  * answers with its own descriptors (operator 3 on the top row, operator 4 under it); page 3/3 is ALGO and the
  * algorithm drawn.
  *
+ * Page 2/3's values live in xparams' extra indices 0x36..0x3d (mods/xparams: saved, p-locked, copied to shared RAM
+ * 0x700 for the voice engine every block).
+ *
  * The descriptors are eight of the table's unused "Error" placeholders
  * (0x4022d83c, 0x34 bytes each), rewritten by patch/s3patch.py from
  * fm4m_records below. Their RAM-side info (0x41ba0a24, 0x54 bytes each:
@@ -25,6 +28,7 @@
  */
 #include <stdint.h>
 #include "synpages.h"
+#include "xparams.h"
 
 typedef uint32_t u32;
 
@@ -270,75 +274,19 @@ static void fm4_draw(void *view, void *bm, u32 page) {
 
 static const sp_machine_t fm4_pages = {R_TUNE, 3, fm4_record, fm4_title, fm4_draw};
 
-/* ---- storage: logical index <-> storage slot ------------------------------
+/* ---- sounds from a stock OS: page 2/3's defaults (xparams loads the extra indices, calls this when they are zero)
  *
- * MAIN OS maps a track's logical indices 0..0x35 to storage slots through
- * 0x40234344 (54 entries) and back through 0x4023441c, which follows it, so
- * neither can grow in place. These copies run to 0x46: page 2/2's indices
- * map to themselves for sounds (soundStorage has 72 slots, 54 used, so slots
- * 0x36..0x3d are spare and a stock OS skips them), and to lock lane ids
- * 0x50..0x57 for pattern locks: a stock OS drops lanes above 0x46, where an
- * id of 0x36 would have loaded as a lock on logical index 0 (trig note).
- * Filled at boot, before MAIN OS reads anything (fm4m_boot, from the mod area's boot list).
- */
-#define LIX2PHYS ((const u32 *)0x40234344)
-#define PHYS2LIX ((const u32 *)0x4023441c)
-#define FX_PHYS2LIX ((const u32 *)0x40234230)
-#define STOCK_LIX 0x36
-#define ALL_LIX 0x47
-#define LANE_FIRST 0x50
-
-u32 fm4m_sound_l2p[ALL_LIX];
-u32 fm4m_sound_p2l[ALL_LIX];
-u32 fm4m_lane_of_lix[ALL_LIX];
+ * A sound saved by a stock OS has zeros in the extra indices, which no SY FM4 sound has (DET is never below
+ * 0x3000): those get page 2/3's defaults, so an old SY TONE sound opens as SY FM4 in its SY TONE algorithm with DET
+ * centred. */
+static void fm4m_empty(volatile uint16_t *lix) {
+    for (int k = 0; k < PAGE2_N; k++)
+        lix[PAGE2_FIRST + k] = (uint16_t)fm4m_records[k].def;
+}
 
 void fm4m_boot(void) {
     sp_register(&fm4_pages);
-    for (int i = 0; i < ALL_LIX; i++) {
-        int stock = i < STOCK_LIX;
-        fm4m_sound_l2p[i] = stock ? LIX2PHYS[i] : (u32)i;
-        fm4m_sound_p2l[i] = stock ? PHYS2LIX[i] : (u32)i;
-        if (stock)
-            fm4m_lane_of_lix[i] = LIX2PHYS[i];
-        else if (i < PAGE2_FIRST + PAGE2_N)
-            fm4m_lane_of_lix[i] = LANE_FIRST + (i - PAGE2_FIRST);
-        else
-            fm4m_lane_of_lix[i] = 0xff;
-    }
-}
-
-/* Replaces FUN_400a5d5e (storage slot / lock lane id -> logical index, per
- * track; 12 is the FX track). Same answers for every id it took before. */
-u32 fm4m_phys_to_lix(u32 track, u32 phys) {
-    if (track > 12)
-        return 0;
-    if (track == 12)
-        return phys < 0x45 ? FX_PHYS2LIX[phys] : 0;
-    if (phys < STOCK_LIX)
-        return PHYS2LIX[phys];
-    if (phys >= LANE_FIRST && phys < LANE_FIRST + PAGE2_N)
-        return PAGE2_FIRST + (phys - LANE_FIRST);
-    return 0;
-}
-
-/* Replaces the deserialiser's slot loop (0x400a706a..0x400a708c in
- * FUN_400a6022, called through fm4m_load_shim with its a2/a3): storage
- * slots 0..0x3d to the sound's logical indices. A sound saved by a stock OS
- * has zeros in page 2/2's slots, which no SY FM4 sound has (DET is never
- * below 0x3000): those get page 2/2's defaults, so an old SY TONE sound
- * opens as SY FM4 in its SY TONE algorithm with DET centred. */
-void fm4m_load_params(uint8_t *sound, const uint8_t *storage) {
-    volatile uint16_t *lix = (volatile uint16_t *)(sound + 10 * 2);
-    const uint16_t *slot = (const uint16_t *)(storage + 0x1c);
-    for (int p = 0; p < PAGE2_FIRST + PAGE2_N; p++)
-        lix[fm4m_sound_p2l[p]] = slot[p];
-    int empty = 1;
-    for (int k = 0; k < PAGE2_N; k++)
-        if (lix[PAGE2_FIRST + k])
-            empty = 0;
-    if (empty)
-        for (int k = 0; k < PAGE2_N; k++)
-            lix[PAGE2_FIRST + k] = (uint16_t)fm4m_records[k].def;
+    xp_on_empty(fm4m_empty);
 }
 
 /* Runs where FUN_400a4ef0 (the descriptor index tables) finishes, in place
@@ -355,47 +303,6 @@ u32 fm4m_index_done(void) {
     }
     *(volatile u32 *)0x43bdf44c = 1;
     return 1;
-}
-
-__asm__(
-    "    .text\n"
-    "    .globl fm4m_load_shim\n"
-    "fm4m_load_shim:\n"
-    "    move.l %a3,-(%sp)\n"
-    "    move.l %a2,-(%sp)\n"
-    "    jsr fm4m_load_params\n"
-    "    addq.l #8,%sp\n"
-    "    rts\n");
-
-/* ---- page 2/2 to the second CPU ---------------------------------------------
- *
- * Replaces FUN_400a10da, the render's wait for eDMA 47 before it starts the
- * frame transfer (and the voice transfer). After the wait it copies each
- * synth track's page 2/2 values, with this block's locks applied, from the
- * sequencer's per-track values (0x800021b0 + (0xe + track * 0x47 + lix) * 2,
- * where FUN_40096958 writes locks and FUN_40096804 restores them) to the
- * shared RAM at FM4_SHARED: 16 bytes a voice, which the voice engine reads.
- * 0x5b0..0x800 is past the frame (0x1b0) and the voice output (0x400) and
- * below the boot-time upload window (0x800..0x1000).
- */
-#define FM4_SHARED 0x700
-#define SEQ_VALUES ((volatile uint16_t *)0x800021b0)
-#define SHARED_MAIN ((volatile uint16_t *)(0x10000000 + FM4_SHARED))
-#define DMA_PENDING (*(volatile uint8_t *)0x43bde73c)
-#define TCD47_CSR (*(volatile uint16_t *)0xfc0455fe)
-
-__attribute__((optimize("O2"))) void fm4m_dma_wait(void) {
-    if (DMA_PENDING) {
-        while (!(TCD47_CSR & 0x80))     /* DONE */
-            ;
-        DMA_PENDING = 0;
-    }
-    /* unrolled: 64 move.w with fixed offsets instead of a loop (~6 instructions a word) */
-#pragma GCC unroll 8
-    for (int t = 0; t < 8; t++)
-#pragma GCC unroll 8
-        for (int k = 0; k < PAGE2_N; k++)
-            SHARED_MAIN[t * 8 + k] = SEQ_VALUES[0xe + t * 0x47 + PAGE2_FIRST + k];
 }
 
 __attribute__((section(".entries"), used))

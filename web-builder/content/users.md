@@ -263,7 +263,7 @@ The Digitakt's sample machines in place of SP TWINSHOT: ONESHOT, WERP, REPITCH a
 | Page | Knobs A–D | Knobs E–H |
 |---|---|---|
 | 1/2 | `TUNE` `PLAY` `BR` `SAMP` | E F G by machine, `LEV` |
-| 2/2 | waveform | E F G by machine, `LEV` |
+| 2/2 | waveform | E F G by machine, H the machine's own |
 
 | Machine | E | F | G |
 |---|---|---|---|
@@ -271,6 +271,15 @@ The Digitakt's sample machines in place of SP TWINSHOT: ONESHOT, WERP, REPITCH a
 | WERP | `SEG` 1/32, 1/16, 1/8 | `MODE` segment play mode | `BARS` 1, 2, 4, 8 |
 | REPITCH | `STRT` | `LEN` | `BARS` 1, 2, 4, 8 |
 | SLICE | `SLICE`: `NOTE`, 1–64 | `LEN` 1–64 slices | `GRID` 4, 8, 16, 32, 64 |
+
+Knob H on page 2/2, each machine's own (0 = as the Digitakt):
+
+| Machine | H | Does |
+|---|---|---|
+| ONESHOT | `XFAD` 0–127 | crossfade at the loop point with `FWD.L`/`REV.L`: the end fades into the samples before the loop start (127 ≈ half the loop) |
+| WERP | `RAND` 0–127 | chance that a segment jumps to a random place of the sample |
+| REPITCH | `KEY` `OFF`/`ON` | `ON`: the note and `TUNE` transpose, the length stays in `BARS` |
+| SLICE | `ORDR` `SLICE`/`NEXT`/`RAND` | which slice a trig plays: the `SLICE` knob, the next one on each trig (from `SLICE`), or a random one |
 
 | Control | Values |
 |---|---|

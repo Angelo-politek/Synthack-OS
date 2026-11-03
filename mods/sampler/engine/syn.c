@@ -11,6 +11,10 @@
  * filter down to 32; LEV; then the Syntakt's DEC and VCA, as SP TWINSHOT ends.
  *
  * For the main CPU's SYN page 2/2 the engine also draws up the waveform of the slot the page shows (wave_step).
+ *
+ * Knob H of page 2/2, one parameter per machine (logical index 0x36, which sy-fm4 saves, locks and copies to shared
+ * RAM 0x700, 16 bytes a voice): ONESHOT XFAD (loop crossfade), WERP RAND (segment jumps), REPITCH KEY (the note
+ * transposes), SLICE ORDR (slice picked, next, random).
  */
 #include "sampler.h"
 
@@ -55,6 +59,10 @@
 #define WAVE ((volatile uint8_t *)0x5c0)
 #define WAVE_COLS 112
 #define WAVE_STEP 2                  /* columns per call */
+
+/* Knob H of page 2/2 (logical index 0x36), from the main CPU (sy-fm4 copies it with this block's locks) */
+#define XPAR(v) (*(volatile const int16_t *)(0x700 + (v) * 16))
+enum { ORDR_SLICE, ORDR_NEXT, ORDR_RAND };
 #define WAVE_READS 48                /* samples read per column at most */
 
 typedef struct {
@@ -67,6 +75,9 @@ typedef struct {
     int32_t a, b;                    /* the part being played, from a towards b */
     uint32_t elapsed;                /* samples since the trig (WERP) */
     int32_t seg;                     /* WERP: current segment number */
+    uint32_t jump;                   /* WERP RAND: phase added to this segment's */
+    int32_t sel;                     /* SLICE ORDR: the slice picked at the trig, 1..64, 0 = by the knob */
+    int32_t step;                    /* SLICE ORDR NEXT: trigs so far */
     int32_t hb[12];                  /* half-band filter: 8 inputs + 4 outputs */
 } voice_t;
 
@@ -79,6 +90,13 @@ static int32_t hb_out[BLOCK];
 static const sm_par_t *pars[VOICES];
 static int32_t pitches[VOICES];
 static int types[VOICES];
+static int xpars[VOICES];
+static uint32_t seed = 0x2545f491;
+
+static uint32_t rnd(void) {
+    seed = seed * 1664525u + 1013904223u;
+    return seed;
+}
 
 extern const uint32_t sm_exp2_q30[257];
 
@@ -167,6 +185,12 @@ static uint32_t werp_phase(voice_t *v, const sm_par_t *p, int32_t *segno) {
 
 static void part(voice_t *v, const sm_par_t *p, int32_t note16, uint32_t phase) {
     sm_grid_t *g;
+    sm_par_t q;
+    if (v->mode == M_SLICE && v->sel) {         /* ORDR NEXT, RAND: the slice picked at the trig */
+        q = *p;
+        q.w[4] = (int16_t)(v->sel << 8);
+        p = &q;
+    }
     switch (v->mode) {
     case M_WERP:
         g = grid_of(v);
@@ -236,6 +260,7 @@ void syn_smp_prep(int32_t pitch, uint8_t *st, uint8_t *params) {
      * overdrive on this machine */
     types[vi] = clamp((int8_t)params[2 * LIX_TYPE], 0, 3);
     *(volatile int16_t *)(params + 2 * LIX_TYPE) = 0;
+    xpars[vi] = clamp(XPAR(vi) >> 8, 0, 127);
     wave_step();
 
     /* SP TWINSHOT's DEC1 left at its end: no decay of the machine's own */
@@ -262,6 +287,18 @@ void syn_smp_prep(int32_t pitch, uint8_t *st, uint8_t *params) {
         v->trig = 1;
         v->elapsed = 0;
         v->seg = 0;
+        v->jump = 0;
+        v->sel = 0;
+        if (v->mode == M_SLICE && xpars[vi] != ORDR_SLICE) {
+            int32_t n = 4 << clamp(SM_BYTE(p, 6), 0, 4), k = clamp(SM_BYTE(p, 4), 0, 64);
+            int32_t s0 = k ? (k > n ? n : k) - 1 : (n - 1) & ((int32_t)(int16_t)(pitch >> 16) - 12);
+            if (xpars[vi] == ORDR_NEXT)
+                v->sel = (s0 + v->step++) % n + 1;
+            else
+                v->sel = (int32_t)((rnd() >> 16) % (uint32_t)n) + 1;
+        } else {
+            v->step = 0;
+        }
         v->active = v->data != 0;
         for (int k = 0; k < 12; k++)
             v->hb[k] = 0;
@@ -274,6 +311,10 @@ void syn_smp_prep(int32_t pitch, uint8_t *st, uint8_t *params) {
             v->active = 0;
     }
 }
+
+/* ONESHOT XFAD: the last xf samples before the loop's end fade into the samples before the loop's start (inv =
+ * 32768 / xf), so the wrap joins them without a step */
+static int32_t xf, xf_inv;
 
 /* Sample at absolute index i of the part being played: the loop wraps past b, nothing else
  * plays past b; before a the sample's own data (taps reaching back). */
@@ -289,7 +330,18 @@ static inline int16_t fetch(const voice_t *v, int32_t i, int loop, int32_t la) {
         over %= span;
         i = fwd ? la + over : la - 1 - over;
     }
-    return (i >= 0 && i < v->len) ? v->data[i] : 0;
+    if (i < 0 || i >= v->len)
+        return 0;
+    int32_t s = v->data[i];
+    if (xf) {
+        int32_t d = fwd ? v->b - i : i - v->b + 1;             /* 1 at the loop's end */
+        int32_t j = fwd ? la - d : la - 1 + d;
+        if (d >= 1 && d <= xf && j >= 0 && j < v->len) {
+            int32_t o = v->data[j];
+            s = o + (((s - o) * (d * xf_inv)) >> 15);
+        }
+    }
+    return (int16_t)s;
 }
 
 void syn_smp_render(int32_t *out, uint8_t *st) {
@@ -309,6 +361,7 @@ void syn_smp_render(int32_t *out, uint8_t *st) {
     /* the part, with this block's parameters (the Digitakt recomputes it every block) */
     int32_t tune = p->w[0];
     int32_t note = pitch;
+    int xp = xpars[vi];
     if (v->mode == M_SLICE && SM_BYTE(p, 4) <= 0)       /* SLIC KEY: the note picks the slice, no transposing */
         note = 60 << 16;
     int32_t semis = note - (60 << 16) + ((tune - 0x4000) << 8);
@@ -316,13 +369,14 @@ void syn_smp_render(int32_t *out, uint8_t *st) {
     if (v->mode == M_WERP) {
         int32_t segno;
         uint32_t phase = werp_phase(v, p, &segno);
-        if (segno != v->seg) {                          /* next segment: from its start */
+        if (segno != v->seg) {                          /* next segment: from its start; RAND: maybe elsewhere */
             v->seg = segno;
-            part(v, p, pitch, phase);
+            v->jump = (int32_t)((rnd() >> 16) % 127u) < xp ? (rnd() - phase) & 0x7fffffffu : 0;
+            part(v, p, pitch, (phase + v->jump) & 0x7fffffffu);
             start_part(v);
         } else {
             int32_t a = v->a;
-            part(v, p, pitch, phase);
+            part(v, p, pitch, (phase + v->jump) & 0x7fffffffu);
             v->a = a;
         }
         int32_t bars = clamp((int16_t)p->w[6] >> 8, 0, 3);
@@ -333,12 +387,14 @@ void syn_smp_render(int32_t *out, uint8_t *st) {
     }
     if (v->mode == M_REPITCH) {
         /* the part lasts BARS (1, 2, 4, 8 bars) at the tempo; TUNE and the note do not transpose it, as on the
-         * Digitakt (0x400756C0: the rate from length and bars replaces the pitch) */
+         * Digitakt (0x400756C0: the rate from length and bars replaces the pitch); KEY ON: they do */
         int32_t bars = clamp((int16_t)p->w[6] >> 8, 0, 3);
         int32_t n = v->b - v->a;
         n = n < 0 ? -n : n;
         uint32_t d = bar_samples(bars);
         uint32_t r = (d && (uint32_t)n < 16 * d) ? sm_udivshl((uint32_t)n, d, 27) : RATE_MAX;  /* n/d x UNITY */
+        if (xp)
+            r = sm_umulshr(r, (uint32_t)pitch_rate(pitch - (60 << 16) + ((tune - 0x4000) << 8)), 27);
         rate = r > RATE_MAX ? RATE_MAX : (int32_t)r;
     }
     int fwd = v->b >= v->a;
@@ -347,10 +403,15 @@ void syn_smp_render(int32_t *out, uint8_t *st) {
 
     int loop = loops(p, v->mode);
     int32_t la = v->a;                                  /* where a loop starts again */
+    xf = 0;
     if (loop && v->mode == M_ONESHOT) {
         int32_t a, b;
         sm_pos_oneshot(p, v->len, 0, &a, &b);
         la = a;
+        int32_t span = b - a < 0 ? a - b : b - a;
+        xf = span * xp >> 8;                            /* XFAD 127: about half the loop */
+        if (xf)
+            xf_inv = 32768 / xf;
     }
 
     /* window: every tap of the 64 points */

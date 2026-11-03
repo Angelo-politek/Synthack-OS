@@ -10,7 +10,8 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x2000` | `0x4000` | readable-values | code and data |
 | `0x4000` | `0x5000` | perf-fx | code and data |
 | `0x5000` | `0x5800` | dual-mono | dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py) |
-| `0x5800` | `0x7000` | sy-fm4 | main CPU side: pages, algorithm drawings, storage tables, shared RAM publisher |
+| `0x5800` | `0x6800` | sy-fm4 | main CPU side: pages, algorithm drawings, page 1/3 names |
+| `0x6800` | `0x7000` | xparams | table (xparams_layout.TABLE), storage tables, sound loader, shared RAM publisher |
 | `0x7000` | `0x7200` | projstore | code, then the 256 bytes saved with the project |
 | `0x7200` | `0x7400` | kitstore | code |
 | `0x7400` | `0x7420` | modarea | boot list: 8 pointers, called after unpacking (BOOT_SLOTS) |
@@ -22,7 +23,7 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0xdff0` | `0xf000` | fx3 | feedback (+0xDFFC) and delay line (+0xE000, 4 KB) |
 | `0xf000` | `0xfff0` | fastmix | code and data: faster OS audio routines |
 
-Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler.
+Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams.
 
 ## Engine area (CPU #2, `mods/modarea7`, RAM `0x47000000`, offsets)
 
@@ -38,7 +39,7 @@ Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 
 | `0x0000` | `0x01b0` | OS | voice frames: 0x1B0 B from 0x80002000 every block (eDMA ch. 47) |
 | `0x01b0` | `0x05b0` | OS | voice output: 8 x 32 x int32 back to CPU #1 |
 | `0x05b0` | `0x0630` | sampler | waveform: request +0x5B0, slot +0x5B4, columns done +0x5B6, length +0x5B8, address +0x5BC, 112 peaks +0x5C0 |
-| `0x0700` | `0x0780` | sy-fm4 | pages 2/3 and 3/3: 8 words per track, locks applied |
+| `0x0700` | `0x0780` | xparams | logical indices 0x36..0x3d of each digital track, locks applied (sy-fm4 pages 2/3 and 3/3, sampler knob H) |
 | `0x07f0` | `0x07f4` | sampler | tempo, BPM x 120 |
 | `0x0800` | `0x1000` | OS | boot-time upload window |
 

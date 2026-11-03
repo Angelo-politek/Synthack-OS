@@ -7,7 +7,16 @@ SP TWINSHOT becomes **SAMPLER**: the Digitakt's sample machines ONESHOT, WERP, R
 1. Load samples as for SP TWINSHOT (64 slots).
 2. Pick **ONESHOT**, **WERP**, **REPITCH** or **SLICE** as the machine of a digital track (they replace SP TWINSHOT in the menu). The machine starts with its own values of knobs E, F, G; from another machine, `TUNE`, `PLAY`, `BR` and `LEV` start at their defaults too (`SAMP` stays).
 3. **SYN 1/2**, as the Digitakt's page: `TUNE PLAY BR SAMP` / `E F G LEV`.
-4. Press **SYN** again for **SYN 2/2**: the sample's waveform, with `E F G LEV` under it. The page title is the Digitakt's machine name: `SAMPLE`, `WERP`, `REPITCH`, `SLICE`.
+4. Press **SYN** again for **SYN 2/2**: the sample's waveform, with `E F G` and the machine's own parameter `H` under it. The page title is the Digitakt's machine name: `SAMPLE`, `WERP`, `REPITCH`, `SLICE`.
+
+Knob H of page 2/2, one parameter of each machine's own (0 = as the Digitakt):
+
+| Machine | H | Does |
+|---|---|---|
+| ONESHOT | `XFAD` 0–127 | crossfade at the loop point with `FWD.L`/`REV.L`: the end fades into the samples before the loop start (127 ≈ half the loop) |
+| WERP | `RAND` 0–127 | chance that a segment jumps to a random place of the sample |
+| REPITCH | `KEY` `OFF`/`ON` | `ON`: the note and `TUNE` transpose, the length stays in `BARS` |
+| SLICE | `ORDR` `SLICE`/`NEXT`/`RAND` | which slice a trig plays: the `SLICE` knob, the next one on each trig (from `SLICE`), or a random one |
 
 Value texts and short names as on the Digitakt 1.54 (`NOTE`, `OFF`, `MODE`, `SLICE`).
 
@@ -56,6 +65,7 @@ Value texts and short names as on the Digitakt 1.54 (`NOTE`, `OFF`, `MODE`, `SLI
 | CPU #1 | `main/smp_main.c`, mod area `+0x8180`. Descriptors 497–504 rewritten (names, ranges, defaults; logical indices `0x12–0x19`). Two SYN pages through [syn-pages](../syn-pages). Value texts and knob graphics, the names of knobs E, F, G by machine. The tempo to shared RAM `0x7F0` once per block. |
 | Four machines | All four are machine 44 for the OS. The machine menu shows menu values 45–48 in its place: the list of machines (`0x400264B6`, its check `0x400A64F2` and loop end), the item's name (`0x4002F286`), the category (`0x4002EEB4`: icon and order) and the cursor (`0x4002FBAE`). Picking one, or turning the machine knob (`0x40031272`), goes through `0x40025594`: in front of it `sm_set_machine` sets machine 44, then writes the type and the start values in the sound's data (sound vtable `+40`, `data + 128 + 2 × index`) and calls the sound's "changed" (vtable `+16`), as the OS does after a machine change. |
 | Type | Logical index `0x1A`, the word of the Syntakt's overdrive (it runs after the engines): CPU #2 reads it, then zeroes it. |
+| Knob H of 2/2 | Logical index `0x36`, one of [xparams](../xparams)' extra indices (saved, p-lockable, copied with the locks to shared RAM `0x700` every block). On page 2/2 descriptor 503 is rewritten for it, on 1/2 back as `LEV`. Picking a machine sets it to 0. |
 | Same as the Digitakt | Start/end of each machine, the 256-point zero-crossing grid, the interpolation arithmetic. Checked against the Digitakt 1.54 code in the emulator, same inputs, same outputs. |
 | Ours | The interpolation table: two Kaiser-windowed sincs, five parameters fitted to the Digitakt's response (within 0.2 dB up to half the sample rate). `BR`, `LEV`'s curve (linear, 100 = unity) and WERP's timing (from the trig, as the Digitakt's `0x400ECE8E`: its phase restarts on each trig and moves with the tempo) is our own code. The second page and its graphics are ours: the Digitakt 1.54 has one page per machine. |
 | Level | One sample at `LEV` 100 plays at the level of SP TWINSHOT with one sample. |

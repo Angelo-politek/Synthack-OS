@@ -37,12 +37,11 @@ One row per modulator: operator 2 under the common controls on 1/3, operators 3 
 | CPU #2 | `engine/syn`, `engine/fm4.c`. Engine 4 (SY TONE) prep/render → SY FM4, in the [modarea7](../modarea7) engine area. SY TONE's prep always runs; ALGO 0 is SY TONE's render. Section 7 is the same in 1.40A, 1.41 and 1.42. |
 | CPU #1 | `engine/main/main_fm4.c`, mod area `+0x5800`. Three pages for machine 4 through [syn-pages](../syn-pages); descriptors 190–197 renamed; the algorithm drawn on page 3/3 under row 13 (above it the OS writes a turned value); turning `ALGO` leaves its name under the box (its knob not highlighted). |
 | Parameters | Descriptors 254–261 (Digitakt MIDI-track "CC1–CC8 Value", no page on the Syntakt), logical indices `0x36–0x3D`. The original uses the MIDI CC placeholders 1–5 and 12–14: on 1.42 they carry CC 1, 2, 6, 7, 10, 120, 121, 123. |
-| Storage | Sound slots `0x36–0x3D` (72 slots, 54 used). P-lock lanes `0x50–0x57`. Tables filled by `fm4m_boot` from the mod area boot list. |
-| To CPU #2 | `fm4m_dma_wait` replaces the render's eDMA 47 wait and copies the eight parameters of pages 2/3 and 3/3 (locks applied) to shared RAM `0x700`. |
+| Storage, p-locks, to CPU #2 | Pages 2/3 and 3/3 are logical indices `0x36–0x3D` of [xparams](../xparams): saved with the sound, p-lock lanes `0x50–0x57`, copied with the locks to shared RAM `0x700` every block. `fm4m_boot` registers page 2/3's defaults for sounds saved by a stock OS (`xp_on_empty`). |
 | Port | Addresses moved with `tools/build/osmap.py`. With the 1.40A addresses put back, every patched site has the hash of the original patcher (`tests/test_sy_fm4.py`). |
 
 ## Test
 
-`tests/test_sy_fm4.py`: sites against the original patcher's hashes; descriptors 254–261; the three pages, names and the 12 algorithm drawings on the main CPU emulator; boot list fills the storage tables on the real build; on the section 7 emulator (cold boot of the real compressed build) ALGO 0 equals stock SY TONE sample by sample, ALGO 1–11 sound and differ, SP TWINSHOT unchanged.
+`tests/test_sy_fm4.py`: sites against the original patcher's hashes; descriptors 254–261; the three pages, names and the 12 algorithm drawings on the main CPU emulator; a stock sound gets page 2/3's defaults; on the section 7 emulator (cold boot of the real compressed build) ALGO 0 equals stock SY TONE sample by sample, ALGO 1–11 sound and differ, SP TWINSHOT unchanged.
 
 Original tests by Rxuting on 1.40A hardware: install, every parameter, p-locks, 8 voices for 47 s recorded clean. On 1.42 hardware: `[wip]`, not tested yet.

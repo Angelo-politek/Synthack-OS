@@ -2,8 +2,8 @@
 
 - Port: ogni sito della sezione 3 con indirizzi, riportato agli indirizzi della 1.40A, ha l'impronta del patcher
   originale (provato sulla macchina da Rxuting); i siti senza indirizzi hanno gli stessi byte.
-- CPU #1: la build vera; l'azzeramento del BSS di modarea chiama fm4m_boot dalla lista di avvio e le tabelle di
-  slot e lane valgono come nell'originale.
+- CPU #1: salvataggio, p-lock e copia della pagina 2/3 verso la CPU #2 sono in xparams (tests/test_xparams.py);
+  qui i default di 2/3 per i suoni di un OS stock.
 - CPU #2: la sezione 7 compressa della build vera, avvio a freddo; ALGO 0 suona come SY TONE stock, campione per
   campione; ALGO 1-11 suonano e sono diversi.
 """
@@ -70,8 +70,9 @@ def test_sites_are_the_ones_of_the_original_patcher(stock):
                 b[k:k + 4] = struct.pack(">I", old)
                 k = b.find(struct.pack(">I", new), k + 1)
         assert hashlib.sha256(bytes(b)).hexdigest() == want, hex(addr)
-    sites = {int(p["addr"], 16) for p in SPEC["patches"] if not p.get("append")}
-    assert {a for a, _, _ in RXUTING} - {0x400A_7452 + 0, 0x400A_803E} <= sites | {0x4025_38C7, 0x4025_38CF}
+    xp = json.loads((ROOT / "mods" / "xparams" / "patch.json").read_text(encoding="utf-8"))
+    sites = {int(p["addr"], 16) for spec in (SPEC, xp) for p in spec["patches"] if not p.get("append")}
+    assert {a for a, _, _ in RXUTING} <= sites                          # i siti di salvataggio e copia: in xparams
 
 
 def test_page2_descriptors_replace_midi_track_cc_values(stock):
@@ -85,20 +86,21 @@ def test_page2_descriptors_replace_midi_track_cc_values(stock):
         assert mn <= de <= mx <= 0x7F00
 
 
-def test_boot_list_fills_the_storage_tables(built, stock):
+def test_stock_sound_gets_page2_defaults(built):
+    """Suono salvato da un OS stock (zeri negli indici 0x36..0x3d): xparams chiama fm4m_empty, registrato da
+    fm4m_boot, che scrive i default della pagina 2/3 (ALGO 0 = SY TONE, DET al centro)."""
     import test_modarea as MA
-    sec3, _ = built
-    uc, _ = MA.boot(sec3)
-    assert struct.unpack(">I", uc.mem_read(M.RAM + M.BOOT_LIST, 4))[0] == SYM["fm4m_boot"]
-    s3 = stock[0]
-    lix2phys = struct.unpack_from(">54I", s3, 0x4023_4344 - LOAD)
-    phys2lix = struct.unpack_from(">54I", s3, 0x4023_441C - LOAD)
-    l2p = struct.unpack(">71I", uc.mem_read(SYM["fm4m_sound_l2p"], 4 * 71))
-    p2l = struct.unpack(">71I", uc.mem_read(SYM["fm4m_sound_p2l"], 4 * 71))
-    lane = struct.unpack(">71I", uc.mem_read(SYM["fm4m_lane_of_lix"], 4 * 71))
-    assert l2p[:54] == lix2phys and p2l[:54] == phys2lix and lane[:54] == lix2phys
-    assert l2p[54:] == p2l[54:] == tuple(range(54, 71))
-    assert lane[54:62] == tuple(range(0x50, 0x58)) and set(lane[62:]) == {0xFF}
+    xp = {k: int(v, 16) for k, v in json.loads((ROOT / "mods" / "xparams" / "patch.json").read_text(
+        encoding="utf-8"))["symbols"].items()}
+    uc, _ = MA.boot(built[0])
+    sound, storage = 0x47FF_0000, 0x47FF_1000
+    uc.mem_write(sound, bytes(0x100))
+    uc.mem_write(storage, bytes(0x100))
+    MA.call(uc, xp["xp_load_params"], sound, storage)
+    got = struct.unpack(">8H", uc.mem_read(sound + 20 + 2 * 0x36, 16))
+    recs = [struct.unpack(">I", bytes.fromhex(p["hex"])[16:20])[0] for p in SPEC["patches"]
+            if p["what"].startswith("descrittore ") and "2/2" in p["what"]]
+    assert list(got) == recs and got[7] == 0x4000
 
 
 def play(e, machine, page2=None, blocks=60):
@@ -132,30 +134,6 @@ def test_engine_on_the_voice_cpu(built):
         assert o != tone[:len(o)]
         seen.add(tuple(o))
     assert len(seen) == 11
-
-
-def test_cpu1_cost_per_block(built):
-    """fm4m_dma_wait a ogni blocco audio della CPU #1: attesa dell'eDMA (gia' finita) e copia della pagina 2/2."""
-    import budget
-    import test_modarea as MA
-    from unicorn import UC_HOOK_CODE
-    from unicorn.m68k_const import UC_M68K_REG_A7, UC_M68K_REG_SR
-    uc, _ = MA.boot(built[0])
-    uc.mem_map(0x1000_0000, 0x2_0000)
-    uc.mem_map(0x8000_0000, 0x1_0000)
-    uc.mem_map(0xFC00_0000, 0x10_0000)
-    n = [0]
-    uc.hook_add(UC_HOOK_CODE, lambda *a: n.__setitem__(0, n[0] + 1))
-    uc.reg_write(UC_M68K_REG_SR, 0x2700)
-    uc.reg_write(UC_M68K_REG_A7, MA.STACK - 4)
-    uc.mem_write(MA.STACK - 4, struct.pack(">I", MA.RET))
-    uc.mem_write(0x8000_21B0, bytes(range(256)) * 8)
-    uc.emu_start(SYM["fm4m_dma_wait"], MA.RET, count=100_000)
-    print("fm4m_dma_wait:", n[0])
-    assert n[0] <= budget.AUDIO_CPU["sy-fm4"], n[0]
-    got = struct.unpack(">64H", uc.mem_read(0x1000_0700, 128))
-    seq = struct.unpack(">1024H", uc.mem_read(0x8000_21B0, 2048))
-    assert got == tuple(seq[0xE + t * 0x47 + 0x36 + k] for t in range(8) for k in range(8))
 
 
 def test_syn_page_on_an_fm4_track():

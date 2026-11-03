@@ -10,7 +10,9 @@
  *   (SM_FIRST + type) in place of machine 44; picking one sets machine 44, the type, and the type's start values
  *   of knobs E, F, G (sm_set_machine, in front of the OS's 0x40025594). The OS never stores 45..48;
  * - two SYN pages through syn-pages (sm_boot registers machine 44): 1/2 the Digitakt's page; 2/2 the sample's
- *   waveform with the type's three knobs and LEV under it;
+ *   waveform with the type's three knobs and one parameter of the machine's own under it (knob H: ONESHOT XFAD,
+ *   WERP RAND, REPITCH KEY, SLICE ORDR). It lives in logical index 0x36, which sy-fm4 saves, locks and copies to
+ *   the voice CPU; on page 2/2 knob H's descriptor (503) is LEV's rewritten for it, on 1/2 back as LEV;
  * - sm_invoke: the text of each value (the OS calls it through the std::function copied from sm_proto, see
  *   readable-values), and the names and ranges of knobs E, F, G for the track's type;
  * - sm_gfx: the graphic in each knob's box (std::function copied from sm_gfx_proto);
@@ -47,6 +49,7 @@ typedef int32_t s32;
 #define WAVE_COLS 112
 
 enum { LIX_TUNE = 0x12, LIX_PLAY, LIX_BR, LIX_SAMP, LIX_P5, LIX_P6, LIX_P7, LIX_LEV, LIX_TYPE };
+#define LIX_X 0x36                          /* knob H of page 2/2 (sy-fm4's extra index: saved, locked, sent) */
 enum { M_ONESHOT, M_WERP, M_REPITCH, M_SLICE };
 
 typedef struct {
@@ -73,6 +76,11 @@ static const knob_t knobs[4][3] = {
      {"Slice Grid", "GRID", 0, 0x400, 0}},
 };
 
+
+/* knob H: LEV on page 1/2; on 2/2 the machine's own parameter */
+static const knob_t lev = {"Sample Level", "LEV", 0, 0x7F00, 0x6400};
+static const knob_t xpar[4] = {{"Loop Crossfade", "XFAD", 0, 0x7F00, 0}, {"Random Jump", "RAND", 0, 0x7F00, 0},
+                               {"Key Tracking", "KEY", 0, 0x100, 0}, {"Slice Order", "ORDR", 0, 0x200, 0}};
 
 /* make_patch.py copies these into descriptors 497..504 (52 B each, as the OS's), with SP TWINSHOT's MIDI
  * fields and parameter numbers. SP TWINSHOT's page puts them on knobs A B C G E F H D: logical indices
@@ -162,6 +170,7 @@ static char *put_u(char *b, u32 n) {
 
 static const char *const play_names[4] = {"REV", "REV.L", "FWD.L", "FWD"};
 static const char *const seg_names[3] = {"1/32", "1/16", "1/8"};
+static const char *const ordr_names[3] = {"SLICE", "NEXT", "RAND"};
 
 static u32 id_of(const void *fn, u32 field) {
     u32 off = (u32)fn - (OBJS + field), id = off / OBJ_SIZE;
@@ -199,6 +208,16 @@ static void format(u32 id, s32 value, char *buf, int t) {
             b = put_u(b, 4u << clampi((s32)i, 4));
         else
             b = put_u(b, 1u << clampi((s32)i, 3));
+        break;
+    case ID_H:                                  /* LEV, or the machine's own on page 2/2 */
+        if (ROW(ID_H)->lix != LIX_X)
+            b = put_u(b, i);
+        else if (t == M_REPITCH)
+            b = put_s(b, i ? "ON" : "OFF");
+        else if (t == M_SLICE)
+            b = put_s(b, ordr_names[clampi((s32)i, 2)]);
+        else
+            b = put_u(b, i);
         break;
     default:                                    /* BR, and anything else: 0..127 */
         b = put_u(b, i);
@@ -365,8 +384,11 @@ void sm_gfx(const void *fn, s32 val, void *bm, s32 x, s32 y) {
         }
         break;
     case ID_H:
-        stock_gfx(ID_STOCK_LEV, val, bm, x, y);
-        return;
+        if (ROW(ID_H)->lix != LIX_X) {
+            stock_gfx(ID_STOCK_LEV, val, bm, x, y);
+            return;
+        }
+        break;
     }
     format(id, val, buf, ty);
     text(bm, x, y, buf);
@@ -378,13 +400,17 @@ const void *const sm_gfx_proto[4] __attribute__((aligned(4))) = {0, 0, (const vo
 
 /* ---- pages (syn-pages) */
 
-/* page 2/2: knobs A..D under the waveform (none), the type's three, LEV; LEVEL */
+/* page 2/2: knobs A..D under the waveform (none), the type's three, the machine's own; LEVEL */
 static const u32 page2[9] = {0, 0, 0, 0, ID_P5, ID_P6, ID_P7, ID_H, 10};
 
 static u32 sm_record(void *view, u32 page, u32 knob) {
-    fit_knobs(track_type());
-    if (page == 1)
+    int t = track_type();
+    fit_knobs(t);
+    if (page == 1) {
+        set_row(ID_H, &xpar[t], LIX_X);
         return knob < 9 ? page2[knob] : 0;
+    }
+    set_row(ID_H, &lev, LIX_LEV);
     return SP_ORIG_RECORD(view, knob);
 }
 
@@ -514,6 +540,7 @@ u32 sm_set_machine(void *sound, u32 machine, u32 track, u32 flag) {
     if (type >= 4)
         return sm_orig_set_machine(sound, machine, track, flag);
     fit_knobs((int)type);
+    set_row(ID_H, &lev, LIX_LEV);               /* the OS's reset sees LEV's descriptor */
     u32 from = OS_SOUND_MACHINE(sound);
     u32 r = sm_orig_set_machine(sound, SM_MACHINE, track, flag);
     if (!(r & 0xFF))
@@ -530,6 +557,7 @@ u32 sm_set_machine(void *sound, u32 machine, u32 track, u32 flag) {
     for (int k = 0; k < 3; k++)
         w[LIX_P5 + k] = (uint16_t)knobs[type][k].def;
     w[LIX_TYPE] = (uint16_t)(type << 8);
+    w[LIX_X] = (uint16_t)xpar[type].def;
     ((void (*)(void *, u32))vt[SOUND_CHANGED / 4])(sound, 0);
     return r;
 }

@@ -389,6 +389,58 @@ def test_slice_and_repitch(engines):
     assert abs(freq(out[TAIL:]) - 500) < 30
 
 
+def xpar(e, v):
+    """Manopola H della 2/2 (indice 0x36): sy-fm4 la copia nella RAM condivisa a 0x700, 16 byte a voce."""
+    e.uc.mem_write(0x700, struct.pack(">h", v << 8))
+
+
+def test_knob_h_per_machine(engines):
+    """XFAD, RAND, KEY, ORDR: 0 lascia la machine come la Digitakt."""
+    e, _ = engines
+    try:
+        n = 48000                                       # 4 slice: 500, 1000, 2000, 4000 Hz
+        load_sample(e, [int(12000 * math.sin(2 * math.pi * f * i / SR)) for f in (500, 1000, 2000, 4000)
+                        for i in range(n // 4)])
+        # SLICE ORDR NEXT: a ogni trig la slice successiva, da SLICE 2
+        xpar(e, 1)
+        p = frame([0x4000, 0x300, 0, 0, 2 << 8, 0, 0, 0x6400], typ=0x300)
+        got = []
+        for trig in range(4):
+            out = []
+            for b in range(40):
+                q = bytearray(p)
+                if b in ((0, 2) if trig == 0 else (0,)):
+                    q[0x180] = 1
+                out += e.render_block(bytes(q))[0]
+            got.append(freq(out[TAIL:TAIL + 512]))
+        assert [round(f / 500) for f in got] == [4, 8, 1, 2], got            # 2 trig al primo giro: 3, 4, 1, 2
+        # REPITCH KEY ON: nota +12 = un'ottava sopra; OFF (0) come la Digitakt
+        load_sample(e, sine(48000))
+        xpar(e, 1)
+        up = play(e, [0x4000, 0x300, 0, 0, 0, 0x7800, 0, 0x6400], blocks=40, typ=0x200, note=72)
+        xpar(e, 0)
+        flat = play(e, [0x4000, 0x300, 0, 0, 0, 0x7800, 0, 0x6400], blocks=40, typ=0x200, note=72)
+        assert abs(freq(up[TAIL:]) - 1000) < 60 and abs(freq(flat[TAIL:]) - 500) < 30
+        # ONESHOT XFAD: loop su 2000 campioni di un seno a 1001 Hz (fase sbagliata alla giunzione)
+        load_sample(e, sine(8000, 1001.0))
+        words = [0x4000, 0x200, 0, 0, 0, 0x2000, 0x1001, 0x6400]           # FWD.L, LEN 32, LOOP 16
+        hard = play(e, words, blocks=120)
+        xpar(e, 127)
+        soft = play(e, words, blocks=120)
+        jump = lambda x: max(abs(x[i] - x[i - 1]) for i in range(TAIL * 4, len(x)))   # noqa: E731
+        assert jump(soft) < 0.8 * jump(hard)
+        # WERP RAND: 127 cambia la sequenza dei segmenti, 0 no
+        load_sample(e, [int(12000 * math.sin(2 * math.pi * (200 + 3000 * i / 96000) * i / SR)) for i in range(96000)])
+        xpar(e, 0)
+        w0 = play(e, [0x4000, 0x300, 0, 0, 0x000, 0x300, 0x000, 0x6400], blocks=200, typ=0x100)
+        w0b = play(e, [0x4000, 0x300, 0, 0, 0x000, 0x300, 0x000, 0x6400], blocks=200, typ=0x100)
+        xpar(e, 127)
+        w1 = play(e, [0x4000, 0x300, 0, 0, 0x000, 0x300, 0x000, 0x6400], blocks=200, typ=0x100)
+        assert w0[TAIL:] == w0b[TAIL:] and w1[TAIL:] != w0[TAIL:] and peak(w1) > 0   # dopo il trig
+    finally:
+        xpar(e, 0)
+
+
 def test_type_word_does_not_reach_the_overdrive(built):
     """TYPE viaggia nella parola 0x1A, quella che l'overdrive comune (0x4000112C) legge dopo i motori: il prep la
     legge e la azzera. Con SLICE (0x300) la parola e' 0 quando gira l'overdrive."""
@@ -536,8 +588,8 @@ def test_main_cpu_cost_per_block(ui):
 
 def test_syn_pages():
     """Pagine SYN da syn-pages (vista SRC, machine del suono = 44). 1/2: la pagina della Digitakt, H = LEV
-    (indice 0x19). 2/2: niente manopole sotto la forma d'onda, i tre del tipo, H = LEV (il tipo si sceglie dal menu
-    delle machine). Titoli col nome della machine della Digitakt. La 2/2 chiede alla CPU #2 il profilo dello slot della traccia e lo disegna quando e' pronto;
+    (indice 0x19). 2/2: niente manopole sotto la forma d'onda, i tre del tipo, H = il parametro della machine
+    (indice 0x36: XFAD, RAND, KEY, ORDR); il tipo si sceglie dal menu delle machine. Titoli col nome della machine della Digitakt. La 2/2 chiede alla CPU #2 il profilo dello slot della traccia e lo disegna quando e' pronto;
     sm_block chiede un ridisegno quando ne arriva dell'altro."""
     from syn_view import SynView
     v = SynView(["sampler"], machine=44)
@@ -548,10 +600,16 @@ def test_syn_pages():
     v.set_value(0, 0x15, 5 << 8)                                   # SAMP 6
     v.page(1)
     assert v.knobs() == [0, 0, 0, 0, 501, 502, 500, 503, 10]
-    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 2/2"
-    v.set_value(0, 0x1A, 3 << 8)
+    assert lix() == 0x36 and short(ui, 503) == "XFAD" and v.title() == b"SAMPLE 2/2"   # H: il parametro della machine
+    for t, name, texts in ((1, "RAND", {0: "0", 127: "127"}), (2, "KEY", {0: "OFF", 1: "ON"}),
+                           (3, "ORDR", {0: "SLICE", 1: "NEXT", 2: "RAND"})):
+        v.set_value(0, 0x1A, t << 8)
+        v.record(7)
+        assert short(ui, 503) == name and lix() == 0x36
+        assert {k: text(ui, 503, k << 8) for k in texts} == texts
     assert v.title() == b"SLICE 2/2"
     v.set_value(0, 0x1A, 0)
+    v.record(7)
     waiting = v.frame()
     assert struct.unpack(">H", ui.uc.mem_read(0x1000_05B0, 2))[0] == 6
     ui.put(0x1000_05B4, ">HH", 6, 112)

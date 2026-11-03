@@ -198,10 +198,11 @@ def main() -> None:
          "ram": f"{E.RAM + OFF_ENGINE:#010x}", "what": "(area motori) SAMPLER sulla CPU #2"},
     ]
     spec = {
-        "name": "sampler", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages"],
+        "name": "sampler", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "xparams"],
         "description": "SAMPLER al posto di SP TWINSHOT: le machine a campioni della Digitakt (ONESHOT, WERP, "
                        "REPITCH, SLICE), riscritte, come quattro machine nel menu. SYN 1/2 come la Digitakt (TUNE PLAY BR "
-                       "SAMP / tre parametri del tipo / LEV), SYN 2/2 la forma d'onda con i tre parametri e LEV.",
+                       "SAMP / tre parametri del tipo / LEV), SYN 2/2 la forma d'onda con i tre parametri e uno proprio della "
+                       "machine (XFAD, RAND, KEY, ORDR), nell'indice 0x36 di xparams.",
         "generated_by": "mods/sampler/make_patch.py",
         "symbols": {k: f"{v:#010x}" for k, v in sorted(s3.items()) if k.startswith("sm_")}
         | {k: f"{v:#010x}" for k, v in sorted(s7.items()) if k.startswith(("syn_smp", "smp_", "sm_"))},

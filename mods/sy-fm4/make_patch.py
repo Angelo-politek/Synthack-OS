@@ -29,23 +29,20 @@ import engine_layout as E  # noqa: E402
 import modarea_layout as M  # noqa: E402
 import registry  # noqa: E402
 import synpages_layout as SP  # noqa: E402
+import xparams_layout as XP  # noqa: E402
 
 LOAD = 0x4000_0400
 OFF_MAIN = 0x5800                       # area mod (registry.py)
 OFF_ENGINE = 0x0000                     # area motori di modarea7 (registry.py)
 BOOT_SLOT = next(n for n, who in registry.BOOT_SLOTS.items() if who == "sy-fm4")
 TOOLS = "~/tools/m68k/root"
-CFLAGS = f"-DSP_TABLE={SP.TABLE:#x} -mcpu=54418 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer"
+CFLAGS = f"-DSP_TABLE={SP.TABLE:#x} -DXP_TABLE={XP.TABLE:#x} -mcpu=54418 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer"
 
 # sezione 3 (OS 1.42)
 PAGE1_IDS = range(190, 198)             # SY TONE: nomi di pagina 1/2 (fm4m_names)
 DESC = 0x4022_D83C                      # descrittori, 52 B per id
 PAGE2_IDS = range(254, 262)             # "CC1..CC8 Value" delle tracce MIDI della Digitakt: nessuna pagina sulla Syntakt
-LIX2PHYS, PHYS2LIX = 0x4023_4344, 0x4023_441C
-SAVE_LEA, SAVE_BOUND = 0x400A_7436, 0x400A_7452
-LOAD_LOOP = 0x400A_706A                 # 34 B: ciclo degli slot del deserializzatore
-LOCK_W_A, LOCK_W_B, LOCK_R_BOUND = 0x400A_81CA, 0x400A_8336, 0x400A_803E
-PHYS_TO_LIX, DMA_WAIT, INDEX_DONE = 0x400A_6D32, 0x400A_20AE, 0x400A_61B0
+INDEX_DONE = 0x400A_61B0                # tabelle degli indici: default di 2/3 (salvataggio, p-lock, copia: xparams)
 NAME, SHORT = 0x4025_38C7, 0x4025_38CF
 # sezione 7 (identica in 1.40A, 1.41, 1.42)
 RENDER_TABLE, PREP_TABLE, ENGINE = 0x4001_48F0, 0x4001_4920, 4
@@ -91,6 +88,7 @@ def compile_blob(sources: list[str], base: int, entry: str, opt: str) -> tuple[b
         tmp = Path(tmp)
         shutil.copytree(HERE / "engine", tmp / "engine")
         shutil.copy(REPO / "mods" / "syn-pages" / "synpages.h", tmp / "engine" / "synpages.h")
+        shutil.copy(REPO / "mods" / "xparams" / "xparams.h", tmp / "engine" / "xparams.h")
         (tmp / "blob.ld").write_text(LDS.format(entry=entry, base=base), encoding="ascii")
         w = eft.to_wsl_path(tmp)
         env = f"R={TOOLS}; export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu; cd {w}; "
@@ -136,10 +134,10 @@ def main() -> None:
                 "hex": new.hex(), "what": what}
 
     p = [{"section": 3, "addr": f"{M.IMG + OFF_MAIN:#010X}", "len": len(blob3), "append": True, "hex": blob3.hex(),
-          "ram": f"{main_ram:#010x}", "what": "(area mod) main_fm4.c: pagina 2/2, salvataggio, RAM condivisa"},
+          "ram": f"{main_ram:#010x}", "what": "(area mod) main_fm4.c: pagine SYN, schemi degli algoritmi"},
          {"section": 3, "addr": f"{M.boot_slot(BOOT_SLOT):#010X}", "len": 4, "append": True,
           "hex": long(s3["fm4m_boot"]).hex(), "ram": f"{M.RAM + M.BOOT_LIST + 4 * BOOT_SLOT:#010x}",
-          "what": "(area mod) lista di avvio: fm4m_boot (tabelle degli slot e delle lane)"}]
+          "what": "(area mod) lista di avvio: fm4m_boot (pagine SYN, default di 2/3 per i suoni stock)"}]
     names = s3["fm4m_names"] - main_ram
     for k, i in enumerate(PAGE1_IDS):
         row = DESC + 52 * i
@@ -161,18 +159,6 @@ def main() -> None:
             raise SystemExit(f"record {k}: id {struct.unpack_from('>I', rec, 32)[0]}, atteso {i}")
         p.append(fixed(sec3, 3, row, rec, f"descrittore {i}: SY FM4 pagina 2/2"))
     p += [
-        fixed(sec3, 3, SAVE_LEA, b"\x41\xf9" + long(s3["fm4m_sound_l2p"]), "salvataggio del suono: tabella degli slot",
-              b"\x41\xf9" + long(LIX2PHYS)),
-        fixed(sec3, 3, SAVE_BOUND, b"\x72\x7c", "salvataggio del suono: fino all'indice 0x3d", b"\x72\x6c"),
-        fixed(sec3, 3, LOAD_LOOP, b"\x4e\xb9" + long(s3["fm4m_load_shim"]) + b"\x43\xf9" + long(s3["fm4m_sound_p2l"])
-              + b"\x4e\x71" * 11, "caricamento del suono: fm4m_load_shim (default di 2/2 per i suoni stock)"),
-        fixed(sec3, 3, LOCK_W_A, b"\x4b\xf9" + long(s3["fm4m_lane_of_lix"]), "p-lock, scrittura A: lane di 2/2",
-              b"\x4b\xf9" + long(LIX2PHYS)),
-        fixed(sec3, 3, LOCK_W_B, b"\x45\xf9" + long(s3["fm4m_lane_of_lix"]), "p-lock, scrittura B: lane di 2/2",
-              b"\x45\xf9" + long(LIX2PHYS)),
-        fixed(sec3, 3, LOCK_R_BOUND, b"\x7a\x57", "p-lock, lettura: lane fino a 0x57", b"\x7a\x46"),
-        fixed(sec3, 3, PHYS_TO_LIX, b"\x4e\xf9" + long(s3["fm4m_phys_to_lix"]), "slot/lane -> indice logico"),
-        fixed(sec3, 3, DMA_WAIT, b"\x4e\xf9" + long(s3["fm4m_dma_wait"]), "attesa eDMA 47: pagina 2/2 nella RAM condivisa"),
         fixed(sec3, 3, INDEX_DONE, b"\x4e\xb9" + long(s3["fm4m_index_done"]), "tabelle degli indici: default di 2/2"),
         fixed(sec3, 3, NAME, b"SY FM4\x00\x00", "nome della machine 4", b"SY TONE\x00"),
         fixed(sec3, 3, SHORT, b"SYF4\x00", "sigla della machine 4", b"SYTN\x00"),
@@ -186,7 +172,7 @@ def main() -> None:
          "ram": f"{E.RAM + OFF_ENGINE:#010x}", "what": "(area motori) SY FM4 sulla CPU #2"},
     ]
     spec = {
-        "name": "sy-fm4", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "fastmix"],
+        "name": "sy-fm4", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "xparams", "fastmix"],
         "description": "SY FM4 (Rxuting, MIT): SY TONE diventa una machine FM a 4 operatori. ALGO 0 = SY TONE, "
                        "ALGO 1-11 algoritmi FM; seconda pagina SYN (ALGO, RAT3, LEV3, DEC3, DET, RAT4, LEV4, DEC4), "
                        "salvata con il suono e con i p-lock.",
