@@ -55,6 +55,14 @@ BLOCK_CALL = 0x400A_4E78                # jsr 0x40095608 nell'interrupt audio: u
 BLOCK_WAS = 0x4009_5608
 # sezione 7 (identica in 1.40A, 1.41, 1.42)
 RENDER_TABLE, PREP_TABLE, ENGINE = 0x4001_48F0, 0x4001_4920, 11
+# the machine menu (main/smp_main.c, "the machine menu")
+LIST_ALLOWED = 0x4002_6514               # lea 0x400a64f2,a3: machine allowed, in the list's loop (0x400264B6)
+LIST_END = 0x4002_6556                   # moveq #45,d0: the loop's end
+ITEM_NAME = 0x4002_F286                  # jsr 0x400a6704: the item's name
+CATEGORY_FN = 0x4002_EEB4                # machine -> category (icon, order of the list)
+CURSOR = 0x4002_FBAE                     # move.l 460(a2),d0; moveq #45,d2; move.l d0,d1: the cursor's machine
+KNOB_MACHINE = 0x4003_1272               # jsr 0x400249ce: the machine knob's current machine
+SET_MACHINE = 0x4002_5594                # set a sound's machine (menu, machine knob)
 
 MAIN_SRC = ["main/smp_main.c"]
 SYN_SRC = ["engine/entries.c", "engine/syn.c", "engine/pos.c", "engine/interp.c", "engine/interp_table.c"]
@@ -145,7 +153,7 @@ def main() -> None:
 
     p = [{"section": 3, "addr": f"{M.IMG + OFF_MAIN:#010X}", "len": len(blob3), "append": True, "hex": blob3.hex(),
           "ram": f"{main_ram:#010x}", "what": "(area mod) smp_main.c: testi dei valori, nomi per tipo, tempo"}]
-    proto, block, rows, gfx, boot = struct.unpack_from(">5I", blob3, 0)
+    proto, block, rows, gfx, boot, allowed, name, category, current, cursor, setm = struct.unpack_from(">11I", blob3, 0)
     p.append({"section": 3, "addr": f"{M.boot_slot(BOOT_SLOT):#010X}", "len": 4, "append": True,
               "hex": long(boot).hex(), "ram": f"{M.RAM + M.BOOT_LIST + 4 * BOOT_SLOT:#010x}",
               "what": "(area mod) lista di avvio: sm_boot (pagine SYN in syn-pages)"})
@@ -166,6 +174,19 @@ def main() -> None:
         fixed(sec3, 3, SHORT, b"SMPL\x00", "sigla della machine 44", b"SPTS\x00"),
         fixed(sec3, 3, BLOCK_CALL, b"\x4e\xb9" + long(block), "interrupt audio: sm_block (tempo nella RAM condivisa)",
               b"\x4e\xb9" + long(BLOCK_WAS)),
+        fixed(sec3, 3, LIST_ALLOWED, b"\x47\xf9" + long(allowed), "elenco delle machine: sm_menu_allowed (45..48 al posto di 44)",
+              bytes.fromhex("47f9400a64f2")),
+        fixed(sec3, 3, LIST_END, bytes.fromhex("7031"), "elenco delle machine: id fino a 48", bytes.fromhex("702d")),
+        fixed(sec3, 3, ITEM_NAME, b"\x4e\xb9" + long(name), "menu delle machine: sm_menu_name (ONESHOT WERP REPITCH SLICE)",
+              bytes.fromhex("4eb9400a6704")),
+        fixed(sec3, 3, CATEGORY_FN, b"\x4e\xf9" + long(category), "categoria della machine: sm_category (45..48 come 44)",
+              bytes.fromhex("722c202f0004")),
+        fixed(sec3, 3, CURSOR, b"\x4e\xb9" + long(cursor) + bytes.fromhex("6006"),
+              "menu delle machine: cursore sul tipo della traccia (sm_menu_cursor)", bytes.fromhex("202a01cc742d2200")),
+        fixed(sec3, 3, KNOB_MACHINE, b"\x4e\xb9" + long(current), "manopola della machine: sm_current_machine",
+              bytes.fromhex("4eb9400249ce")),
+        fixed(sec3, 3, SET_MACHINE, b"\x4e\xf9" + long(setm) + bytes.fromhex("4e71"),
+              "machine del suono: sm_set_machine (tipo e valori di partenza)", bytes.fromhex("4fefffd848d77c7c")),
     ]
     prep, render = struct.unpack_from(">2I", blob7, 0)
     p += [
@@ -179,8 +200,8 @@ def main() -> None:
     spec = {
         "name": "sampler", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages"],
         "description": "SAMPLER al posto di SP TWINSHOT: le machine a campioni della Digitakt (ONESHOT, WERP, "
-                       "REPITCH, SLICE), riscritte. SYN 1/2 come la Digitakt (TUNE PLAY BR SAMP / tre parametri del tipo / LEV), "
-                       "SYN 2/2 la forma d'onda con i tre parametri e TYPE.",
+                       "REPITCH, SLICE), riscritte, come quattro machine nel menu. SYN 1/2 come la Digitakt (TUNE PLAY BR "
+                       "SAMP / tre parametri del tipo / LEV), SYN 2/2 la forma d'onda con i tre parametri e LEV.",
         "generated_by": "mods/sampler/make_patch.py",
         "symbols": {k: f"{v:#010x}" for k, v in sorted(s3.items()) if k.startswith("sm_")}
         | {k: f"{v:#010x}" for k, v in sorted(s7.items()) if k.startswith(("syn_smp", "smp_", "sm_"))},

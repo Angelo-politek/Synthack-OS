@@ -491,7 +491,7 @@ def test_page_names_and_values(ui):
     tab = ui.tab("SRC")
     ids = [ui.param(tab, e) for e in "ABCDEFGH"]
     lix = [struct.unpack(">I", ui.uc.mem_read(DESC + 52 * i + 4, 4))[0] for i in ids]
-    assert lix == list(range(0x12, 0x1A))                        # A..H = indici 0x12..0x19 (TYPE in 0x1A, 2/2)
+    assert lix == list(range(0x12, 0x1A))                        # A..H = indici 0x12..0x19 (il tipo in 0x1A, dal menu)
     assert [short(ui, i) for i in ids[:4]] + [short(ui, ids[7])] == ["TUNE", "PLAY", "BR", "SAMP", "LEV"]
     for i in ids[1:]:                                            # TUNE tiene formattatore e grafica dell'OS
         f = struct.unpack(">8I", ui.uc.mem_read(OBJS + 84 * i + 20, 32))
@@ -536,8 +536,8 @@ def test_main_cpu_cost_per_block(ui):
 
 def test_syn_pages():
     """Pagine SYN da syn-pages (vista SRC, machine del suono = 44). 1/2: la pagina della Digitakt, H = LEV
-    (indice 0x19). 2/2: niente manopole sotto la forma d'onda, i tre del tipo, H = TYPE (descrittore 503 riscritto
-    sull'indice 0x1A). La 2/2 chiede alla CPU #2 il profilo dello slot della traccia e lo disegna quando e' pronto;
+    (indice 0x19). 2/2: niente manopole sotto la forma d'onda, i tre del tipo, H = LEV (il tipo si sceglie dal menu
+    delle machine). Titoli col nome della machine della Digitakt. La 2/2 chiede alla CPU #2 il profilo dello slot della traccia e lo disegna quando e' pronto;
     sm_block chiede un ridisegno quando ne arriva dell'altro."""
     from syn_view import SynView
     v = SynView(["sampler"], machine=44)
@@ -548,7 +548,10 @@ def test_syn_pages():
     v.set_value(0, 0x15, 5 << 8)                                   # SAMP 6
     v.page(1)
     assert v.knobs() == [0, 0, 0, 0, 501, 502, 500, 503, 10]
-    assert lix() == 0x1A and short(ui, 503) == "TYPE" and v.title() == b"SAMPLE 2/2"
+    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 2/2"
+    v.set_value(0, 0x1A, 3 << 8)
+    assert v.title() == b"SLICE 2/2"
+    v.set_value(0, 0x1A, 0)
     waiting = v.frame()
     assert struct.unpack(">H", ui.uc.mem_read(0x1000_05B0, 2))[0] == 6
     ui.put(0x1000_05B4, ">HH", 6, 112)
@@ -566,6 +569,52 @@ def test_syn_pages():
     ui.put(0x1000_05B6, ">H", 50)
     ui.call(ui.sym["sm_block"], [0])
     assert ui.uc.mem_read(0x4FE0_4000 + 96, 1) == b"\x01"
+
+
+def test_machine_menu():
+    """Menu delle machine: ONESHOT, WERP, REPITCH, SLICE (valori 45..48) al posto della machine 44 nell'elenco delle
+    tracce digitali (0x400264B6), nella categoria della 44; la scelta (0x40025594) imposta la machine 44, il tipo
+    nella parola 0x1A e i valori di partenza di E F G del tipo; da un'altra machine anche TUNE PLAY BR LEV (SAMP
+    resta). Cursore del menu e manopola della machine vedono il valore del tipo della traccia."""
+    import screens
+    from unicorn.m68k_const import UC_M68K_REG_A0, UC_M68K_REG_A2
+    u = screens.UI(["sampler"])
+    out = 0x4FE0_3000
+    u.uc.mem_write(out, bytes(12))
+    u.uc.reg_write(UC_M68K_REG_A0, out)
+    u.call(0x4002_64B6, [0])                                      # traccia 1, digitale
+    ids = [u.long(a) for a in range(u.long(out), u.long(out + 4), 4)]
+    assert 44 not in ids and ids[ids.index(45):ids.index(45) + 4] == [45, 46, 47, 48]
+    name = lambda i: bytes(u.uc.mem_read(u.call(u.sym["sm_menu_name"], [i]), 12)).split(b"\0")[0]   # noqa: E731
+    assert [name(i) for i in (45, 46, 47, 48)] == [b"ONESHOT", b"WERP", b"REPITCH", b"SLICE"]
+    assert name(0) == b"BD MODERN"
+    assert [u.call(0x4002_EEB4, [i]) for i in (44, 45, 48, 0, 99)] == [11, 11, 11, 1, 0]
+    out8 = 0x4FE0_3100
+    u.uc.mem_write(out8, bytes(12))
+    u.uc.reg_write(UC_M68K_REG_A0, out8)
+    u.call(0x4002_64B6, [8])                                      # traccia 9, analogica: niente sampler
+    assert not {44, 45, 46, 47, 48} & {u.long(a) for a in range(u.long(out8), u.long(out8 + 4), 4)}
+    src = u.tab("SRC")
+    trk = u.call(0x4001_FF74, [u.long(src + 116)])
+    snd = u.call(0x4000_F04C, [u.long(src + 120), trk])
+    data = u.call(u.long(u.long(snd) + 40), [snd])
+    w = lambda: list(struct.unpack(">9H", u.uc.mem_read(data + 128 + 2 * 0x12, 18)))   # noqa: E731
+    u.put(data + 128 + 2 * 0x15, ">H", 7 << 8)                     # SAMP 8: resta
+    assert u.call(0x4002_5594, [snd, 48, trk, 0]) & 0xFF
+    assert u.uc.mem_read(data + 162, 1)[0] == 44
+    assert w() == [0x4000, 0x300, 0, 0x700, 0, 0, 0, 0x6400, 0x300]       # SLICE: NOTE, LEN 1, GRID 4
+    u.put(data + 128 + 2 * 0x12, ">H", 0x4C00)                     # TUNE +12: resta passando a WERP
+    assert u.call(0x4002_5594, [snd, 46, trk, 0]) & 0xFF
+    assert w() == [0x4C00, 0x300, 0, 0x700, 0x100, 0x300, 0x200, 0x6400, 0x100]   # SEG 1/16, MODE FWD, BARS 4
+    assert u.call(0x4002_5594, [snd, 45, trk, 0]) & 0xFF
+    assert w()[4:7] == [0, 0x7800, 0]                              # ONESHOT: STRT 0, LEN 120, LOOP OFF
+    seq = 0x8000_21B0 + 2 * (0xE + 0x1A)
+    u.put(seq, ">h", 2 << 8)                                       # la traccia attiva e' REPITCH
+    u.uc.reg_write(UC_M68K_REG_A2, out)
+    u.put(out + 460, ">I", 44)
+    assert u.call(u.sym["sm_menu_cursor"]) == 47
+    u.put(out + 460, ">I", 3)
+    assert u.call(u.sym["sm_menu_cursor"]) == 3
 
 
 def screens_pixels(frame):

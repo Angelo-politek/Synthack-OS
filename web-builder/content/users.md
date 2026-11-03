@@ -250,28 +250,27 @@ Saved with the sound. Every parameter is p-lockable.
 
 ## SAMPLER
 
-The Digitakt's sample machines in place of SP TWINSHOT: ONESHOT, WERP, REPITCH and SLICE.
+The Digitakt's sample machines in place of SP TWINSHOT: ONESHOT, WERP, REPITCH and SLICE, four machines in the menu.
 
 <!-- @screen:sampler/page -->
 <!-- @screen:sampler/wave -->
 
 1. Load samples as for SP TWINSHOT. 64 slots.
-2. Select a digital track. Pick **SAMPLER** as its machine. It replaces SP TWINSHOT in the list.
-3. Open the **SYN** page: page 1/2, laid out as the Digitakt's.
+2. Select a digital track. Pick **ONESHOT**, **WERP**, **REPITCH** or **SLICE** as its machine. They replace SP TWINSHOT in the menu. Knobs E, F, G start at the machine's values; coming from another machine, `TUNE`, `PLAY`, `BR` and `LEV` start at their defaults too.
+3. Open the **SYN** page: page 1/2, laid out as the Digitakt's. The page title shows the machine: `SAMPLE`, `WERP`, `REPITCH`, `SLICE`.
 4. Press **SYN** again for page 2/2: the sample's waveform.
-5. Turn **H** (`TYPE`) to pick the machine. Knobs E, F, G follow it. The page title shows the machine: `SAMPLE`, `WERP`, `REPITCH`, `SLICE`.
 
 | Page | Knobs A–D | Knobs E–H |
 |---|---|---|
-| 1/2 | `TUNE` `PLAY` `BR` `SAMP` | E F G by `TYPE`, `LEV` |
-| 2/2 | waveform | E F G by `TYPE`, `TYPE` |
+| 1/2 | `TUNE` `PLAY` `BR` `SAMP` | E F G by machine, `LEV` |
+| 2/2 | waveform | E F G by machine, `LEV` |
 
-| `TYPE` | E | F | G |
+| Machine | E | F | G |
 |---|---|---|---|
-| `ONE` (ONESHOT) | `STRT` 0–120 | `LEN` 0–120 | `LOOP` (`OFF` = loop from `STRT`) |
-| `WERP` | `SEG` 1/32, 1/16, 1/8 | `MODE` segment play mode | `BARS` 1, 2, 4, 8 |
-| `PTCH` (REPITCH) | `STRT` | `LEN` | `BARS` 1, 2, 4, 8 |
-| `SLIC` (SLICE) | `SLICE`: `NOTE`, 1–64 | `LEN` 1–64 slices | `GRID` 4, 8, 16, 32, 64 |
+| ONESHOT | `STRT` 0–120 | `LEN` 0–120 | `LOOP` (`OFF` = loop from `STRT`) |
+| WERP | `SEG` 1/32, 1/16, 1/8 | `MODE` segment play mode | `BARS` 1, 2, 4, 8 |
+| REPITCH | `STRT` | `LEN` | `BARS` 1, 2, 4, 8 |
+| SLICE | `SLICE`: `NOTE`, 1–64 | `LEN` 1–64 slices | `GRID` 4, 8, 16, 32, 64 |
 
 | Control | Values |
 |---|---|
@@ -284,14 +283,14 @@ The Digitakt's sample machines in place of SP TWINSHOT: ONESHOT, WERP, REPITCH a
 On page 2/2:
 
 - The part that plays is solid, the rest dotted. A line marks each end.
-- `ONE`: the loop point is a dashed line, flagged at the bottom.
-- `SLIC`: the grid's slices are dotted, the slice picked is solid.
+- ONESHOT: the loop point is a dashed line, flagged at the bottom.
+- SLICE: the grid's slices are dotted, the slice picked is solid.
 
-| `TYPE` | How it plays |
+| Machine | How it plays |
 |---|---|
-| `WERP` | the sample spans `BARS` bars at the tempo, from each trig; each segment starts on time, at its pitch |
-| `PTCH` | the part plays in `BARS` bars at the tempo; `TUNE` and the note don't transpose it |
-| `SLIC` | slices start on the nearest zero crossing; with `SLICE` at `NOTE` the note picks the slice |
+| WERP | the sample spans `BARS` bars at the tempo, from each trig; each segment starts on time, at its pitch |
+| REPITCH | the part plays in `BARS` bars at the tempo; `TUNE` and the note don't transpose it |
+| SLICE | slices start on the nearest zero crossing; with `SLICE` at `NOTE` the note picks the slice |
 
 With `SLICE` at `NOTE`, slice = (note − 12) modulo the number of slices. Up to 16 slices, C4 plays slice 1. The note doesn't transpose. Play the slices from the keyboard in chromatic mode.
 
@@ -299,7 +298,7 @@ Saved with the sound. Every parameter is p-lockable.
 
 `[!]` Sounds made with SP TWINSHOT open as SAMPLER and sound different.
 
-`[!]` No `OVER` on this machine: `TYPE` takes its place.
+`[!]` No `OVER` on these machines. Elsewhere in the OS (the machine knob's name) the four show as `SAMPLER`.
 
 `[!]` The track's AMP envelope still shapes the sound. `HOLD` at `NOTE` (127) holds it for the trig's length only: for whole samples, use a long `HOLD` or `DEC` at `INF`.
 

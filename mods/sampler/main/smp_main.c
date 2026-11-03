@@ -6,9 +6,11 @@
  * engine like any machine's; nothing here is saved.
  *
  * Here:
+ * - four machines in the machine menu, as on the Digitakt: ONESHOT, WERP, REPITCH, SLICE are menu values 45..48
+ *   (SM_FIRST + type) in place of machine 44; picking one sets machine 44, the type, and the type's start values
+ *   of knobs E, F, G (sm_set_machine, in front of the OS's 0x40025594). The OS never stores 45..48;
  * - two SYN pages through syn-pages (sm_boot registers machine 44): 1/2 the Digitakt's page; 2/2 the sample's
- *   waveform with the type's three knobs and TYPE under it. TYPE has no descriptor of its own (none is free):
- *   on page 2/2 knob H's descriptor (503) is LEV's rewritten as TYPE, on 1/2 back as LEV;
+ *   waveform with the type's three knobs and LEV under it;
  * - sm_invoke: the text of each value (the OS calls it through the std::function copied from sm_proto, see
  *   readable-values), and the names and ranges of knobs E, F, G for the track's type;
  * - sm_gfx: the graphic in each knob's box (std::function copied from sm_gfx_proto);
@@ -71,9 +73,6 @@ static const knob_t knobs[4][3] = {
      {"Slice Grid", "GRID", 0, 0x400, 0}},
 };
 
-/* knob H: LEV on page 1/2, TYPE on 2/2 (logical index, range, default, names) */
-static const knob_t lev = {"Sample Level", "LEV", 0, 0x7F00, 0x6400};
-static const knob_t type = {"Machine Type", "TYPE", 0, 0x300, 0};
 
 /* make_patch.py copies these into descriptors 497..504 (52 B each, as the OS's), with SP TWINSHOT's MIDI
  * fields and parameter numbers. SP TWINSHOT's page puts them on knobs A B C G E F H D: logical indices
@@ -162,7 +161,6 @@ static char *put_u(char *b, u32 n) {
 }
 
 static const char *const play_names[4] = {"REV", "REV.L", "FWD.L", "FWD"};
-static const char *const type_names[4] = {"ONE", "WERP", "PTCH", "SLIC"};
 static const char *const seg_names[3] = {"1/32", "1/16", "1/8"};
 
 static u32 id_of(const void *fn, u32 field) {
@@ -201,12 +199,6 @@ static void format(u32 id, s32 value, char *buf, int t) {
             b = put_u(b, 4u << clampi((s32)i, 4));
         else
             b = put_u(b, 1u << clampi((s32)i, 3));
-        break;
-    case ID_H:                                  /* LEV, or TYPE on page 2/2 */
-        if (ROW(ID_H)->lix == LIX_TYPE)
-            b = put_s(b, type_names[clampi((s32)i, 3)]);
-        else
-            b = put_u(b, i);
         break;
     default:                                    /* BR, and anything else: 0..127 */
         b = put_u(b, i);
@@ -373,11 +365,8 @@ void sm_gfx(const void *fn, s32 val, void *bm, s32 x, s32 y) {
         }
         break;
     case ID_H:
-        if (ROW(ID_H)->lix != LIX_TYPE) {
-            stock_gfx(ID_STOCK_LEV, val, bm, x, y);
-            return;
-        }
-        break;
+        stock_gfx(ID_STOCK_LEV, val, bm, x, y);
+        return;
     }
     format(id, val, buf, ty);
     text(bm, x, y, buf);
@@ -389,16 +378,13 @@ const void *const sm_gfx_proto[4] __attribute__((aligned(4))) = {0, 0, (const vo
 
 /* ---- pages (syn-pages) */
 
-/* page 2/2: knobs A..D under the waveform (none), the type's three, TYPE; LEVEL */
+/* page 2/2: knobs A..D under the waveform (none), the type's three, LEV; LEVEL */
 static const u32 page2[9] = {0, 0, 0, 0, ID_P5, ID_P6, ID_P7, ID_H, 10};
 
 static u32 sm_record(void *view, u32 page, u32 knob) {
     fit_knobs(track_type());
-    if (page == 1) {
-        set_row(ID_H, &type, LIX_TYPE);
+    if (page == 1)
         return knob < 9 ? page2[knob] : 0;
-    }
-    set_row(ID_H, &lev, LIX_LEV);
     return SP_ORIG_RECORD(view, knob);
 }
 
@@ -450,6 +436,105 @@ void sm_block(u32 arg) {
     ORIG_BLOCK(arg);
 }
 
-__attribute__((section(".entries"), used)) const void *const sm_entries[5] = {
+/* ---- the machine menu: ONESHOT, WERP, REPITCH, SLICE in place of machine 44 (make_patch.py points the OS here)
+ *
+ * The menu's values go through the OS's machine list (0x400264B6: ids 0..44 allowed on the track, by category),
+ * the item's name (0x400A6704 from 0x4002F286), its category (0x4002EEB4: icon and order) and the cursor on the
+ * current machine (0x4002FBAE); picking an item, or turning the machine knob (0x40031242), calls 0x40025594. */
+#define SM_FIRST 45u                        /* menu values 45..48 = machine 44, type 0..3 */
+#define SM_MACHINE 44u
+#define OS_ALLOWED ((u32 (*)(u32, u32))0x400A64F2u)       /* machine allowed on a track kind */
+#define OS_NAME ((u32 (*)(u32))0x400A6704u)               /* machine name (char *, in d0) */
+#define OS_SOUND_MACHINE ((u32 (*)(void *))0x400249CEu)
+#define CATEGORY ((const uint8_t *)0x4024D8DDu)          /* machine -> category (icon, order) */
+#define SOUND_DATA 40                       /* sound vtable: +40 the sound's data, +16 "changed" */
+#define SOUND_CHANGED 16
+#define DATA_LIX 128                        /* data + 128 + 2 * logical index; the machine at + 162 */
+
+static const char *const machine_names[4] = {"ONESHOT", "WERP", "REPITCH", "SLICE"};
+
+/* in place of 0x400A64F2 in the list's loop (0x40026514), which now runs to 48 */
+u32 sm_menu_allowed(u32 id, u32 kind) {
+    if (id == SM_MACHINE)
+        return 0;
+    return OS_ALLOWED(id - SM_FIRST < 4 ? SM_MACHINE : id, kind);
+}
+
+/* the item's name (0x4002F286) */
+u32 sm_menu_name(u32 id) {
+    return id - SM_FIRST < 4 ? (u32)machine_names[id - SM_FIRST] : OS_NAME(id);
+}
+
+/* in place of 0x4002EEB4: the category, 0 outside the table */
+u32 sm_category(u32 id) {
+    if (id - SM_FIRST < 4)
+        id = SM_MACHINE;
+    return id <= SM_MACHINE ? CATEGORY[id] : 0;
+}
+
+/* the current machine as the menu and the machine knob see it */
+static u32 menu_value(u32 machine) {
+    return machine == SM_MACHINE ? SM_FIRST + (u32)track_type() : machine;
+}
+
+/* the machine knob (0x40031272): the sound's machine */
+u32 sm_current_machine(void *sound) {
+    return menu_value(OS_SOUND_MACHINE(sound));
+}
+
+/* the menu's cursor (0x4002FBAE, a2 = the menu): the machine at +460, as a menu value */
+u32 sm_menu_cursor_value(u32 machine) {
+    return menu_value(machine);
+}
+void sm_menu_cursor(void);
+__asm__(
+    "    .text\n"
+    "    .globl sm_menu_cursor\n"
+    "sm_menu_cursor:\n"
+    "    move.l 460(%a2),-(%sp)\n"
+    "    jsr sm_menu_cursor_value\n"
+    "    addq.l #4,%sp\n"
+    "    rts\n");
+
+/* 0x40025594(sound, machine, track, flag): its first two instructions, then the rest of it */
+u32 sm_orig_set_machine(void *sound, u32 machine, u32 track, u32 flag);
+__asm__(
+    "    .text\n"
+    "    .globl sm_orig_set_machine\n"
+    "sm_orig_set_machine:\n"
+    "    lea -40(%sp),%sp\n"
+    "    movem.l %d2-%d6/%a2-%a6,(%sp)\n"
+    "    jmp 0x4002559c\n");
+
+/* in front of 0x40025594: a menu value sets machine 44, then the type and the type's start values of E, F, G
+ * (the OS resets a machine's values only when the machine changes), as the OS does: the sound's data, then
+ * "changed" */
+u32 sm_set_machine(void *sound, u32 machine, u32 track, u32 flag) {
+    u32 type = machine - SM_FIRST;
+    if (type >= 4)
+        return sm_orig_set_machine(sound, machine, track, flag);
+    fit_knobs((int)type);
+    u32 from = OS_SOUND_MACHINE(sound);
+    u32 r = sm_orig_set_machine(sound, SM_MACHINE, track, flag);
+    if (!(r & 0xFF))
+        return r;
+    const u32 *vt = *(const u32 *const *)sound;
+    uint8_t *data = (uint8_t *)((u32(*)(void *))vt[SOUND_DATA / 4])(sound);
+    volatile uint16_t *w = (volatile uint16_t *)(data + DATA_LIX);
+    if (from != SM_MACHINE) {                   /* from another machine: TUNE PLAY BR LEV too (SAMP stays) */
+        w[LIX_TUNE] = (uint16_t)sm_rows[0].def;
+        w[LIX_PLAY] = (uint16_t)sm_rows[1].def;
+        w[LIX_BR] = (uint16_t)sm_rows[2].def;
+        w[LIX_LEV] = (uint16_t)sm_rows[6].def;
+    }
+    for (int k = 0; k < 3; k++)
+        w[LIX_P5 + k] = (uint16_t)knobs[type][k].def;
+    w[LIX_TYPE] = (uint16_t)(type << 8);
+    ((void (*)(void *, u32))vt[SOUND_CHANGED / 4])(sound, 0);
+    return r;
+}
+
+__attribute__((section(".entries"), used)) const void *const sm_entries[11] = {
     (const void *)sm_proto, (const void *)sm_block, (const void *)sm_rows, (const void *)sm_gfx_proto,
-    (const void *)sm_boot};
+    (const void *)sm_boot, (const void *)sm_menu_allowed, (const void *)sm_menu_name, (const void *)sm_category,
+    (const void *)sm_current_machine, (const void *)sm_menu_cursor, (const void *)sm_set_machine};

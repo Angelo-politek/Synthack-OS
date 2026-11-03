@@ -133,7 +133,7 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 500 | sampler | SAMPLER knob G LOOP/BARS/GRID, lix 0x18 (was SP TWINSHOT MIX) |
 | 501 | sampler | SAMPLER knob E STRT/SEG/SLICE (was SP TWINSHOT TUN2) |
 | 502 | sampler | SAMPLER knob F LEN/MODE (was SP TWINSHOT SMP2) |
-| 503 | sampler | SAMPLER knob H LEV, lix 0x19 (TYPE, lix 0x1A, on page 2/2) (was SP TWINSHOT OVER) |
+| 503 | sampler | SAMPLER knob H LEV, lix 0x19 (the machine type in lix 0x1A, set from the machine menu) (was SP TWINSHOT OVER) |
 | 504 | sampler | SAMPLER knob D SAMP, lix 0x15 (was SP TWINSHOT DEC1) |
 
 Ids without a page often carry a MIDI CC or are aliases: clear the CC, check aliases. Ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).

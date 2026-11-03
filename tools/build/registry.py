@@ -98,7 +98,7 @@ IDS = {
            "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))))},
     **{497 + k: ("sampler", f"SAMPLER knob {n} (was SP TWINSHOT {w})") for k, (n, w) in enumerate(
         (("A TUNE", "TUN1"), ("B PLAY", "SMP1"), ("C BR", "FLT1"), ("G LOOP/BARS/GRID, lix 0x18", "MIX"),
-         ("E STRT/SEG/SLICE", "TUN2"), ("F LEN/MODE", "SMP2"), ("H LEV, lix 0x19 (TYPE, lix 0x1A, on page 2/2)", "OVER"),
+         ("E STRT/SEG/SLICE", "TUN2"), ("F LEN/MODE", "SMP2"), ("H LEV, lix 0x19 (the machine type in lix 0x1A, set from the machine menu)", "OVER"),
          ("D SAMP, lix 0x15", "DEC1")))},
 }
 
