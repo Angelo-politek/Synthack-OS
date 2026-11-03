@@ -646,6 +646,7 @@ def test_machine_menu():
     name = lambda i: bytes(u.uc.mem_read(u.call(u.sym["sm_menu_name"], [i]), 12)).split(b"\0")[0]   # noqa: E731
     assert [name(i) for i in (45, 46, 47, 48)] == [b"ONESHOT", b"WERP", b"REPITCH", b"SLICE"]
     assert name(0) == b"BD MODERN"
+    assert u.long(0x4002_F3E8) == u.sym["sm_menu_name"]           # anche il nome mostrato dopo YES (0x4002F346)
     assert [u.call(0x4002_EEB4, [i]) for i in (44, 45, 48, 0, 99)] == [11, 11, 11, 1, 0]
     out8 = 0x4FE0_3100
     u.uc.mem_write(out8, bytes(12))
@@ -656,12 +657,15 @@ def test_machine_menu():
     trk = u.call(0x4001_FF74, [u.long(src + 116)])
     snd = u.call(0x4000_F04C, [u.long(src + 120), trk])
     data = u.call(u.long(u.long(snd) + 40), [snd])
-    w = lambda: list(struct.unpack(">9H", u.uc.mem_read(data + 128 + 2 * 0x12, 18)))   # noqa: E731
-    u.put(data + 128 + 2 * 0x15, ">H", 7 << 8)                     # SAMP 8: resta
+    w = lambda: list(struct.unpack(">9H", u.uc.mem_read(data + 20 + 2 * 0x12, 18)))   # noqa: E731
+    u.put(data + 20 + 2 * 0x15, ">H", 7 << 8)                     # SAMP 8: resta
+    u.put(0x8000_21B0 + 2 * (0xE + 0x47 * trk + 0x15), ">H", 7 << 8)
     assert u.call(0x4002_5594, [snd, 48, trk, 0]) & 0xFF
     assert u.uc.mem_read(data + 162, 1)[0] == 44
+    live = 0x8000_21B0 + 2 * (0xE + 0x47 * trk + 0x12)             # i valori vivi = i dati del suono da +20
+    assert bytes(u.uc.mem_read(live, 18)) == bytes(u.uc.mem_read(data + 20 + 2 * 0x12, 18))
     assert w() == [0x4000, 0x300, 0, 0x700, 0, 0, 0, 0x6400, 0x300]       # SLICE: NOTE, LEN 1, GRID 4
-    u.put(data + 128 + 2 * 0x12, ">H", 0x4C00)                     # TUNE +12: resta passando a WERP
+    u.put(data + 20 + 2 * 0x12, ">H", 0x4C00)                     # TUNE +12: resta passando a WERP
     assert u.call(0x4002_5594, [snd, 46, trk, 0]) & 0xFF
     assert w() == [0x4C00, 0x300, 0, 0x700, 0x100, 0x300, 0x200, 0x6400, 0x100]   # SEG 1/16, MODE FWD, BARS 4
     assert u.call(0x4002_5594, [snd, 45, trk, 0]) & 0xFF
@@ -673,6 +677,24 @@ def test_machine_menu():
     assert u.call(u.sym["sm_menu_cursor"]) == 47
     u.put(out + 460, ">I", 3)
     assert u.call(u.sym["sm_menu_cursor"]) == 3
+    # 0x4002F2AE riporta il menu sulla machine del suono, e confronta con quella d'apertura (+436): valori del menu,
+    # o il menu chiede "Confirm? Y/N" scorrendo le voci del sampler
+    from unicorn.m68k_const import UC_M68K_REG_A6, UC_M68K_REG_D1, UC_M68K_REG_D2
+    u.put(out + 12, ">I", 44)
+    u.uc.reg_write(UC_M68K_REG_A6, out)
+    u.uc.reg_write(UC_M68K_REG_D1, 49)
+    assert u.call(u.sym["sm_menu_set"]) == 47
+    assert u.uc.reg_read(UC_M68K_REG_D2) == 47 and u.uc.reg_read(UC_M68K_REG_D1) == 49
+    u.put(out + 12, ">I", 0x1234)
+    u.uc.reg_write(UC_M68K_REG_D2, 44)
+    u.call(u.sym["sm_menu_opened"])
+    assert u.long(out + 436) == 47 and u.long(out + 432) == 0x1234
+    # i valori vivi della traccia seguono subito; la stessa machine di nuovo tiene i suoi valori
+    assert u.call(0x4002_5594, [snd, 48, trk, 0]) & 0xFF
+    assert struct.unpack(">h", u.uc.mem_read(seq, 2))[0] == 3 << 8
+    u.put(data + 20 + 2 * 0x17, ">H", 5 << 8)                     # LEN 6 slice
+    assert u.call(0x4002_5594, [snd, 48, trk, 0]) & 0xFF
+    assert w()[5] == 5 << 8
 
 
 def screens_pixels(frame):

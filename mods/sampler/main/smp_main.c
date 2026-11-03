@@ -465,8 +465,12 @@ void sm_block(u32 arg) {
 /* ---- the machine menu: ONESHOT, WERP, REPITCH, SLICE in place of machine 44 (make_patch.py points the OS here)
  *
  * The menu's values go through the OS's machine list (0x400264B6: ids 0..44 allowed on the track, by category),
- * the item's name (0x400A6704 from 0x4002F286), its category (0x4002EEB4: icon and order) and the cursor on the
- * current machine (0x4002FBAE); picking an item, or turning the machine knob (0x40031242), calls 0x40025594. */
+ * the item's name (0x400A6704 from 0x4002F286; the name shown after YES, 0x4002F3E6), its category (0x4002EEB4:
+ * icon and order) and the cursor on the current machine (0x4002FBAE); picking an item, or turning the machine knob
+ * (0x40031242), calls 0x40025594.
+ * While the cursor moves the OS sets the highlighted machine, then brings the menu back to the sound's machine
+ * (0x4002F2AE): if that differs from the machine the menu opened on (+436) it asks "Confirm? Y/N". Both are
+ * menu values too (sm_menu_set, sm_menu_opened). */
 #define SM_FIRST 45u                        /* menu values 45..48 = machine 44, type 0..3 */
 #define SM_MACHINE 44u
 #define OS_ALLOWED ((u32 (*)(u32, u32))0x400A64F2u)       /* machine allowed on a track kind */
@@ -475,7 +479,7 @@ void sm_block(u32 arg) {
 #define CATEGORY ((const uint8_t *)0x4024D8DDu)          /* machine -> category (icon, order) */
 #define SOUND_DATA 40                       /* sound vtable: +40 the sound's data, +16 "changed" */
 #define SOUND_CHANGED 16
-#define DATA_LIX 128                        /* data + 128 + 2 * logical index; the machine at + 162 */
+#define DATA_LIX 20                         /* data + 20 + 2 * logical index: 0x400A321A copies them to the track */
 
 static const char *const machine_names[4] = {"ONESHOT", "WERP", "REPITCH", "SLICE"};
 
@@ -522,6 +526,34 @@ __asm__(
     "    addq.l #4,%sp\n"
     "    rts\n");
 
+/* 0x4002F2AE(menu, machine): the sound's machine as a menu value (d2 and d0; d1 = 49, the bound after it) */
+void sm_menu_set(void);
+__asm__(
+    "    .text\n"
+    "    .globl sm_menu_set\n"
+    "sm_menu_set:\n"
+    "    move.l %d1,-(%sp)\n"
+    "    move.l 12(%a6),-(%sp)\n"
+    "    jsr sm_menu_cursor_value\n"
+    "    addq.l #4,%sp\n"
+    "    move.l (%sp)+,%d1\n"
+    "    move.l %d0,%d2\n"
+    "    rts\n");
+
+/* the menu's constructor (0x4002F95C, a2 = the menu, d2 = the sound's machine): the machine it opened on (+436) as a
+ * menu value, then the store it replaces (+432 = the caller's 12(a6)) */
+void sm_menu_opened(void);
+__asm__(
+    "    .text\n"
+    "    .globl sm_menu_opened\n"
+    "sm_menu_opened:\n"
+    "    move.l %d2,-(%sp)\n"
+    "    jsr sm_menu_cursor_value\n"
+    "    addq.l #4,%sp\n"
+    "    move.l %d0,436(%a2)\n"
+    "    move.l 12(%a6),432(%a2)\n"
+    "    rts\n");
+
 /* 0x40025594(sound, machine, track, flag): its first two instructions, then the rest of it */
 u32 sm_orig_set_machine(void *sound, u32 machine, u32 track, u32 flag);
 __asm__(
@@ -532,9 +564,16 @@ __asm__(
     "    movem.l %d2-%d6/%a2-%a6,(%sp)\n"
     "    jmp 0x4002559c\n");
 
-/* in front of 0x40025594: a menu value sets machine 44, then the type and the type's start values of E, F, G
+/* a value of the sound and of the track's live values (the menu reads the type back from these at once) */
+static void put(volatile uint16_t *w, u32 track, int lix, u32 v) {
+    w[lix] = (uint16_t)v;
+    if (track < 8)
+        ((volatile uint16_t *)TRACKS)[0xE + TRACK_WORDS * track + lix] = (uint16_t)v;
+}
+
+/* in front of 0x40025594: a menu value sets machine 44, then the type and the type's start values of E, F, G and H
  * (the OS resets a machine's values only when the machine changes), as the OS does: the sound's data, then
- * "changed" */
+ * "changed". The same machine again keeps its values. */
 u32 sm_set_machine(void *sound, u32 machine, u32 track, u32 flag) {
     u32 type = machine - SM_FIRST;
     if (type >= 4)
@@ -542,27 +581,37 @@ u32 sm_set_machine(void *sound, u32 machine, u32 track, u32 flag) {
     fit_knobs((int)type);
     set_row(ID_H, &lev, LIX_LEV);               /* the OS's reset sees LEV's descriptor */
     u32 from = OS_SOUND_MACHINE(sound);
+    volatile uint16_t *live = (volatile uint16_t *)TRACKS + 0xE + TRACK_WORDS * track + LIX_TYPE;
+    uint16_t was = track < 8 ? *live : 0;
+    if (track < 8)                              /* the type first: the menu may read it back during the call */
+        *live = (uint16_t)(type << 8);
     u32 r = sm_orig_set_machine(sound, SM_MACHINE, track, flag);
-    if (!(r & 0xFF))
+    if (!(r & 0xFF)) {
+        if (track < 8)
+            *live = was;
         return r;
+    }
     const u32 *vt = *(const u32 *const *)sound;
     uint8_t *data = (uint8_t *)((u32(*)(void *))vt[SOUND_DATA / 4])(sound);
     volatile uint16_t *w = (volatile uint16_t *)(data + DATA_LIX);
+    if (from == SM_MACHINE && (u32)(w[LIX_TYPE] >> 8) == type)
+        return r;
     if (from != SM_MACHINE) {                   /* from another machine: TUNE PLAY BR LEV too (SAMP stays) */
-        w[LIX_TUNE] = (uint16_t)sm_rows[0].def;
-        w[LIX_PLAY] = (uint16_t)sm_rows[1].def;
-        w[LIX_BR] = (uint16_t)sm_rows[2].def;
-        w[LIX_LEV] = (uint16_t)sm_rows[6].def;
+        put(w, track, LIX_TUNE, sm_rows[0].def);
+        put(w, track, LIX_PLAY, sm_rows[1].def);
+        put(w, track, LIX_BR, sm_rows[2].def);
+        put(w, track, LIX_LEV, sm_rows[6].def);
     }
     for (int k = 0; k < 3; k++)
-        w[LIX_P5 + k] = (uint16_t)knobs[type][k].def;
-    w[LIX_TYPE] = (uint16_t)(type << 8);
-    w[LIX_X] = (uint16_t)xpar[type].def;
+        put(w, track, LIX_P5 + k, knobs[type][k].def);
+    put(w, track, LIX_TYPE, type << 8);
+    put(w, track, LIX_X, xpar[type].def);
     ((void (*)(void *, u32))vt[SOUND_CHANGED / 4])(sound, 0);
     return r;
 }
 
-__attribute__((section(".entries"), used)) const void *const sm_entries[11] = {
+__attribute__((section(".entries"), used)) const void *const sm_entries[13] = {
     (const void *)sm_proto, (const void *)sm_block, (const void *)sm_rows, (const void *)sm_gfx_proto,
     (const void *)sm_boot, (const void *)sm_menu_allowed, (const void *)sm_menu_name, (const void *)sm_category,
-    (const void *)sm_current_machine, (const void *)sm_menu_cursor, (const void *)sm_set_machine};
+    (const void *)sm_current_machine, (const void *)sm_menu_cursor, (const void *)sm_set_machine,
+    (const void *)sm_menu_set, (const void *)sm_menu_opened};

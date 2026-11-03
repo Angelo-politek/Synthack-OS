@@ -63,6 +63,10 @@ CATEGORY_FN = 0x4002_EEB4                # machine -> category (icon, order of t
 CURSOR = 0x4002_FBAE                     # move.l 460(a2),d0; moveq #45,d2; move.l d0,d1: the cursor's machine
 KNOB_MACHINE = 0x4003_1272               # jsr 0x400249ce: the machine knob's current machine
 SET_MACHINE = 0x4002_5594                # set a sound's machine (menu, machine knob)
+MENU_BOUND = 0x4002_F2B2                 # moveq #45,d1 in 0x4002F2AE (menu back to the sound's machine)
+MENU_SET = 0x4002_F2B8                   # move.l 12(a6),d2; move.l d2,d0: that machine
+MENU_OPENED = 0x4002_F95C                # move.l d2,436(a2); move.l 12(a6),432(a2): the machine the menu opened on
+CONFIRM_NAME = 0x4002_F3E6               # jsr 0x400a6704: the machine's name shown after YES (0x4002F346)
 
 MAIN_SRC = ["main/smp_main.c"]
 SYN_SRC = ["engine/entries.c", "engine/syn.c", "engine/pos.c", "engine/interp.c", "engine/interp_table.c"]
@@ -153,7 +157,8 @@ def main() -> None:
 
     p = [{"section": 3, "addr": f"{M.IMG + OFF_MAIN:#010X}", "len": len(blob3), "append": True, "hex": blob3.hex(),
           "ram": f"{main_ram:#010x}", "what": "(area mod) smp_main.c: testi dei valori, nomi per tipo, tempo"}]
-    proto, block, rows, gfx, boot, allowed, name, category, current, cursor, setm = struct.unpack_from(">11I", blob3, 0)
+    (proto, block, rows, gfx, boot, allowed, name, category, current, cursor, setm, menu_set,
+     menu_opened) = struct.unpack_from(">13I", blob3, 0)
     p.append({"section": 3, "addr": f"{M.boot_slot(BOOT_SLOT):#010X}", "len": 4, "append": True,
               "hex": long(boot).hex(), "ram": f"{M.RAM + M.BOOT_LIST + 4 * BOOT_SLOT:#010x}",
               "what": "(area mod) lista di avvio: sm_boot (pagine SYN in syn-pages)"})
@@ -187,6 +192,13 @@ def main() -> None:
               bytes.fromhex("4eb9400249ce")),
         fixed(sec3, 3, SET_MACHINE, b"\x4e\xf9" + long(setm) + bytes.fromhex("4e71"),
               "machine del suono: sm_set_machine (tipo e valori di partenza)", bytes.fromhex("4fefffd848d77c7c")),
+        fixed(sec3, 3, MENU_BOUND, bytes.fromhex("7231"), "menu: valori fino a 48", bytes.fromhex("722d")),
+        fixed(sec3, 3, MENU_SET, b"\x4e\xb9" + long(menu_set), "menu: la machine del suono come valore del menu",
+              bytes.fromhex("242e000c2002")),
+        fixed(sec3, 3, MENU_OPENED, b"\x4e\xb9" + long(menu_opened) + bytes.fromhex("4e714e71"),
+              "menu: la machine d'apertura come valore del menu", bytes.fromhex("254201b4256e000c01b0")),
+        fixed(sec3, 3, CONFIRM_NAME, b"\x4e\xb9" + long(name), "menu: nome della machine scelta (YES), sm_menu_name",
+              bytes.fromhex("4eb9400a6704")),
     ]
     prep, render = struct.unpack_from(">2I", blob7, 0)
     p += [
