@@ -13,6 +13,7 @@ python tools/emu/cli.py survey --seconds 0.5 -o out/emu      # one WAV per engin
 | `memmap.py` | shared RAM, DDR `0x40000000`, SRAM `0x80000000`, peripherals |
 | `periph.py` | behavioural PIT, eDMA, timers |
 | `engine.py` | boots section 7 (simulated CPU #1 handshake), one interrupt = one block |
+| `isr.py` | CPU #1 audio interrupt, whole, after the `screens.py` boot: instructions per block and call tree (`python tools/emu/isr.py --scene max fx3`) |
 | `emac.py` | **EMAC** (multiply-accumulate unit) in Python, hooked via `ILLEGAL` breakpoints |
 | `gen_emac_sites.py` | exact list of EMAC instruction addresses (GNU objdump) |
 
