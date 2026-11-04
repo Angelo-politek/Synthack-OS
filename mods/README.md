@@ -10,7 +10,7 @@ One folder per mod. Target: Syntakt OS 1.42.
 | [perf-fx](perf-fx) | feature | Mod A (FUNC+15): keys 13–16 repeat, reverse or half-speed the pattern; quantized retrig | modarea |
 | [fx3](fx3) | feature | Third send effect (chorus, flanger, phaser, crusher): SND3 per track, REVERB tab page 2 | modarea, vparams, fastmix |
 | [dual-mono](dual-mono) | feature | EXTERNAL IN mono: separate IN L / IN R levels and sends | modarea, vparams, kitstore, fastmix |
-| [long-samples](long-samples) | feature | Samples longer than 5 s: Synfact's HZFS storage on the eMMC, sent to the voice CPU at boot, SAMPLER slots 65–128 | modarea |
+| [long-samples](long-samples) | feature | Samples longer than 5 s: Synfact's HZFS storage on the eMMC, sent to the voice CPU at boot; the SAMPLER plays them in one list with the stock samples | modarea |
 | [sy-fm4](sy-fm4) | machine | SY TONE becomes a 4-operator FM machine (Rxuting, MIT); three SYN pages, algorithm drawn on 3/3; ALGO 0 = SY TONE | modarea, modarea7, syn-pages, xparams, fastmix |
 | [sampler](sampler) | machine | SP TWINSHOT becomes the Digitakt's sample machines: ONESHOT, WERP, REPITCH, SLICE, four machines in the menu; SYN 1/2 as the Digitakt's, 2/2 waveform and one parameter of each machine | modarea, modarea7, syn-pages, xparams |
 | [modarea](modarea) | infra | Unpacks the compressed mod code at boot into a 128 KB block of the OS heap; boot list for setup functions | — |

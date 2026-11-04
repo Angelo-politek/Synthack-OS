@@ -24,7 +24,7 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0xdff0` | `0xf000` | fx3 | feedback (+0xDFFC) and delay line (+0xE000, 4 KB) |
 | `0xf000` | `0xfff0` | fastmix | code and data: faster OS audio routines |
 | `0xfff0` | `0x00018000` | long-samples | Synfact HZFS storage, plan and upload of long samples (GPL-2.0-or-later) |
-| `0x00018000` | `0x0001b000` | sampler | main CPU side: pages (1/3..3/3 POOL), knob graphics, waveform, value texts, tempo |
+| `0x00018000` | `0x0001b000` | sampler | main CPU side: pages, sample menu, one list of samples, knob graphics, waveform, value texts, tempo |
 | `0x0001b000` | `0x0001fff0` | **free** |  |
 
 Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams.

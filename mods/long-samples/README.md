@@ -32,7 +32,7 @@ python ../Synthack-OS/mods/long-samples/put_folder.py "C:/Users/me/Music/Syntakt
 
 `[!]` Files beyond the 64th, or beyond the voice CPU's memory, stay on the eMMC and don't play.
 
-Device (2026-11-04): `ls`, `put` of an 11 s file, playback as `L1` checked on a Syntakt with OS 1.42.
+Device (2026-11-04): `ls`, `put` of an 11 s file, playback checked on a Syntakt with OS 1.42.
 
 `[!]` OS 1.42 needs `synfact-tool-os142.patch` on Synfact's tool (see step 3).
 

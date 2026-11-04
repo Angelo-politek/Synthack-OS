@@ -38,7 +38,7 @@ MODAREA = [
     (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
     (0xF000, 0xFFF0, "fastmix", "code and data: faster OS audio routines"),
     (0xFFF0, 0x18000, "long-samples", "Synfact HZFS storage, plan and upload of long samples (GPL-2.0-or-later)"),
-    (0x18000, 0x1B000, "sampler", "main CPU side: pages (1/3..3/3 POOL), knob graphics, waveform, value texts, tempo"),
+    (0x18000, 0x1B000, "sampler", "main CPU side: pages, sample menu, one list of samples, knob graphics, waveform, value texts, tempo"),
     # 0x1B000..0x1FFF0: free
 ]
 

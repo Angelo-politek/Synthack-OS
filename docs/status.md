@@ -119,7 +119,8 @@ Steps:
 1. `[ok]` Mod area 64 → 128 KB (`HEAP_BLOCK_SIZE`): room for the port (`+0xFFF0`…`+0x1FFF0`).
 2. `[ok]` [long-samples](../mods/long-samples): Synfact's storage (`hzfs.c`, `crc.c`, `high-storage.c` unchanged), route and write guard. Emulator: eMMC double, catalogues, put, route, guard. `[ ]` Device: `long_samples ls/put/get` round trip.
 3. `[ok]` Boot upload (ours, at Synfact's sites `0x40082FB6`/`0x40082FCE`, plan at `0x4008287A`): a table and the files after the stock pages. `[ ]` Synfact's project pool (128 positions saved in the project) not ported: files map to slots in catalogue order.
-4. `[ok]` SAMPLER machines on slots 65–128 (`SAMP` 1–128, `L1`–`L64`). Engine test: 15 s sample played from 12.5 s. SYN 3/3 SAMPLE POOL: names, lengths, waveform, knob A picks. Device: `ls`, `put`, playback checked (2026-11-04).
+4. `[ok]` SAMPLER: one list of samples (stock slots that hold a sample, then the long ones), sample menu on knob D of SYN 1/2 (names, lengths, waveform). Engine test: 15 s sample played from 12.5 s. Device: `ls`, `put`, playback checked (2026-11-04); the menu and the one list: device test open.
+4b. `[ok]` Web builder **Samples** page (WebMIDI): list, add WAV files, order (catalogue slot map), remove. Tested against a device double; device test open.
 5. `[ ]` Synfact's Sample Manager menu and project pool (assignments saved per project, folders).
 6. `[ ]` Web builder: a long-sample uploader over WebMIDI (port of `long_samples.py`), optional.
 
