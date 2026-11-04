@@ -621,18 +621,18 @@ def test_syn_pages():
     ui = v.ui
     lix = lambda: struct.unpack(">I", ui.uc.mem_read(DESC + 52 * 503 + 4, 4))[0]   # noqa: E731
     assert v.knobs() == [497, 498, 499, 504, 501, 502, 500, 503, 10] and v.pages() == 3
-    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 1/2"
+    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 1/3"
     v.set_value(0, 0x15, 5 << 8)                                   # SAMP 6
     v.page(1)
     assert v.knobs() == [0, 0, 0, 0, 501, 502, 500, 503, 10]
-    assert lix() == 0x36 and short(ui, 503) == "XFAD" and v.title() == b"SAMPLE 2/2"   # H: il parametro della machine
+    assert lix() == 0x36 and short(ui, 503) == "XFAD" and v.title() == b"SAMPLE 2/3"   # H: il parametro della machine
     for t, name, texts in ((1, "RAND", {0: "0", 127: "127"}), (2, "KEY", {0: "OFF", 1: "ON"}),
                            (3, "ORDR", {0: "SLICE", 1: "NEXT", 2: "RAND"})):
         v.set_value(0, 0x1A, t << 8)
         v.record(7)
         assert short(ui, 503) == name and lix() == 0x36
         assert {k: text(ui, 503, k << 8) for k in texts} == texts
-    assert v.title() == b"SLICE 2/2"
+    assert v.title() == b"SLICE 2/3"
     v.set_value(0, 0x1A, 0)
     v.record(7)
     waiting = v.frame()

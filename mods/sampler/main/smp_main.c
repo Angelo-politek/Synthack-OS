@@ -423,7 +423,7 @@ static u32 sm_record(void *view, u32 page, u32 knob) {
 
 /* the Digitakt's machine names, then the page */
 static const char *const titles[4][2] = {
-    {"SAMPLE 1/2", "SAMPLE 2/2"}, {"WERP 1/2", "WERP 2/2"}, {"REPITCH 1/2", "REPITCH 2/2"}, {"SLICE 1/2", "SLICE 2/2"}};
+    {"SAMPLE 1/3", "SAMPLE 2/3"}, {"WERP 1/3", "WERP 2/3"}, {"REPITCH 1/3", "REPITCH 2/3"}, {"SLICE 1/3", "SLICE 2/3"}};
 
 /* page 2/2 of a long sample (SAMP 65..128): its name and length, from mods/long-samples' header at LS_HDR
  * ('LSHD', table, names), when that mod is in the build */
