@@ -88,9 +88,23 @@ Leads in OS 1.42 (section 3, CPU #1):
 | Boot load | `LOADING SAMPLES`, `PREPARING SAMPLES`; path `/samples` |
 | Memory | CPU #2: BSS with the sample memory up to ~`0x4405F750`; `0x46000000` used by modarea7's boot copy only; engine area `0x47000000` (256 KB); stack `0x48000000`. CPU #1: `0x45565490–0x48000000` written during sample loading ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)) |
 
+Found (2026-11-04, OS 1.42 section 7, CPU #2):
+
+| What | Where |
+|---|---|
+| Sample memory | `0x4004F750`, 64 MB (`0x04000000`) |
+| Boot load | `0x40000CDA` → `0x40000B92`: DSPI reads with command `0x03` + 24-bit address (serial memory READ), up to 64 MB |
+| Pool format | `0x40000D06`: 64 slots in a row, each a 32-bit length in samples followed by the 16-bit samples; table `{length, pointer}` × 64 at `0x4404F754` |
+| SP TWINSHOT engine | length clamped at `0x7FFFF` samples (10.9 s, `0x40009988`). The sampler engine keeps the same bound (`MAX_LEN`) |
+| Manual | 5 s, 512 KB per sample (users report). 512 KB = 262 144 samples = 5.46 s |
+
+So CPU #2 has no 5 s bound: the cut happens on CPU #1, or in Transfer, before the pool is written.
+
+Ruled out on CPU #1: `0x40080646` (OS update over serial, `READY FOR OS`, 256 KB sector erase); `0x400B9EB6`, `0x400BA1C2` (a length > `0x7FFFF` becomes `0x80000`: UI side). No WAV parser on the device: Transfer converts the files (`MidiRpcFsSample*`, `SampleAssign`, `ListRam`, `ClearRam`, `MemoryCompaction`).
+
 Plan:
 
-1. `[ ]` Find the length limit: the loader path from `copyFilesFromMmcToPool` to the CPU #2 transfer. Check the 5 s figure with a long WAV in the emulator.
+1. `[ ]` Find the length limit: which device the CPU #2 DSPI reads (`0x40000B92`) and the CPU #1 code that writes it; the loader path from `copyFilesFromMmcToPool` to the CPU #2 transfer. Check the 5 s figure with a long WAV in the emulator.
 2. `[ ]` Map the CPU #2 sample memory: slot table, per-slot size, allocator. Check at runtime which RAM above the BSS stays unused (the #4 lesson: no static reference is not proof).
 3. `[ ]` Design: one pool for all slots, length bounded by free memory, slot table compatible with stock projects (a stock OS must still load them, rule 10).
 4. `[ ]` Sampler machines read the pool (`mods/sampler/engine`).
