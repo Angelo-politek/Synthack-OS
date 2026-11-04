@@ -37,6 +37,8 @@ Value texts and short names as on the Digitakt 1.54 (`NOTE`, `OFF`, `MODE`, `SLI
 | `SAMP` | slot 1–64 |
 | `LEV` | sample level 0–127, 100 = as SP TWINSHOT |
 
+**SYN 3/3, SAMPLE POOL** (with [long-samples](../long-samples)): knob A is `SAMP`. Four long samples around it, `L` number, name (8 characters) and length; `>` marks the one the track plays, its waveform underneath. Turning A picks a sample for the machine (p-lockable, like any value). Without long samples: `NO LONG SAMPLES`.
+
 | Page 2/2 | Shows |
 |---|---|
 | Waveform | The part that plays solid, the rest dotted. A line at each end of the part. |

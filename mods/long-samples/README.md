@@ -15,7 +15,7 @@ Samples longer than 5 s. The storage is **Synfact's** ([GSM1980/synfact-dev](htt
    ```
 4. Power cycle. "PREPARING SAMPLES" now also sends the long samples to the voice CPU.
 5. On a SAMPLER track, turn `SAMP` past 64: `L1` is the first file of the catalogue, `L2` the second, …
-   SYN 2/2 shows the file's name (8 characters) and length in seconds as the page title, with its waveform.
+   SYN 2/2 shows the file's name (8 characters) and length in seconds as the page title, with its waveform. SYN 3/3, **SAMPLE POOL**, lists the long samples with name and length: turn knob A to pick one.
 
 A whole folder at once (names cut to 32 characters, made unique; `--dry-run` first to see them):
 ```sh

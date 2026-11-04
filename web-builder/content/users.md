@@ -320,7 +320,7 @@ Transfer cuts samples at 5 s. Longer samples go through [Synfact](https://github
 1. Build with **Long samples** and **SAMPLER**. Flash.
 2. On the computer, from a checkout of synfact-dev, Transfer closed: `pip install python-rtmidi`, then `python -m elekloader.sdk.syntakt.long_samples put pad.wav --yes-write-device`.
 3. Power cycle. "PREPARING SAMPLES" takes longer: it also sends the long samples.
-4. On a SAMPLER track, turn `SAMP` past 64: `L1`, `L2`, … are the files in the order `long_samples ls` lists them.
+4. On a SAMPLER track, press **SYN** three times: **SAMPLE POOL** lists the long samples with name and length. Turn knob A to pick one: `L1`, `L2`, … in the order `long_samples ls` lists them. Or turn `SAMP` past 64 on page 1/3.
 
 | | |
 |---|---|

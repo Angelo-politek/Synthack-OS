@@ -188,7 +188,7 @@ static void sync(void)
 }
 
 /* ---- effetti */
-static s32 lfo(u32 ph)                                    /* seno unipolare 0..32767 */
+__attribute__((noinline)) static s32 lfo(u32 ph)                                    /* seno unipolare 0..32767 */
 {
     u32 i = ph >> 24, f = (ph >> 8) & 0xFFFF;
     s32 a = SIN_T[i], b = SIN_T[i + 1];
@@ -250,7 +250,7 @@ void fx3_sum1(s32 *dst, u32 src, s32 g, u32 add);         /* una traccia: dst[n]
 void fx3_sum2(s32 *dst, u32 s0, s32 g0, u32 s1, s32 g1, u32 add);    /* due canali in un passaggio */
 void fx3_ret(const s32 *wet, s32 gain, s32 *a, s32 *h);  /* a -= 2 * wet * gain a 48 kHz (saturato) */
 
-static u32 glide(u32 to, u32 from)                       /* TIME girato di colpo: scivola */
+__attribute__((noinline)) static u32 glide(u32 to, u32 from)                       /* TIME girato di colpo: scivola */
 {
     s32 d = (s32)(to - from);
     return d > MAXD ? from + MAXD : d < -MAXD ? from - MAXD : to;
