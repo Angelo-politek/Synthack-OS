@@ -102,7 +102,7 @@ stock .syx (user's own)          mods/<name>/patch.json (ours)
 8. Pull requests against `dev`. CI green.
 9. Every mod has `mod.json` and `README.md`.
 10. Respect the [CPU budget](#cpu-budget).
-11. Third-party code: compatible license (MIT), notice and credit.
+11. Third-party code: a license compatible with GPL-2.0-or-later, notice and credit.
 12. Don't post mods or instructions on Elektronauts. It is forbidden there.
 
 ## Pitfalls

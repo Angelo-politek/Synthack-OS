@@ -96,4 +96,4 @@ Don't post mods or instructions on Elektronauts. It is forbidden there. Use GitH
 
 ## License
 
-MIT for everything in this repository ([LICENSE](LICENSE)). See [LEGAL.md](LEGAL.md).
+GPL-2.0-or-later ([LICENSE](LICENSE)). Credits, third-party code and the earlier MIT releases: [NOTICE](NOTICE). See [LEGAL.md](LEGAL.md).

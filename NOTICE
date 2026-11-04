@@ -1,0 +1,42 @@
+SyntHack OS
+Copyright (C) 2026 Angelo-politek and SyntHack contributors
+
+SyntHack is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, either version 2 of the License, or (at your option) any later
+version. See LICENSE for version 2.
+
+SyntHack is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+History
+-------
+Up to commit ab9a282 (2026-11-04) SyntHack was released under the MIT
+licence; copies taken before that commit keep it. From 2026-11-04 the
+repository is GPL-2.0-or-later, to include code from Synfact (below).
+Contributions received under MIT keep their notices:
+
+  master-comp ids (#3)           Aleksey Grechkin, MIT
+
+Code from other projects
+------------------------
+  mods/sy-fm4, mods/xparams      from SY FM4 by Rxuting
+                                 (https://github.com/Rxuting/sy-fm4), MIT,
+                                 see mods/sy-fm4/LICENSE
+  web-builder/src/core/*.ts      ports of elektron-firmware-tool by Marcel
+                                 Bierling (https://github.com/mischa85/elektron-firmware-tool),
+                                 MIT, see web-builder/public/THIRD-PARTY-NOTICES.txt
+  long samples (in progress)     from Synfact by GSM1980 and contributors
+                                 (https://github.com/GSM1980/synfact-dev),
+                                 GPL-2.0-or-later, built on elekloader by
+                                 irpina and contributors
+                                 (https://github.com/irpina/elekloader),
+                                 GPL-2.0-or-later. Each file taken from there
+                                 names its origin in its header.
+
+Elektron
+--------
+Elektron and Syntakt are trademarks of Elektron Music Machines. SyntHack is
+not affiliated with or endorsed by Elektron. It contains no Elektron firmware:
+every build starts from the stock OS file the user supplies. See LEGAL.md.

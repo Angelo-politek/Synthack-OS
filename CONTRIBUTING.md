@@ -30,7 +30,7 @@ The canonical rules list. Guides: [modders](web-builder/content/modders.md), [cr
 9. **Audio CPU budget.** The stock OS uses ~89 % of the audio interrupt at rest. Count the instructions your mod adds per block (`tests/test_cpu_budget.py`) and estimate its cycles with the cache model (`tools/emu/cycles.py`, `tests/test_cycles.py`): code and DDR data lines cost a DDR read every block. Keep a regression test. Enter the worst case in `AUDIO_CPU` and `AUDIO_CYCLES` of `tools/build/budget.py` and run it: the site's load indicator reads `web-builder/src/budget.json`.
 10. **Safe files.** Kits and projects saved with your mod survive the OS save → reload. They load on the stock OS and on builds without the mod, without crashing.
 11. **Pull requests against `dev`.** CI green. `main` holds the latest release.
-12. **Third-party code:** compatible license, notice, credit.
+12. **Third-party code:** a license compatible with GPL-2.0-or-later, its notice, credit in [NOTICE](NOTICE).
 13. **Text follows [docs/writing-style.md](docs/writing-style.md).**
 14. **No mods or instructions on Elektronauts.** It is forbidden there. Use GitHub.
 
