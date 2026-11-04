@@ -111,18 +111,20 @@ __attribute__((optimize("O2"))) void xp_dma_wait(void) {
             ;
         DMA_PENDING = 0;
     }
-    /* unrolled: 64 move.w with fixed offsets instead of a loop (~6 instructions a word) */
-#pragma GCC unroll 8
-    for (int t = 0; t < 8; t++)
+    /* One move.w (a0)+,(a1)+ a word, the words of a track unrolled, the tracks in a loop: ~190 instructions in
+     * ~70 bytes of code. The audio interrupt does not fit the 8 KB instruction cache, so every 16 bytes of code
+     * it runs cost a line fill each block: the fully unrolled copy (144 move.w d16(An),d16(An), 870 bytes) ran
+     * fewer instructions and cost more time (tools/emu/cycles.py). */
+    volatile uint16_t *dst = SHARED_MAIN, *raw = SHARED_RAW;
+    for (int t = 0; t < 8; t++) {
+        volatile const uint16_t *src = SEQ_VALUES + 0xe + t * 0x47 + XP_FIRST;
 #pragma GCC unroll 8
         for (int k = 0; k < XP_N; k++)
-            SHARED_MAIN[t * 8 + k] = SEQ_VALUES[0xe + t * 0x47 + XP_FIRST + k];
-    /* the machine words as set: the voice frames carry them smoothed (one move.w (a0)+,(a1)+ a word) */
-    volatile uint16_t *dst = SHARED_RAW;
-    for (int t = 0; t < 8; t++) {
-        volatile const uint16_t *src = SEQ_VALUES + 0xe + t * 0x47 + XP_RAW_FIRST;
+            *dst++ = *src++;
+        /* the machine words as set: the voice frames carry them smoothed */
+        src = SEQ_VALUES + 0xe + t * 0x47 + XP_RAW_FIRST;
 #pragma GCC unroll 10
         for (int k = 0; k < XP_RAW_N; k++)
-            *dst++ = *src++;
+            *raw++ = *src++;
     }
 }

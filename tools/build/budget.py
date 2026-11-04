@@ -2,8 +2,8 @@
 
     python tools/build/budget.py        # rigenera web-builder/src/budget.json
 
-- cpu: istruzioni in piu' per blocco audio nel caso peggiore, misurate nell'emulatore
-  (tests/test_cpu_budget.py controlla che le misure non superino questi valori);
+- cpu: cicli in piu' per blocco audio nel caso peggiore, stimati nell'emulatore con le cache (tools/emu/cycles.py,
+  tests/test_cycles.py); AUDIO_CPU tiene le istruzioni (tests/test_cpu_budget.py e i test delle mod);
 - modarea, kit, project: spazio prenotato nel registro (registry.py);
 - sec7: byte accodati alla sezione 7 (CPU #2), dai patch.json.
 
@@ -37,12 +37,22 @@ OUT = REPO / "web-builder" / "src" / "budget.json"
 # fastmix (2026-11-03): credito, routine dell'OS piu' veloci. Misurato sull'interrupt intero (tools/emu/isr.py,
 # scena "max": tutte le mandate, guadagni fermi): -11 000 con o senza le altre mod. Qui -10 000. Nei blocchi in
 # cui i guadagni sono in rampa o i parametri si muovono (dopo un cambio di kit) il credito sparisce (+~400).
-AUDIO_CPU = {"fx3": 2743, "master-comp": 578, "dual-mono": 324 + 133, "xparams": 345, "sampler": 8, "fastmix": -10000}
+# xparams (2026-11-04): copia in un ciclo per traccia (362, piu' istruzioni, meno codice: vedi AUDIO_CYCLES).
+AUDIO_CPU = {"fx3": 2749, "master-comp": 578, "dual-mono": 324 + 133, "xparams": 362, "sampler": 8, "fastmix": -10000}
+
+# cicli in piu' per blocco (2026-11-04, tools/emu/cycles.py, scena "max", taratura prudente CPI 1.0: una riga
+# mancata ~54 cicli). L'interrupt non sta nella cache istruzioni da 8 KB: ogni 16 byte di codice eseguito e ogni
+# riga di dati in DDR costano una lettura dalla DDR a ogni blocco. fx3, master-comp, dual-mono contati sopra
+# fastmix; sampler e sy-fm4 sopra xparams; fastmix sopra lo stock. Il sito somma questi valori.
+AUDIO_CYCLES = {"fx3": 15000, "master-comp": 3700, "dual-mono": 2400, "xparams": 5200, "sampler": 400, "sy-fm4": 0,
+                "fastmix": -600}
 
 SEC7_ROOM = 127_695
 
 LIMITS = {
-    "cpu": 3000,                   # ~3 000 istruzioni in piu' per blocco fanno gia' laggare l'interfaccia (prova sulla macchina)
+    # stock a riposo ~89 % del blocco (166 666 cicli): 10 000 cicli in piu' = interrupt al ~95 %. Provvisorio, da
+    # tarare con una misura DTIM0 sul dispositivo (docs/audio-path.md); fx3 laggava gia' sulla macchina
+    "cpu": 10000,
     "modarea": modarea_layout.SIZE,
     "kit": kitstore_layout.WORDS_PER_BLOCK * kitstore_layout.N_BLOCKS,
     "project": 256,
@@ -59,7 +69,7 @@ def mods() -> list[str]:
 def static(name: str) -> dict:
     spec = build.read_spec(REPO / "mods" / name)
     return {
-        "cpu": AUDIO_CPU.get(name, 0),
+        "cpu": AUDIO_CYCLES.get(name, 0),
         "modarea": sum(b - a for a, b, who, _ in registry.MODAREA if who == name),
         "kit": len(kitstore_layout.PARTS.get(name, [])),
         "project": projstore_layout.PARTS.get(name, (0, 0))[1],

@@ -18,7 +18,7 @@ The indices are per track: a track has one machine, so two machines can give the
 | Storage | The OS maps logical indices `0..0x35` to storage slots (`0x40234344`, back `0x4023441C`). xparams' copies of the two tables run to `0x46`: the extra indices keep their own slots (the sound has 72, 54 used). Saving: `0x400A7436`, bound `0x400A7452`. |
 | Loading | The deserializer's slot loop (`0x400A706A`) calls `xp_load_params`: slots to logical indices, then the registered machine's values if the extra indices are all zero. |
 | p-locks | Lock lanes `0x50`–`0x57` for the extra indices (`0x400A81CA`, `0x400A8336`, read bound `0x400A803E`); `0x400A6D32` maps a lane back. A stock OS drops lanes above `0x46`. |
-| Voice CPU | `0x400A20AE`, the render's wait for eDMA 47, then a copy of the 8 × 8 extra words to shared RAM `0x700` and of the 8 × 10 machine words, as set, to `0x640` (335 instructions a block). |
+| Voice CPU | `0x400A20AE`, the render's wait for eDMA 47, then a copy of the 8 × 8 extra words to shared RAM `0x700` and of the 8 × 10 machine words, as set, to `0x640` (~360 instructions a block, one loop per track: the unrolled copy ran fewer instructions and cost ~4 500 cycles more in cache misses, `tools/emu/cycles.py`). |
 | Boot | `xp_boot` from the mod area's boot list fills the tables before the OS reads a sound. |
 
 `[!]` A project with p-locks on these parameters, opened on a stock OS, loses those locks.

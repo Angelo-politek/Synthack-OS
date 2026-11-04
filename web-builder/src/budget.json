@@ -1,6 +1,6 @@
 {
   "limits": {
-    "cpu": 3000,
+    "cpu": 10000,
     "modarea": 65520,
     "kit": 36,
     "project": 256,
@@ -8,21 +8,21 @@
   },
   "mods": {
     "dual-mono": {
-      "cpu": 457,
+      "cpu": 2400,
       "modarea": 2048,
       "kit": 3,
       "project": 0,
       "sec7": 0
     },
     "fastmix": {
-      "cpu": -10000,
+      "cpu": -600,
       "modarea": 4080,
       "kit": 0,
       "project": 0,
       "sec7": 0
     },
     "fx3": {
-      "cpu": 2743,
+      "cpu": 15000,
       "modarea": 20480,
       "kit": 0,
       "project": 0,
@@ -36,7 +36,7 @@
       "sec7": 0
     },
     "master-comp": {
-      "cpu": 578,
+      "cpu": 3700,
       "modarea": 8192,
       "kit": 0,
       "project": 0,
@@ -85,7 +85,7 @@
       "sec7": 0
     },
     "sampler": {
-      "cpu": 8,
+      "cpu": 400,
       "modarea": 7808,
       "kit": 0,
       "project": 0,
@@ -120,7 +120,7 @@
       "sec7": 0
     },
     "xparams": {
-      "cpu": 345,
+      "cpu": 5200,
       "modarea": 2304,
       "kit": 0,
       "project": 0,
