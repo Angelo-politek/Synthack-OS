@@ -1,0 +1,18 @@
+diff --git a/elekloader/sdk/syntakt/data_rpc.py b/elekloader/sdk/syntakt/data_rpc.py
+index 0148c8c..7f7cdb6 100644
+--- a/elekloader/sdk/syntakt/data_rpc.py
++++ b/elekloader/sdk/syntakt/data_rpc.py
+@@ -159,7 +159,12 @@ class DataClient:
+                 if rx[18] and (expected is None or len(out)<expected):raise RuntimeError('truncated Data object')
+             if len(out)!=expected:raise RuntimeError('extra Data object bytes')
+             return object_unpack(bytes(out),n)
+-        finally:self.call(0x56,be32(job))
++        finally:
++            # OS 1.42 answers "Reader did not complete" when a probe closes its job after the header
++            # (SyntHack); the job is released all the same, see 0x4010AA2E
++            try:self.call(0x56,be32(job))
++            except RuntimeError:
++                if not header_only:raise
+     def write(self,path,body,*,card_bytes=None):
+         n,body=checked_body(path,body,card_bytes)
+         obj=object_pack(n,body);head,footer=obj[:-12],obj[-12:]
