@@ -55,7 +55,7 @@ class Machine:
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
         uc.mem_map(0x41B9_1000, 0x2_0000)
-        uc.mem_map(0x444E_1000, 0x2_0000)
+        uc.mem_map(0x444E_1000, 0x3_0000)
         uc.mem_map(0x5000_0000, 0x2_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
         self.sym = {}

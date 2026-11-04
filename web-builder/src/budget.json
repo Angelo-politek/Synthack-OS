@@ -1,7 +1,7 @@
 {
   "limits": {
     "cpu": 10000,
-    "modarea": 65520,
+    "modarea": 131056,
     "kit": 36,
     "project": 256,
     "sec7": 127695

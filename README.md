@@ -23,7 +23,7 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 | [Performance FX](mods/perf-fx) | `[ok]` | Mod A (FUNC+15): keys 13–16 repeat, reverse or half-speed the pattern, all tracks. Quantized retrig (QNT). Saved with the kit. |
 | [Third send FX](mods/fx3) | `[ok]` | SND3 on every track and the input into chorus, flanger, phaser or crusher. REVERB tab, page 2. Saved with the kit. |
 | [Boot splash](mods/splash) | `[ok]` | Logo, version and optional name after the official intro. In every build. Boot time unchanged. |
-| [Mod area](mods/modarea) | `[ok]` infra | 64 KB for mod code in a reserved block of the OS heap. |
+| [Mod area](mods/modarea) | `[ok]` infra | 128 KB for mod code in a reserved block of the OS heap. |
 | [Virtual parameters](mods/vparams) | `[ok]` infra | Mods add their own parameters to OS pages. |
 | [Kit storage](mods/kitstore) | `[ok]` infra | 36 words of mod settings saved with the kit. |
 | [Faster mixing](mods/fastmix) | `[ok]` infra | OS audio routines rewritten: same sound, ~11 000 fewer instructions per block. The time saved depends on cache misses: to measure on the device. Added with the audio mods. |

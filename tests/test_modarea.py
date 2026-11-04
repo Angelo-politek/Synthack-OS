@@ -58,7 +58,7 @@ def area_image():
 
 def test_layout_is_the_first_heap_block():
     assert (RAM, SIZE, BLOCK) == (L.RAM, L.SIZE, L.HEAP_BLOCK)
-    assert BLOCK == HEAP_LO and RAM == BLOCK + 0x10 and RAM + SIZE == BLOCK + 0x1_0000
+    assert BLOCK == HEAP_LO and RAM == BLOCK + 0x10 and RAM + SIZE == BLOCK + L.HEAP_BLOCK_SIZE == BLOCK + 0x2_0000
     assert BSS_LO < RAM < RAM + SIZE < BSS_HI
 
 
@@ -153,7 +153,7 @@ def test_first_allocation_reserves_the_area_and_no_other_block_touches_it(built)
     uc.hook_add(UC_HOOK_MEM_WRITE, lambda u, acc, a, n, v, d: writes.append(a), begin=RAM, end=RAM + SIZE - 1)
     first = call(uc, ALLOC, 0x40)                               # prima allocazione dell'OS
     assert struct.unpack(">I", uc.mem_read(block_var, 4))[0] == BLOCK
-    assert not BLOCK <= first < BLOCK + 0x1_0000
+    assert not BLOCK <= first < BLOCK + L.HEAP_BLOCK_SIZE
     rnd = random.Random(4)
     live = [first]
     for i in range(1500):
@@ -165,7 +165,7 @@ def test_first_allocation_reserves_the_area_and_no_other_block_touches_it(built)
         if p == 0:
             continue
         assert HEAP_LO <= p < HEAP_HI
-        assert p + size <= BLOCK or p >= BLOCK + 0x1_0000, (hex(p), size)
+        assert p + size <= BLOCK or p >= BLOCK + L.HEAP_BLOCK_SIZE, (hex(p), size)
         live.append(p)
     for p in live:
         call(uc, FREE, p)

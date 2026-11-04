@@ -7,7 +7,7 @@ usa a runtime (caricamento dei campioni, issue #4).
 """
 
 HEAP_BLOCK = 0x444E_48C0        # primo blocco dell'heap (indice 0)
-HEAP_BLOCK_SIZE = 0x1_0000      # richiesta all'allocatore: 64 KB (ordine 12)
+HEAP_BLOCK_SIZE = 0x2_0000      # richiesta all'allocatore: 128 KB (ordine 13; 64 KB fino al 2026-11-04)
 RAM = HEAP_BLOCK + 0x10         # i primi 12 byte li scrive l'inizializzazione dell'heap
 SIZE = HEAP_BLOCK + HEAP_BLOCK_SIZE - RAM
 IMG = 0x4034_9000               # flusso compresso accodato alla sezione 3

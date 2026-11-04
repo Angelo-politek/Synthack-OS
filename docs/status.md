@@ -14,7 +14,7 @@ Snapshot of `dev`, 2026-11-04. Target: SyntHack 1.0 on Syntakt OS 1.42, with the
 | Machines | 2: sy-fm4, sampler. Not tested on 1.42 hardware |
 | Infra mods | 9: modarea, modarea7, vparams, kitstore, projstore, fastmix, syn-pages, xparams, mod-zero (example) |
 | Audio CPU | `[!]` above stock with fx3 or the machines (cache misses, see [fx3 CPU](#fx3-cpu)) |
-| Sample length | `[!]` the OS cuts samples at ~5 s. Sample management not started ([plan](#sample-management)) |
+| Sample length | `[wip]` the stock upload cuts at 5 s. Port of Synfact's long samples ([plan](#sample-management)) |
 
 ## Release 1.0
 
@@ -77,57 +77,57 @@ Done (2026-11-04): cpu-meter diagnostic mod; cache model and tests; site load in
 
 ## Sample management
 
-The OS cuts samples at ~5 s. Goal: Digitakt-style sample management (longer samples, a shared pool) for the sampler machines.
+Decision (2026-11-04): port the long samples of [Synfact](https://github.com/GSM1980/synfact-dev) (GSM1980, on elekloader by irpina; GPL-2.0-or-later, OS 1.41) as they are. SyntHack is GPL-2.0-or-later from that date ([NOTICE](../NOTICE)).
 
-Leads in OS 1.42 (section 3, CPU #1):
+Checked on the device: a long sample loaded with Transfer is cut at 5 s. Synfact documents why: the stock upload converts to 48 kHz mono PCM16 and crops to 240 000 frames (5 s) before writing the slot. Transfer can't carry long samples; Synfact sends them with its own tool over MIDI.
 
-| Lead | Where |
+### What Synfact does
+
+| Part | Detail |
 |---|---|
-| Pool and transfer classes | `SoundPool` (`updateMirror`), `SampleHandler::register_route`, `SoundManager::copyFilesFromMmcToPool` / `copyFilesFromPoolToMmc` (RTTI strings) |
-| Capabilities reported to Transfer | `sample_file.mono_support`, `sample_file.interleaved_stereo_support`, `sample_file.sample_rates` |
-| Boot load | `LOADING SAMPLES`, `PREPARING SAMPLES`; path `/samples` |
-| Memory | CPU #2: BSS with the sample memory up to ~`0x4405F750`; `0x46000000` used by modarea7's boot copy only; engine area `0x47000000` (256 KB); stack `0x48000000`. CPU #1: `0x45565490–0x48000000` written during sample loading ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)) |
+| HZFS | Named long samples in the high eMMC zone (`0x30100000` … card end, ~1 GB): two catalogues (A/B, CRC32, sequence), contiguous extents of 512 KB windows, stock `SAMP` header + PCM16BE 48 kHz mono. Never formats a zone that isn't blank |
+| Data RPC | Raw windows `/samples/(8185 + k)` for the high zone (`core_fs_route`); a write guard refuses stock-slot writes over 5 s or across slots (`core_fs_write`) |
+| PC tool | `python -m elekloader.sdk.syntakt.long_samples put / get / ls / rm / fsck` (python-rtmidi). Same protocol once ported: their tool works with SyntHack |
+| Project pool | 128 positions in the project header (`POOL` record, `0xF0..0x200`): 1–64 stock slots, `0x8000 + id` HZFS files |
+| Boot | after the stock sample blob, long PCM planned into CPU #2 RAM and sent with the same uploader and progress bar (`core_pool_count`, `core_pool_map`, `core_pool_blob`) |
+| Playback | their sampler machines read pool positions; CPU #2 service `audio-pool.c` |
 
-Found (2026-11-04, OS 1.42 section 7, CPU #2):
+### Port to OS 1.42
 
-| What | Where |
-|---|---|
-| Sample memory | `0x4004F750`, 64 MB (`0x04000000`) |
-| Boot load | `0x40000CDA` → `0x40000B92`: DSPI reads with command `0x03` + 24-bit address (serial memory READ), up to 64 MB |
-| Pool format | `0x40000D06`: 64 slots in a row, each a 32-bit length in samples followed by the 16-bit samples; table `{length, pointer}` × 64 at `0x4404F754` |
-| SP TWINSHOT engine | length clamped at `0x7FFFF` samples (10.9 s, `0x40009988`). The sampler engine keeps the same bound (`MAX_LEN`) |
-| Manual | 5 s, 512 KB per sample (users report). 512 KB = 262 144 samples = 5.46 s |
+The 16 hook sites of the long-sample parts, translated with `tools/build/osmap.py`:
 
-So CPU #2 has no 5 s bound: the cut happens on CPU #1, or in Transfer, before the pool is written.
+| Synfact hook | 1.41 | 1.42 | Stock bytes on 1.42 |
+|---|---|---|---|
+| `core_fs_route` | `0x400b8088` | `0x400b8100` | same |
+| `core_fs_write` | `0x400b618c` | `0x400b6204` | same |
+| `core_fs_written` | `0x4010b8da` | `0x4010ba9e` | same after translating the call target (osmap) |
+| `core_storage_boot` | `0x400826a6` | `0x4008271e` | same after translating the call target (osmap) |
+| `core_pool_count` | `0x40082f3e` | `0x40082fb6` | same |
+| `core_pool_map` | `0x40082f56` | `0x40082fce` | same after translating the call target (osmap) |
+| `core_pool_blob` | `0x40082802` | `0x4008287a` | same after translating the call target (osmap) |
+| `core_pool_initialize` | `0x4001d16a` | `0x4001d16a` | same |
+| `core_pool_new` | `0x40018ab0` | `0x40018ab0` | same |
+| `core_pool_snapshot` | `0x4019ffd4` | `0x401a0198` | same |
+| `core_pool_validate` | `0x400afa7e` | `0x400afaf6` | same |
+| `core_pool_load` | `0x4001d6fe` | `0x4001d6fe` | same |
+| `core_pool_save` | `0x4001a7be` | `0x4001a7be` | same after translating the call target (osmap) |
+| `core_pool_sound_menu` | `0x40064918` | `0x40064990` | same |
+| `core_pool_value` | `0x4007bb6a` | `0x4007bbe2` | same |
+| `core_machine_sample_dial` | `0x40011e74` | `0x40011e74` | same |
 
-Found on CPU #1 (section 3):
+The other services (`fw_mmc_read`, `fw_mmc_write`, `fw_malloc`, …, in their `fw.s`) are 1.41 addresses: translate the same way, check each against the 1.42 code.
 
-| What | Where |
-|---|---|
-| Slot storage | raw sectors of the internal memory: slot `k` at byte `(k + 8) × 0x80000` (4 MB … 36 MB), 512 KB each: a 64-byte header (`SAMP` magic, `+8` length in samples, `+12` name, 16 chars) then the 16-bit samples. Sector read `0x4010F612` (512-byte sectors, bound `*0x444BA720`) |
-| Header check | `0x401132EC`: `SAMP` and `2 × length ≤ 0x7FFC0`, else −6. **This is the 5 s limit**: 0x7FFC0 bytes = 262 112 samples = 5.46 s, the slot area minus the header |
-| Slot read | `0x401133CE (slot, header, dst, offset, max bytes)` |
-| Pool image | `0x40082334`: buffer `0x4D84F2C0` (getter `0x40082A48`): `0xAA`, total length, then per slot `length` + samples. Read through a 512 KB temporary buffer, max `0x80000` bytes per slot |
-| Upload to CPU #2 | `0x40082F90`: 2 KB blocks through shared RAM `0x800`, block index at `+0x0C`, progress every 128 blocks ("PREPARING SAMPLES"). CPU #2 side: `0x40000F8E` |
-| Other users of the header | `0x40111500` (slot scan, names to a table, same `0x7FFC0` check), `0x40111F60` / `0x40112280` (rename, header rewrite through `0x40111628`) |
+Steps:
 
-Stock compatibility: a stock OS rejects a header longer than `0x7FFC0` bytes (−6) and loads the slot empty. No crash.
+1. `[ok]` Mod area 64 → 128 KB (`HEAP_BLOCK_SIZE`): room for the port (`+0xFFF0`…`+0x1FFF0`).
+2. `[ ]` `long-samples` mod, storage only: `hzfs.c`, `high-storage.c/.s`, `crc.c`, the route and write-guard hooks. Tests: host build of `hzfs.c` against a block-device double (their `tests/`); the route and the guard in the emulator. Device: `long_samples init/put/get/ls` round trip.
+3. `[ ]` Project pool and boot upload (`sample-pool.c`, the pool hooks above); CPU #2 side in modarea7.
+4. `[ ]` SAMPLER machines on pool positions 65–128 (`SAMP` 1–128).
+5. `[ ]` Web builder: a long-sample uploader over WebMIDI (port of `long_samples.py`), optional.
 
-Design for longer samples: a sample of `n` bytes spans `ceil((n + 64) / 0x80000)` consecutive slot areas from its slot. The following slots lose their header and read as empty. Changes: header check and slot read without the 512 KB bound, pool image without the temporary buffer, the assign/write path, the sampler engine's `MAX_LEN` (SP TWINSHOT keeps `0x7FFFF`).
+`[!]` Steps 2–3 write the internal eMMC. Test on the device only after the emulator and host tests, with a backup of the projects (Transfer).
 
-`[!]` Open: does Elektron Transfer cut the file before sending it (then the device never gets the rest), or does the device refuse or cut it? Check: send a 10 s WAV and read its length on the device. The write path for an assigned sample is not mapped yet.
-
-Ruled out on CPU #1: `0x40080646` (OS update over serial, `READY FOR OS`, 256 KB sector erase); `0x400B9EB6`, `0x400BA1C2` (a length > `0x7FFFF` becomes `0x80000`: UI side). No WAV parser on the device: Transfer converts the files (`MidiRpcFsSample*`, `SampleAssign`, `ListRam`, `ClearRam`, `MemoryCompaction`).
-
-Plan:
-
-1. `[ ]` Find the length limit: which device the CPU #2 DSPI reads (`0x40000B92`) and the CPU #1 code that writes it; the loader path from `copyFilesFromMmcToPool` to the CPU #2 transfer. Check the 5 s figure with a long WAV in the emulator.
-2. `[ ]` Map the CPU #2 sample memory: slot table, per-slot size, allocator. Check at runtime which RAM above the BSS stays unused (the #4 lesson: no static reference is not proof).
-3. `[ ]` Design: one pool for all slots, length bounded by free memory, slot table compatible with stock projects (a stock OS must still load them, rule 10).
-4. `[ ]` Sampler machines read the pool (`mods/sampler/engine`).
-5. `[ ]` Tests: long sample, slot reuse, save/reload, project opened on a stock OS.
-
-No other Syntakt firmware with Digitakt sample machines was found to copy from (search 2026-11-04). The sampler's positions and interpolation are already checked against the Digitakt 1.54 code.
+Found here before the decision (still valid, OS 1.42): stock slots at `(k + 8) × 0x80000`, header check `0x401132EC` (`0x7FFC0`), slot read `0x401133CE`, pool image `0x40082334`, upload `0x40082F90`, CPU #2 pool `0x4004F750` (64 MB) and its parser `0x40000D06`.
 
 ## Next session
 
