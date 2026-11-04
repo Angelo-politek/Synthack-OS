@@ -308,14 +308,17 @@ static u32 crusher(const s32 *in)
     return (u32)(cr_hold + 10) <= 20;
 }
 
-/* nuovo tipo: niente coda del precedente */
+/* nuovo tipo: niente coda del precedente. La linea (4 KB) si svuota in CLR_N blocchi, 1/CLR_N per blocco,
+ * con l'effetto muto: tutta in un blocco sono ~1 000 scritture e 256 righe di cache, l'interrupt sfora il blocco */
+#define CLR_N 8
+u32 fx3_clr DATA = 0;                                      /* blocchi di svuotamento che restano */
+
 static void retype(u32 t)
 {
-    u32 *l = (u32 *)DL_M, k;
+    u32 k;
 
     dsp_type = t;
-    for (k = 0; k < DL; k++)                               /* linea e copia: 2 x DL campioni */
-        l[k] = 0;
+    fx3_clr = CLR_N;
     for (k = 0; k < 5; k++)
         ph.s[k] = 0;
     cr_hold = 0;
@@ -400,6 +403,16 @@ void fx3_run(void)
     fx3_idle = 0;
     if (fx3_p[P_TYPE] != dsp_type)
         retype(fx3_p[P_TYPE]);
+    if (fx3_clr) {                                         /* svuotamento della linea: effetto muto */
+        u32 *l = (u32 *)DL_M + (CLR_N - fx3_clr) * (DL / CLR_N), *w = (u32 *)fx3_wet;
+        fx3_clr--;
+        for (k = 0; k < DL / CLR_N; k++)                   /* linea e copia: 2 x DL campioni = DL parole */
+            l[k] = 0;
+        for (k = 0; k < 2 * H; k++)
+            w[k] = 0;
+        ret_h[0] = ret_h[1] = 0;
+        return;
+    }
     in = mask ? fx3_bus : zero;
     switch (dsp_type) {
     case PHSR:

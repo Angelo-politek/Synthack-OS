@@ -24,6 +24,7 @@ FX3 page: A `TYPE`; B–F change name and range with TYPE; G `DEL`; H `REV`.
 - `REV` (v0.9, replaces VOL): FX3 → reverb.
 - Return to the master: fixed at 0 dB. The SND3 sends set the amount.
 - Changing TYPE resets SPD…WID to that type's start values. DEL and REV are kept. CRSH starts neutral: 24 kHz, 16 bits, no drive.
+- After a TYPE change the effect is silent for 8 blocks (~5 ms) while its delay line clears, 1/8 per block. Clearing it in one block overran the audio interrupt.
 - FLNG and PHSR feedback is bipolar: center = none.
 - PHSR: four allpass stages. WID turns the right side into the complementary response.
 - CRSH is mono. It hides knobs E and F.
@@ -61,7 +62,11 @@ Instructions per 32-sample block, emulator. The stock OS uses ~89 % of the CPU a
 |---|---|
 | Idle | ~60 |
 | One track: CHOR / FLNG / PHSR / CRSH | ~1,300 / ~1,500 / ~1,700 / ~850 |
-| Worst case: 12 tracks and the input sending, maximum feedback and sends | ~2,740 (ceiling 2,770 in `tests/test_cpu_budget.py`) |
+| Worst case: 12 tracks and the input sending, maximum feedback and sends | ~2,750 (ceiling 2,770 in `tests/test_cpu_budget.py`) |
+
+With the caches (`tools/emu/cycles.py`, worst case): ~164 code lines and ~41 data lines in DDR per block, ~15,000 cycles over fastmix (CPI 1.0 estimate), ~9 % of the block. Interrupt at ~90–98 % against 89 % stock.
+
+`[!]` `[wip]` UI lag with many tracks sending: the cost is in cache misses, not instructions. Biggest part: the C control code of `fx3_run` (76 lines, ~700 instructions). Plan in [docs/status.md](../../docs/status.md#fx3-cpu).
 
 ## Build and test
 

@@ -275,7 +275,7 @@ def main() -> None:
         "symbols": {k: f"{syms[k]:#010x}" for k in (
             "fx3_trk_hook", "fx3_del_hook", "fx3_macsr", "fx3_mix_hook", "fx3_page_stub", "fx3_amp_stub",
             "fx3_run", "fx3_dsnd", "fx3_ret", "fx3_get", "fx3_set", "fx3_p", "fx3_tgt", "fx3_cur", "fx3_moving",
-            "fx3_bus", "fx3_wet", "fx3_idle", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
+            "fx3_bus", "fx3_wet", "fx3_idle", "fx3_clr", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
             "fx3_kser_hook", "fx3_kdes_hook", "fx3_rsnd", "fx3_rev_hook", "fx3_addsat", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set",

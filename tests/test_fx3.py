@@ -209,6 +209,10 @@ def settle(m, **params):
     gains(m, [0x4000_0000])                                    # guadagno 1 (meta')
     m.put(SRC_DIG, [0] * 256)
     run_block(m)
+    if m.longs(m.sym["fx3_clr"], 1)[0]:                        # nuovo tipo: linea svuotata in CLR_N blocchi,
+        while m.longs(m.sym["fx3_clr"], 1)[0]:                 # effetto fermo; poi due blocchi con l'effetto
+            run_block(m)
+        run_block(m)
     run_block(m)
 
 
@@ -299,15 +303,39 @@ def test_cost_per_block(m):
     for t, most in ((1, 1600), (2, 1800), (3, 1050)):          # FLNG e PHSR con retroazione (-95/-90 %),
         m.param("TYPE", t)                                     # CRSH neutro (un campione su uno)
         m.param("FDBK", 0)
-        run_block(m)
+        for _ in range(CLR_N + 1):                             # linea svuotata in CLR_N blocchi
+            run_block(m)
         assert block_cost(m) < most, t
     m.param("TYPE", 0)
     gains(m, [0x4000_0000] * 12)
     m.param("FDBK", 64)
     m.param("DSND", 64)
-    run_block(m)
+    for _ in range(CLR_N + 1):
+        run_block(m)
     worst = block_cost(m)
     assert worst < 2400, worst                                 # era ~3800
+
+
+CLR_N = 8                                                       # blocchi di svuotamento della linea (fx3.c)
+
+
+def test_type_change_spreads_the_line_clear(m):
+    """Cambio di TYPE: la linea da 4 KB si svuota in CLR_N blocchi con l'effetto muto. Tutta in un blocco erano
+    ~1 000 scritture e 256 righe di cache: quel blocco sforava il tempo dell'interrupt."""
+    settle(m, TYPE=0, FDBK=120)
+    loud(m)
+    gains(m, [0x4000_0000] * 12)
+    for _ in range(10):
+        run_block(m)
+    full = block_cost(m)
+    m.param("TYPE", 2)
+    costs = [block_cost(m) for _ in range(CLR_N)]
+    assert max(costs) < full, (costs, full)                     # mai piu' di un blocco con l'effetto
+    line = m.uc.mem_read(MA + 0xE000, 4096)
+    assert line == bytes(4096)                                  # linea e copia vuote
+    assert m.longs(m.sym["fx3_wet"], 32) == [0] * 32            # muto durante lo svuotamento
+    run_block(m)
+    assert block_cost(m) < 2400                                 # il phaser riparte
 
 
 def test_sends_on_but_inputs_silent(m):
