@@ -20,6 +20,7 @@ One folder per mod. Target: Syntakt OS 1.42.
 | [kitstore](kitstore) | infra | 36 words saved with the kit (reserved bytes of the per-track kit blocks) | modarea |
 | [fastmix](fastmix) | infra | Two hot OS audio routines (bus sums, parameter smoothing) rewritten: same output, ~11 000 fewer instructions per block | modarea |
 | [projstore](projstore) | infra | 256 bytes saved with the project (reserved area of the project settings) | modarea |
+| [cpu-meter](cpu-meter) | test | Diagnostic: audio interrupt load measured on the device (DTIM0), average and peak on the parameter pages | modarea |
 | [mod-zero](mod-zero) | test | Example: renames a menu entry; smallest possible mod | — |
 
 ## Files

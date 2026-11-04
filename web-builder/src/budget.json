@@ -7,6 +7,13 @@
     "sec7": 127695
   },
   "mods": {
+    "cpu-meter": {
+      "cpu": 0,
+      "modarea": 768,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
     "dual-mono": {
       "cpu": 2400,
       "modarea": 2048,
@@ -121,7 +128,7 @@
     },
     "xparams": {
       "cpu": 5200,
-      "modarea": 2304,
+      "modarea": 1536,
       "kit": 0,
       "project": 0,
       "sec7": 0

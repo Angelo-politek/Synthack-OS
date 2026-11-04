@@ -1,0 +1,56 @@
+{
+  "name": "cpu-meter",
+  "os": "1.42",
+  "requires": [
+    "modarea"
+  ],
+  "description": "Diagnostica: carico dell'interrupt audio misurato con DTIM0 (media e massimo, percento del blocco) in alto a destra sulle pagine dei parametri.",
+  "generated_by": "mods/cpu-meter/make_patch.py",
+  "symbols": {
+    "cm_draw": "0x444eb686",
+    "cm_entry": "0x444eb5d0",
+    "cm_exit": "0x444eb5f8",
+    "cm_mdur": "0x444eb7c0",
+    "cm_n": "0x444eb7bc",
+    "cm_per": "0x444eb7cc",
+    "cm_pub": "0x444eb7b0",
+    "cm_sdur": "0x444eb7c8",
+    "cm_sper": "0x444eb7c4",
+    "cm_t0": "0x444eb7d0"
+  },
+  "patches": [
+    {
+      "section": 3,
+      "addr": "0X4034FD00",
+      "len": 516,
+      "append": true,
+      "hex": "4e56ff5c48d73fff2039fc07000c2239444eb7d023c0444eb7d0908123c0444eb7cc4ef9400a38d62039fc07000c90b9444eb7d0d1b9444eb7c8b0b9444eb7c0630623c0444eb7c02039444eb7ccd1b9444eb7c42039444eb7bc528023c0444eb7bc0c8000000200664041f9444eb7b020f9444eb7c820f9444eb7c420b9444eb7c042b9444eb7c842b9444eb7c442b9444eb7c042b9444eb7bc2039444e233467082040117c000100604cee3fffff5c4ef9400a551e4feffff048d7003c282f00182639444eb7b02a39444eb7b42f042f2f00182439444eb7b84eb940032692508f0c85000003e7630000ca223c000003e84c415005702013c0444eb7a44c45300320035a800c80000003e7620000b0720a4c410000720a4c4100034c410000720906800000003013c0444eb7a5702006830000003013c3444eb7a613c0444eb7a72002e3a84c4500005a800c80000003e76270740a4c420000740a4c4200014c4200004879444eb7a44879444eb7984879444eb79b42a742a7068000000030487800384878004a2f3c402a951013c0444eb7a80681000000302f04420013c1444eb7a913c0444eb7aa4eb9400f8ddc4fef00244cd7003c4fef00104e7570636000ff5470636092257300585858585858580000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "ram": "0x444eb5d0",
+      "what": "(area mod) cpumeter.c"
+    },
+    {
+      "section": 3,
+      "addr": "0X400A38CE",
+      "len": 8,
+      "expect_sha256": "fc4bfce85da943d6e5dd7435ef74a8a1fee139ecd55c53a90e161c7fa4b0e355",
+      "hex": "4ef9444eb5d04e71",
+      "what": "ingresso dell'interrupt audio"
+    },
+    {
+      "section": 3,
+      "addr": "0X400A5518",
+      "len": 6,
+      "expect_sha256": "a59f9dcdbc55d669de5da670c1fd1d3494b963569219fc7f44ff031ebd537d14",
+      "hex": "4ef9444eb5f8",
+      "what": "uscita dell'interrupt audio"
+    },
+    {
+      "section": 3,
+      "addr": "0X401C84AC",
+      "len": 4,
+      "expect_sha256": "fc9f7c3dcb29b3f3736a05c0328f67482667f49c7106f240e0ef2354cbc766c3",
+      "hex": "444eb686",
+      "what": "disegno della vista dei parametri"
+    }
+  ]
+}
