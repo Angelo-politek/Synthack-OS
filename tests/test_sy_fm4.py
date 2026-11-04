@@ -83,6 +83,8 @@ def test_page2_descriptors_replace_midi_track_cc_values(stock):
         owner, lix, mn, mx, de, _r5, cc, nrpn, rid = struct.unpack(">9I", bytes.fromhex(p["hex"])[:36])
         assert (owner, lix, rid) == (0xFFFF_FFFF, 0x36 + k, 254 + k)
         assert (cc, nrpn) == (0xFFFF_FFFF, 0xFFFF_FFFF)                # niente MIDI sulla pagina 2/2
+        flags = struct.unpack(">I", bytes.fromhex(p["hex"])[36:40])[0]
+        assert flags == 0              # come i descrittori stock senza machine: fuori dalle destinazioni di LFO e mod
         assert mn <= de <= mx <= 0x7F00
 
 

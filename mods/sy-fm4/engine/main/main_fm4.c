@@ -70,17 +70,19 @@ static const char group[] = "SYF4";
 
 /* Copied into the descriptor table by the patcher. owner 0xffffffff keeps
  * them out of the per-machine index tables (FUN_400a4ef0), which only have
- * room for logical indices 0x11..0x1a; midi 0xffffffff = no CC/NRPN. */
+ * room for logical indices 0x11..0x1a; midi 0xffffffff = no CC/NRPN; flags 0, as every stock descriptor
+ * without an owner: not in the LFO and modulation destination lists (they would show on every track, under "ERR",
+ * and the OS's modulation does not reach these indices). */
 __attribute__((used)) const record_t fm4m_records[PAGE2_N] = {
-    {0xffffffff, 0x36, 0, 0x0b00, 0,      0, 0xffffffff, 0xffffffff, R_ALGO, 0xe00, "Algorithm", group, "ALGO"},
-    {0xffffffff, 0x37, 0, 0x7f00, 0x0400, 0, 0xffffffff, 0xffffffff, R_RAT3, 0xe00, "Op3 Ratio", group, "RAT3"},
-    {0xffffffff, 0x38, 0, 0x7f00, 0,      0, 0xffffffff, 0xffffffff, R_LEV3, 0xe00, "Op3 Level", group, "LEV3"},
-    {0xffffffff, 0x39, 0, 0x7f00, 0x4c00, 0, 0xffffffff, 0xffffffff, R_DEC3, 0xe00, "Op3 Decay", group, "DEC3"},
-    {0xffffffff, 0x3a, 0, 0x7f00, 0x0400, 0, 0xffffffff, 0xffffffff, R_RAT4, 0xe00, "Op4 Ratio", group, "RAT4"},
-    {0xffffffff, 0x3b, 0, 0x7f00, 0,      0, 0xffffffff, 0xffffffff, R_LEV4, 0xe00, "Op4 Level", group, "LEV4"},
-    {0xffffffff, 0x3c, 0, 0x7f00, 0x4c00, 0, 0xffffffff, 0xffffffff, R_DEC4, 0xe00, "Op4 Decay", group, "DEC4"},
+    {0xffffffff, 0x36, 0, 0x0b00, 0,      0, 0xffffffff, 0xffffffff, R_ALGO, 0, "Algorithm", group, "ALGO"},
+    {0xffffffff, 0x37, 0, 0x7f00, 0x0400, 0, 0xffffffff, 0xffffffff, R_RAT3, 0, "Op3 Ratio", group, "RAT3"},
+    {0xffffffff, 0x38, 0, 0x7f00, 0,      0, 0xffffffff, 0xffffffff, R_LEV3, 0, "Op3 Level", group, "LEV3"},
+    {0xffffffff, 0x39, 0, 0x7f00, 0x4c00, 0, 0xffffffff, 0xffffffff, R_DEC3, 0, "Op3 Decay", group, "DEC3"},
+    {0xffffffff, 0x3a, 0, 0x7f00, 0x0400, 0, 0xffffffff, 0xffffffff, R_RAT4, 0, "Op4 Ratio", group, "RAT4"},
+    {0xffffffff, 0x3b, 0, 0x7f00, 0,      0, 0xffffffff, 0xffffffff, R_LEV4, 0, "Op4 Level", group, "LEV4"},
+    {0xffffffff, 0x3c, 0, 0x7f00, 0x4c00, 0, 0xffffffff, 0xffffffff, R_DEC4, 0, "Op4 Decay", group, "DEC4"},
     /* +-16 semitones around 0x4000, fine steps: SY DUAL VCO's DET */
-    {0xffffffff, 0x3d, 0x3000, 0x5000, 0x4000, 1, 0xffffffff, 0xffffffff, R_DET, 0xe00, "Detune", group, "DET"},
+    {0xffffffff, 0x3d, 0x3000, 0x5000, 0x4000, 1, 0xffffffff, 0xffffffff, R_DET, 0, "Detune", group, "DET"},
 };
 __attribute__((used)) const u32 fm4m_record_index[PAGE2_N] = {
     R_ALGO, R_RAT3, R_LEV3, R_DEC3, R_RAT4, R_LEV4, R_DEC4, R_DET};

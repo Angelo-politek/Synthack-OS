@@ -28,7 +28,7 @@ One row per modulator: operator 2 under the common controls on 1/3, operators 3 
 
 `[!]` A project with p-locks of pages 2/3 and 3/3 opened on a stock OS loses those locks.
 
-`[!]` Pages 2/3 and 3/3 have no MIDI CC.
+`[!]` Pages 2/3 and 3/3 have no MIDI CC and are not LFO or modulation destinations.
 
 ## How it works
 
