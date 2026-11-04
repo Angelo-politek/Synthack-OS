@@ -34,7 +34,9 @@ OFF_MAIN = next(a for a, b, who, _ in registry.MODAREA if who == "sampler")
 OFF_ENGINE = next(a for a, b, who, _ in registry.ENGINE if who == "sampler")
 BOOT_SLOT = next(n for n, who in registry.BOOT_SLOTS.items() if who == "sampler")
 TOOLS = "~/tools/m68k/root"
-CFLAGS = (f"-DSP_TABLE={SP.TABLE:#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
+LS_HDR = __import__("modarea_layout").RAM + next(a for a, b, who, _ in __import__("registry").MODAREA
+                                                  if who == "long-samples")    # mods/long-samples: 'LSHD'
+CFLAGS = (f"-DSP_TABLE={SP.TABLE:#x} -DLS_HDR={LS_HDR:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
           "--param=min-pagesize=0")             # la RAM condivisa della CPU #2 parte da 0
 
 # sezione 3 (OS 1.42)

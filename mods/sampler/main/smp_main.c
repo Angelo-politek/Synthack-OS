@@ -423,9 +423,34 @@ static u32 sm_record(void *view, u32 page, u32 knob) {
 static const char *const titles[4][2] = {
     {"SAMPLE 1/2", "SAMPLE 2/2"}, {"WERP 1/2", "WERP 2/2"}, {"REPITCH 1/2", "REPITCH 2/2"}, {"SLICE 1/2", "SLICE 2/2"}};
 
+/* page 2/2 of a long sample (SAMP 65..128): its name and length, from mods/long-samples' header at LS_HDR
+ * ('LSHD', table, names), when that mod is in the build */
+static char long_title[20];
+
+static const char *long_name(u32 slot) {
+    const u32 *h = (const u32 *)LS_HDR;
+    if (slot < 64 || h[0] != 0x4C534844u)
+        return 0;
+    const u32 *t = (const u32 *)h[1];
+    u32 n = slot - 64;
+    if (t[0] != 0x53484C53u || n >= t[1])
+        return 0;
+    const char *name = (const char *)h[2] + 16 * n;
+    char *b = long_title;
+    for (int k = 0; k < 8 && name[k]; k++)
+        *b++ = name[k] >= 'a' && name[k] <= 'z' ? (char)(name[k] - 32) : name[k];
+    *b++ = ' ';
+    b = put_u(b, (t[3 + 2 * n] + 24000) / 48000);
+    *b++ = 'S';
+    *b = 0;
+    return long_title;
+}
+
 static const char *sm_title(void *view, u32 page) {
     (void)view;
-    return titles[track_type()][page == 1];
+    s32 t = active_track();
+    const char *l = page == 1 && t >= 0 ? long_name((u32)clampi(value(t, LIX_SAMP) >> 8, 127)) : 0;
+    return l ? l : titles[track_type()][page == 1];
 }
 
 /* page 2/2: the waveform over the top row (x 16..127, rows 13..35: the stock knob graphics' rows, under the line

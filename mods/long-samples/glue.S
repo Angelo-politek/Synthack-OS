@@ -23,6 +23,13 @@
         .set BOOT_NEXT,0x400bd74e           | the call the boot hook (0x4008271e) displaces
 
         .text
+| at the start of the blob (mod area + 0xFFF0, registry): read by the SAMPLER's main CPU side for names and lengths
+        .globl ls_header
+ls_header:
+        .long 0x4C534844                    | 'LSHD'
+        .long ls_table                      | 'SHLS', count, {pointer on CPU #2, frames} x 64
+        .long ls_names                      | 64 x 16 chars
+
 | malloc of the OS (0x401036d0) returns the pointer in d0; m68k-linux-gnu-gcc reads it from a0 (Synfact builds with
 | m68k-elf, which reads d0): docs/modding-guide.md, OS functions returning a pointer
         .globl fw_malloc

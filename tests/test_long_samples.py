@@ -176,3 +176,26 @@ def test_route_of_a_high_window(m):
     assert struct.unpack(">I", m.uc.mem_read(info + 12, 4))[0] == k << 19         # indirizzo sulla eMMC
     assert route("/samples/12") == 0                                             # slot stock: all'OS
     assert route(f"/samples/{8185 + 0x5FF}") == 0                                # sotto la zona alta
+
+
+def test_header_for_the_sampler(m):
+    """'LSHD' all'inizio dell'area di long-samples (registro): il SAMPLER (CPU #1) vi trova tabella e nomi."""
+    sys.path.insert(0, str(ROOT.parent / "tools" / "build"))
+    import modarea_layout
+    import registry
+    hdr = modarea_layout.RAM + next(a for a, b, who, _ in registry.MODAREA if who == "long-samples")
+    assert hdr == m.sym["ls_header"]
+    magic, table, names = struct.unpack(">3I", m.uc.mem_read(hdr, 12))
+    assert magic == 0x4C53_4844 and table == m.sym["ls_table"]
+    s = m.sym
+    m.disk.s.clear()
+    io = s["core_hzfs_native_io"]
+    assert m.call(s["core_hzfs_ensure"], [io], count=400_000_000) == 1
+    m.body = samp(11 * 48000)
+    m.uc.mem_write(SCRATCH, b"MagMag Vocal 175\0")
+    assert m.call(s["core_hzfs_put"], [io, SCRATCH, len(m.body), 0, STREAM, 0, SCRATCH + 64],
+                  count=2_000_000_000) == 1
+    m.uc.mem_write(TOTAL, struct.pack(">I", 256))
+    m.call(s["ls_plan"], count=400_000_000)
+    assert bytes(m.uc.mem_read(names, 16)).split(b"\0")[0] == b"MagMag Vocal 17"   # 15 caratteri + 0
+    assert struct.unpack(">I", m.uc.mem_read(table + 12, 4))[0] == 11 * 48000

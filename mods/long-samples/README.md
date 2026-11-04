@@ -15,6 +15,13 @@ Samples longer than 5 s. The storage is **Synfact's** ([GSM1980/synfact-dev](htt
    ```
 4. Power cycle. "PREPARING SAMPLES" now also sends the long samples to the voice CPU.
 5. On a SAMPLER track, turn `SAMP` past 64: `L1` is the first file of the catalogue, `L2` the second, …
+   SYN 2/2 shows the file's name (8 characters) and length in seconds as the page title, with its waveform.
+
+A whole folder at once (names cut to 32 characters, made unique; `--dry-run` first to see them):
+```sh
+python ../Synthack-OS/mods/long-samples/put_folder.py "C:/Users/me/Music/Syntakt/Sample" --skip "MagMag" --dry-run
+python ../Synthack-OS/mods/long-samples/put_folder.py "C:/Users/me/Music/Syntakt/Sample" --skip "MagMag"
+```
 
 | | |
 |---|---|
@@ -25,7 +32,9 @@ Samples longer than 5 s. The storage is **Synfact's** ([GSM1980/synfact-dev](htt
 
 `[!]` Files beyond the 64th, or beyond the voice CPU's memory, stay on the eMMC and don't play.
 
-`[!]` Synfact's own docs say its hardware transfer on the device is still to be confirmed. Test with backups.
+Device (2026-11-04): `ls`, `put` of an 11 s file, playback as `L1` checked on a Syntakt with OS 1.42.
+
+`[!]` OS 1.42 needs `synfact-tool-os142.patch` on Synfact's tool (see step 3).
 
 ## How it works
 
