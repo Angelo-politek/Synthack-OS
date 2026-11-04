@@ -100,6 +100,23 @@ Found (2026-11-04, OS 1.42 section 7, CPU #2):
 
 So CPU #2 has no 5 s bound: the cut happens on CPU #1, or in Transfer, before the pool is written.
 
+Found on CPU #1 (section 3):
+
+| What | Where |
+|---|---|
+| Slot storage | raw sectors of the internal memory: slot `k` at byte `(k + 8) × 0x80000` (4 MB … 36 MB), 512 KB each: a 64-byte header (`SAMP` magic, `+8` length in samples, `+12` name, 16 chars) then the 16-bit samples. Sector read `0x4010F612` (512-byte sectors, bound `*0x444BA720`) |
+| Header check | `0x401132EC`: `SAMP` and `2 × length ≤ 0x7FFC0`, else −6. **This is the 5 s limit**: 0x7FFC0 bytes = 262 112 samples = 5.46 s, the slot area minus the header |
+| Slot read | `0x401133CE (slot, header, dst, offset, max bytes)` |
+| Pool image | `0x40082334`: buffer `0x4D84F2C0` (getter `0x40082A48`): `0xAA`, total length, then per slot `length` + samples. Read through a 512 KB temporary buffer, max `0x80000` bytes per slot |
+| Upload to CPU #2 | `0x40082F90`: 2 KB blocks through shared RAM `0x800`, block index at `+0x0C`, progress every 128 blocks ("PREPARING SAMPLES"). CPU #2 side: `0x40000F8E` |
+| Other users of the header | `0x40111500` (slot scan, names to a table, same `0x7FFC0` check), `0x40111F60` / `0x40112280` (rename, header rewrite through `0x40111628`) |
+
+Stock compatibility: a stock OS rejects a header longer than `0x7FFC0` bytes (−6) and loads the slot empty. No crash.
+
+Design for longer samples: a sample of `n` bytes spans `ceil((n + 64) / 0x80000)` consecutive slot areas from its slot. The following slots lose their header and read as empty. Changes: header check and slot read without the 512 KB bound, pool image without the temporary buffer, the assign/write path, the sampler engine's `MAX_LEN` (SP TWINSHOT keeps `0x7FFFF`).
+
+`[!]` Open: does Elektron Transfer cut the file before sending it (then the device never gets the rest), or does the device refuse or cut it? Check: send a 10 s WAV and read its length on the device. The write path for an assigned sample is not mapped yet.
+
 Ruled out on CPU #1: `0x40080646` (OS update over serial, `READY FOR OS`, 256 KB sector erase); `0x400B9EB6`, `0x400BA1C2` (a length > `0x7FFFF` becomes `0x80000`: UI side). No WAV parser on the device: Transfer converts the files (`MidiRpcFsSample*`, `SampleAssign`, `ListRam`, `ClearRam`, `MemoryCompaction`).
 
 Plan:
