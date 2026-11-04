@@ -1,0 +1,5 @@
+{
+  "title": "Long samples",
+  "kind": "feature",
+  "summary": "Samples longer than 5 s (Synfact's HZFS): sent with Synfact's tool, played by the SAMPLER machines as slots 65-128."
+}

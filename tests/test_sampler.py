@@ -725,3 +725,41 @@ def test_machine_menu():
 def screens_pixels(frame):
     import screens
     return screens.pixels(frame)
+
+
+POOL, LONG_MAGIC = 0x4004_F750, 0x5348_4C53
+
+
+def long_table(e, entries):
+    """La tabella che mods/long-samples manda dopo l'immagine stock: a POOL + 2048 x ceil(byte stock / 2048)."""
+    lens = struct.unpack(">128I", e.uc.mem_read(SAMPLE_TABLE, 512))[0::2]
+    stock = 4 * 64 + 2 * sum(lens)
+    at = POOL + ((stock + 2047) & ~2047)
+    words = [LONG_MAGIC, len(entries)] + [w for ptr, n in entries for w in (ptr, n)]
+    e.uc.mem_write(at, struct.pack(f">{len(words)}I", *words))
+    return at
+
+
+def test_long_sample_slot_65(engines):
+    """SAMP 65 (L1): un sample di 15 s, oltre il limite stock (5.46 s nello slot, 10.9 s in SP TWINSHOT)."""
+    e, _ = engines
+    load_sample(e, sine(4800), 0)
+    at = long_table(e, [])
+    n = 15 * SR
+    pcm = at + 2048 + 64
+    half = n // 2
+    data = sine(half, 500) + sine(n - half, 3000)
+    for k in range(0, n, 65536):                       # a pezzi: unicorn scrive bene anche cosi'
+        part = data[k:k + 65536]
+        e.uc.mem_write(pcm + 2 * k, struct.pack(f">{len(part)}h", *part))
+    long_table(e, [(pcm, n)])
+    samp = 64 << 8                                      # SAMP 65
+    start = play(e, [0x4000, 0x300, 0, samp, 0, 0x7800, 0, 0x6400])
+    assert abs(freq(start[TAIL:]) - 500) < 40
+    late = play(e, [0x4000, 0x300, 0, samp, 100 << 8, 0x1400, 0, 0x6400])   # STRT 100/120: 12.5 s
+    assert abs(freq(late[TAIL:]) - 3000) < 150
+    none = play(e, [0x4000, 0x300, 0, 65 << 8, 0, 0x7800, 0, 0x6400])        # L2: nessun file
+    assert peak(none[TAIL:]) == 0                       # (nei primi blocchi la coda del suono di prima)
+    e.uc.mem_write(at, bytes(8))                        # niente tabella: lo slot lungo tace, lo stock no
+    assert peak(play(e, [0x4000, 0x300, 0, samp, 0, 0x7800, 0, 0x6400])[TAIL:]) == 0
+    assert peak(play(e, ONESHOT)) > 0

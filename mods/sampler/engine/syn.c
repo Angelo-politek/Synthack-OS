@@ -25,8 +25,12 @@
 
 /* Section 7 (the same in 1.40A, 1.41, 1.42). */
 #define SAMPLES ((volatile const uint32_t *)0x4404f754)    /* 64 slots: {length in samples, pointer} */
-#define SLOTS 64
-#define MAX_LEN 0x7ffff                                      /* SP TWINSHOT's limit */
+#define SLOTS 128                                            /* 1..64 stock, 65..128 long samples (mods/long-samples) */
+#define STOCK_SLOTS 64
+#define MAX_LEN 0x7ffff                                      /* SP TWINSHOT's limit (stock slots) */
+#define LONG_MAX 0x1000000                                   /* 16 M samples, 5.8 min: CPU #2 holds 64 MB */
+#define POOL 0x4004f750u                                     /* the stock image on CPU #2 (64 MB to 0x4404f750) */
+#define LONG_MAGIC 0x53484c53u                               /* 'SHLS' */
 #define FW_HALFBAND ((void (*)(void *, int32_t *, int32_t *))0x400051c6)  /* state at voice + 1388 */
 #define FW_DEC ((void (*)(uint8_t *))0x40003d42)
 #define FW_VCA ((void (*)(int32_t *, uint8_t *))0x400045a0)
@@ -87,7 +91,34 @@ typedef struct {
 
 static voice_t voices[VOICES];
 static int32_t *hb_ptr[VOICES];
-static sm_grid_t grids[SLOTS];
+static sm_grid_t grids[STOCK_SLOTS];                     /* a cache: slot & 63, checked on (data, len) */
+
+/* Slot 0..127 -> length and pointer. 64..127: the table long-samples (main CPU) sends after the stock image,
+ * at POOL + 2048 x ceil(stock bytes / 2048); stock bytes = 64 x 4 + 2 x the lengths. */
+static int sample_at(int slot, uint32_t *len, uint32_t *ptr) {
+    *len = *ptr = 0;
+    if (slot < 0 || slot >= SLOTS)
+        return 0;
+    if (slot < STOCK_SLOTS) {
+        *len = SAMPLES[2 * slot];
+        *ptr = SAMPLES[2 * slot + 1];
+        if (*len > MAX_LEN)
+            *len = MAX_LEN;
+    } else {
+        uint32_t bytes = 4 * STOCK_SLOTS;
+        for (int k = 0; k < STOCK_SLOTS; k++)
+            bytes += 2 * SAMPLES[2 * k];
+        volatile const uint32_t *t = (volatile const uint32_t *)(POOL + ((bytes + 2047) & ~2047u));
+        uint32_t n = (uint32_t)(slot - STOCK_SLOTS);
+        if (bytes > 0x4000000u - 2048 || t[0] != LONG_MAGIC || n >= t[1] || n >= 64)
+            return 0;
+        *ptr = t[2 + 2 * n];
+        *len = t[3 + 2 * n];
+        if (*len > LONG_MAX || *ptr < POOL || *ptr + 2 * *len > POOL + 0x4000000u)
+            *len = *ptr = 0;
+    }
+    return *len && *ptr;
+}
 static int16_t win[WIN];
 static int32_t hb_in[8 + 2 * BLOCK];
 static int32_t hb_out[BLOCK];
@@ -140,7 +171,7 @@ static uint32_t bar_samples(int bars_log2) {
 static sm_grid_t *grid_of(voice_t *v) {
     if (v->slot < 0 || v->slot >= SLOTS || v->data == 0)
         return 0;
-    sm_grid_t *g = &grids[v->slot];
+    sm_grid_t *g = &grids[v->slot & (STOCK_SLOTS - 1)];
     if (g->data != v->data || g->len != v->len) {
         g->data = v->data;
         g->len = v->len;
@@ -227,9 +258,8 @@ static void wave_step(void) {
     uint32_t req = WAVE_REQ;
     if (req == 0 || req > SLOTS)
         return;
-    uint32_t len = SAMPLES[2 * (req - 1)], ptr = SAMPLES[2 * (req - 1) + 1];
-    if (len > MAX_LEN)
-        len = MAX_LEN;
+    uint32_t len, ptr;
+    sample_at((int)req - 1, &len, &ptr);
     if (WAVE_SLOT != req || WAVE_LEN != len || WAVE_PTR != ptr) {
         WAVE_DONE = 0;
         WAVE_LEN = len;
@@ -285,14 +315,10 @@ void syn_smp_prep(int32_t pitch, uint8_t *st, uint8_t *params) {
         v->slot = slot;
         v->data = 0;
         v->len = 0;
-        if (slot >= 0 && slot < SLOTS) {
-            uint32_t len = SAMPLES[2 * slot], ptr = SAMPLES[2 * slot + 1];
-            if (len > MAX_LEN)
-                len = MAX_LEN;
-            if (len && ptr) {
-                v->data = (const int16_t *)ptr;
-                v->len = (int32_t)len;
-            }
+        uint32_t len, ptr;
+        if (sample_at(slot, &len, &ptr)) {
+            v->data = (const int16_t *)ptr;
+            v->len = (int32_t)len;
         }
         v->mode = types[vi];
         v->trig = 1;

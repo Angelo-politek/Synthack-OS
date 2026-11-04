@@ -42,6 +42,13 @@
       "project": 0,
       "sec7": 0
     },
+    "long-samples": {
+      "cpu": 0,
+      "modarea": 32784,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
     "master-comp": {
       "cpu": 3700,
       "modarea": 8192,
@@ -96,7 +103,7 @@
       "modarea": 7808,
       "kit": 0,
       "project": 0,
-      "sec7": 12684
+      "sec7": 13012
     },
     "splash": {
       "cpu": 0,

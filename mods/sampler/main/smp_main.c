@@ -104,7 +104,7 @@ __attribute__((used)) const desc_t sm_rows[8] = {
     {44, 0x16, 0, 0x7800, 0, 0, 0, 0, 0, 0xE00, "Start", group, "STRT"},                    /* 501, E */
     {44, 0x17, 0, 0x7800, 0x7800, 0, 0, 0, 0, 0xE00, "Length", group, "LEN"},               /* 502, F */
     {44, 0x19, 0, 0x7F00, 0x6400, 0, 0, 0, 0, 0xE00, "Sample Level", group, "LEV"},         /* 503, H */
-    {44, 0x15, 0, 0x3F00, 0, 0, 0, 0, 0, 0xE00, "Sample Slot", group, "SAMP"},              /* 504, D */
+    {44, 0x15, 0, 0x7F00, 0, 0, 0, 0, 0, 0xE00, "Sample Slot", group, "SAMP"},              /* 504, D: 65..128 long */
 };
 
 /* knobs E, F, G: descriptors */
@@ -184,8 +184,13 @@ static void format(u32 id, s32 value, char *buf, int t) {
     case ID_PLAY:
         b = put_s(b, play_names[clampi((s32)i, 3)]);
         break;
-    case ID_SAMP:                               /* slot 1..64 */
-        b = put_u(b, i + 1);
+    case ID_SAMP:                               /* slot 1..64, long samples L1..L64 (mods/long-samples) */
+        if (i < 64) {
+            b = put_u(b, i + 1);
+        } else {
+            *b++ = 'L';
+            b = put_u(b, i - 63);
+        }
         break;
     case ID_P5:                                 /* STRT | SEG | STRT | SLICE */
         if (t == M_WERP)
@@ -375,7 +380,7 @@ void sm_gfx(const void *fn, s32 val, void *bm, s32 x, s32 y) {
     case ID_P6:
     case ID_P7:
         if ((ty == M_ONESHOT || ty == M_REPITCH) && !(ty == M_REPITCH && id == ID_P7) &&
-            wave_ready(clampi(value(t, LIX_SAMP) >> 8, 63))) {
+            wave_ready(clampi(value(t, LIX_SAMP) >> 8, 127))) {
             part_t p = part_of(t);
             if (id != ID_P7)
                 p.l = -1;
@@ -433,7 +438,7 @@ static void sm_draw(void *view, void *bm, u32 page) {
     if (page != 1 || t < 0)
         return;
     sp_clear(bm, 16, WAVE_TOP, 128, 37);
-    if (wave_ready(clampi(value(t, LIX_SAMP) >> 8, 63))) {
+    if (wave_ready(clampi(value(t, LIX_SAMP) >> 8, 127))) {
         part_t p = part_of(t);
         draw_wave(bm, 16, WAVE_TOP, 112, WAVE_H, &p, 1);
     } else {
