@@ -10,9 +10,9 @@ const LIMITS = budget.limits as Record<Key, number>;
 const COSTS = budget.mods as Record<string, Cost>;
 
 const METERS: { key: Key; label: string; kb: boolean; over: string; note: string }[] = [
-  { key: "cpu", label: "Audio CPU", kb: false, over: "Audio CPU above ~3 000 extra instructions per block: the UI is likely to lag.",
-    note: "Extra instructions per audio block on CPU #1, worst case. Above ~3 000 the Syntakt UI lags. "
-      + "Below zero: faster than the stock OS (fastmix)." },
+  { key: "cpu", label: "Audio CPU", kb: false, over: "Audio CPU above ~10 000 extra cycles per block: the UI is likely to lag.",
+    note: "Extra CPU cycles per audio block on CPU #1, worst case, cache misses included (estimate). "
+      + "The stock OS uses ~89 % of each block; 10 000 cycles more is ~95 %. Below zero: faster than the stock OS." },
   { key: "modarea", label: "Mod RAM", kb: true, over: "Mod RAM full: these mods don't fit together.",
     note: "RAM reserved for mod code and data (64 KB)." },
   { key: "kit", label: "Kit words", kb: false, over: "Kit words full: these mods don't fit together.",
@@ -55,7 +55,7 @@ export function updateLoad(box: HTMLElement, names: string[], unknown: string[])
   const note = box.querySelector(".m-note")!;
   note.classList.toggle("bad", overs.length > 0);
   note.textContent = [...overs, unknown.length ? `Not counted (no measurements yet): ${unknown.join(", ")}.`
-    : "Measured in the emulator, worst case. The build checks the boot margin."].join(" ");
+    : "Estimated in the emulator, worst case. The build checks the boot margin."].join(" ");
 }
 
 export const measured = (name: string): boolean => name in COSTS;

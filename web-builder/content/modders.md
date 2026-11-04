@@ -127,15 +127,19 @@ stock .syx (user's own)          mods/<name>/patch.json (ours)
 
 - The audio interrupt runs once per 32-sample block: 1,500 times per second.
 - The stock OS uses ~89 % of the CPU in it at rest. The UI and sequencer get the rest.
-- A few thousand extra instructions per block make the UI lag.
+- Instructions are not time. The interrupt runs ~19 KB of code per block and the instruction cache holds 8 KB: every 16 bytes of code you run and every 16-byte line of data you touch in DDR cost a DDR read (~30–55 cycles) in every block.
+- ~10 000 extra cycles per block (estimate) make the UI lag. fx3 alone is at ~15 000.
 
 1. Count the instructions your mod adds per block in the emulator: `UC_HOOK_CODE`, after `uc.ctl_flush_tb()`. Copy `counted()` from [`tests/test_cpu_budget.py`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/tests/test_cpu_budget.py). That test sums the worst case of all audio mods against a ceiling.
-2. Keep a cost regression test, as `tests/test_fx3.py::test_cost_per_block`.
-3. Put idle and worst-case counts in the PR.
+2. Estimate the cycles with the cache model: `python tools/emu/cycles.py --scene max <your mod>`. Enter the result in `AUDIO_CYCLES` of `tools/build/budget.py`; [`tests/test_cycles.py`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/tests/test_cycles.py) checks it.
+3. Keep a cost regression test, as `tests/test_fx3.py::test_cost_per_block`.
+4. Put idle and worst-case counts in the PR.
 
 Keep it cheap:
 
 - Do nothing when idle: no sends, silent input, tail done.
+- Keep hot code short. Don't unroll a loop the interrupt runs once per block: the extra code costs more than the loop. xparams went from 870 to ~70 bytes of copy code: +27 instructions, −4 500 cycles.
+- Keep hot data in SRAM (`0x80000000`) when the OS already has it there. Every DDR line you read is a miss.
 - Run at 24 kHz where the sound allows it.
 - Recompute constants only when a knob moves.
 - Make ramps end: snap when close.
