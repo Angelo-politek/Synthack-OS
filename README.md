@@ -11,7 +11,7 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 > **Not affiliated with Elektron.** Modified firmware can make your device unusable and may void your warranty.
 > Read the [recovery procedure](RECOVERY.md) before flashing. Use at your own risk.
 
-**Status:** `v0.9.0` released (OS 1.41). `v1.0` (OS 1.42) in progress on `dev`.
+**Status:** `v0.9.0` released (OS 1.41). `v1.0` (OS 1.42) in progress on `dev`: [status and release checklist](docs/status.md).
 
 ## Features
 
@@ -26,20 +26,23 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 | [Mod area](mods/modarea) | `[ok]` infra | 64 KB for mod code in a reserved block of the OS heap. |
 | [Virtual parameters](mods/vparams) | `[ok]` infra | Mods add their own parameters to OS pages. |
 | [Kit storage](mods/kitstore) | `[ok]` infra | 36 words of mod settings saved with the kit. |
-| [Faster mixing](mods/fastmix) | `[ok]` infra | OS audio routines rewritten: same sound, ~15 % less audio CPU. Added with the audio mods. |
+| [Faster mixing](mods/fastmix) | `[ok]` infra | OS audio routines rewritten: same sound, ~11 000 fewer instructions per block. The time saved depends on cache misses: to measure on the device. Added with the audio mods. |
 | [Project storage](mods/projstore) | `[ok]` infra | 256 bytes of mod settings saved with the project. |
 | [Web builder](web-builder) | `[wip]` | Build your `.syx` in the browser. Nothing uploaded. Same bytes as `build.py`. Not online yet. |
-| New machines | `[wip]` | Need `modarea7`, a shared CPU #2 code area ([#1](https://github.com/Angelo-politek/Synthack-OS/issues/1)). |
+| [SY FM4](mods/sy-fm4) | `[wip]` machine | SY TONE becomes a 4-operator FM machine (Rxuting, MIT). Three SYN pages, algorithm drawn. Not tested on 1.42 hardware. |
+| [SAMPLER](mods/sampler) | `[wip]` machine | SP TWINSHOT becomes the Digitakt's ONESHOT, WERP, REPITCH, SLICE. Not tested on hardware. Samples limited to ~5 s by the OS. |
+| [Machine infra](mods/modarea7) | `[ok]` infra | [modarea7](mods/modarea7): ~125 KB for CPU #2 code. [syn-pages](mods/syn-pages): SYN pages per machine. [xparams](mods/xparams): 8 more parameters per track. |
 | PIN lock | planned | PIN at power-on. OS reflash still recovers. |
 | New LFO shapes · 3rd LFO / mod matrix | planned | |
 | Arpeggiator · Euclidean UI | planned | |
-| Resampling to SP TWINSHOT · sampler | planned | |
+| Sample management: samples longer than 5 s, one pool | planned | [Plan](docs/status.md#sample-management) |
 
 ## Known issues
 
 | Issue | Status |
 |---|---|
-| UI lag with many tracks sent to FX3 and high feedback | `[wip]` being optimized |
+| UI lag with many tracks sent to FX3 | `[wip]` cause found: cache misses, not instructions ([fx3 CPU](docs/status.md#fx3-cpu)). Device measurement needed |
+| Samples cut at ~5 s by the OS | `[wip]` [sample management](docs/status.md#sample-management) |
 | Bus compressor: toggling *global* for the external input mixer also copies the compressor settings | known |
 | v0.8.0 and earlier: projects with SP TWINSHOT samples can crash at boot ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)) | fixed in v0.8.1. Flash the stock OS; projects and samples are not affected |
 
@@ -48,8 +51,8 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 ```mermaid
 flowchart LR
   A["Foundations [ok]<br/>build · emulator · recovery"] --> B["Mods v0.5–v0.9 [ok]<br/>compressor · dual mono · readable values<br/>perf FX · third send FX"]
-  B --> C["v1.0 [wip]<br/>OS 1.42 · web builder · CPU budget"]
-  C --> D["After v1.0<br/>machines · arpeggiator · PIN lock<br/>LFOs · sampler"]
+  B --> C["v1.0 [wip]<br/>OS 1.42 · web builder · CPU budget<br/>SY FM4 · SAMPLER"]
+  C --> D["After v1.0<br/>sample pool · arpeggiator · PIN lock<br/>LFOs"]
 ```
 
 ## How it works
@@ -59,7 +62,7 @@ flowchart LR
 | `tools/unpack` | Unpack and repack the `.syx`. Wraps [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool). |
 | `mods/<name>/patch.json` | Where to patch, SHA-256 of the expected original bytes, our new bytes. |
 | `tools/build/build.py` | Stock OS + mods → verified `.syx`. Refuses a wrong OS, overlaps, protected sections. |
-| `tools/emu` | ColdFire emulator: Unicorn + our EMAC model. Every mod is tested against the original code. |
+| `tools/emu` | ColdFire emulator: Unicorn + our EMAC model. Every mod is tested against the original code. `cycles.py` estimates audio CPU time with the 8 KB caches. |
 
 ## Documentation
 
@@ -68,7 +71,7 @@ flowchart LR
 | Musicians | [Users guide](web-builder/content/users.md): build, flash, use each mod, go back |
 | Modders | [Modders guide](web-builder/content/modders.md): architecture, workflow, rules, CPU budget |
 | Modders | [Create your mod](web-builder/content/create-mod.md): try it in the builder, submit it |
-| Everyone | [RECOVERY.md](RECOVERY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [LEGAL.md](LEGAL.md) · [docs/](docs) |
+| Everyone | [Status](docs/status.md) · [RECOVERY.md](RECOVERY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [LEGAL.md](LEGAL.md) · [docs/](docs) |
 
 ## Build your OS
 
