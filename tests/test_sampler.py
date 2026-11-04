@@ -507,10 +507,10 @@ def test_waveform_for_the_main_cpu(built):
     data = [int(16000 * (i / 48000)) * (1 if i % 2 else -1) for i in range(48000)]   # rampa: picchi crescenti
     load_sample(e, data, slot=2)
     load_sample(e, sine(4800), slot=0)
-    e.uc.mem_write(0x5B0, struct.pack(">H", 3))
+    e.uc.mem_write(0x5B0, struct.pack(">H", 2))         # posizione 2 della lista: slot 1, poi slot 3
     play(e, ONESHOT, blocks=80)
     slot, done = struct.unpack(">HH", e.uc.mem_read(0x5B4, 4))
-    assert (slot, done) == (3, 112)
+    assert (slot, done) == (2, 112)
     w = list(e.uc.mem_read(0x5C0, 112))
     assert w == sorted(w) and w[0] < 5 and w[-1] >= 60
     load_sample(e, sine(9600), slot=2)                 # sample nuovo nello stesso slot: si ricomincia
@@ -574,7 +574,7 @@ def test_page_names_and_values(ui):
         f = struct.unpack(">8I", ui.uc.mem_read(OBJS + 84 * i + 20, 32))
         assert f[2:4] == (ui.sym["sm_mgr"], ui.sym["sm_invoke"]) and f[6:] == (ui.sym["sm_mgr"], ui.sym["sm_gfx"])
     assert [text(ui, ids[1], v << 8) for v in range(4)] == ["REV", "REV.L", "FWD.L", "FWD"]
-    assert text(ui, ids[3], 0) == "1" and text(ui, ids[3], 0x3F00) == "64"
+    assert text(ui, ids[3], 0) == "--" and text(ui, ids[3], 0x3F00) == "--"   # SAMP: nessun sample nella lista
     assert text(ui, ids[7], 100 << 8) == "100"                   # LEV
     seq = 0x8000_21B0 + 2 * (0xE + 0x1A)                         # TYPE della traccia 1 nei valori del sequencer
     expect = {0: ["STRT", "LEN", "LOOP"], 1: ["SEG", "MODE", "BARS"], 2: ["STRT", "LEN", "BARS"],
@@ -620,19 +620,19 @@ def test_syn_pages():
     v = SynView(["sampler"], machine=44)
     ui = v.ui
     lix = lambda: struct.unpack(">I", ui.uc.mem_read(DESC + 52 * 503 + 4, 4))[0]   # noqa: E731
-    assert v.knobs() == [497, 498, 499, 504, 501, 502, 500, 503, 10] and v.pages() == 3
-    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 1/3"
+    assert v.knobs() == [497, 498, 499, 504, 501, 502, 500, 503, 10] and v.pages() == 2
+    assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 1/2"
     v.set_value(0, 0x15, 5 << 8)                                   # SAMP 6
     v.page(1)
     assert v.knobs() == [0, 0, 0, 0, 501, 502, 500, 503, 10]
-    assert lix() == 0x36 and short(ui, 503) == "XFAD" and v.title() == b"SAMPLE 2/3"   # H: il parametro della machine
+    assert lix() == 0x36 and short(ui, 503) == "XFAD" and v.title() == b"SAMPLE 2/2"   # H: il parametro della machine
     for t, name, texts in ((1, "RAND", {0: "0", 127: "127"}), (2, "KEY", {0: "OFF", 1: "ON"}),
                            (3, "ORDR", {0: "SLICE", 1: "NEXT", 2: "RAND"})):
         v.set_value(0, 0x1A, t << 8)
         v.record(7)
         assert short(ui, 503) == name and lix() == 0x36
         assert {k: text(ui, 503, k << 8) for k in texts} == texts
-    assert v.title() == b"SLICE 2/3"
+    assert v.title() == b"SLICE 2/2"
     v.set_value(0, 0x1A, 0)
     v.record(7)
     waiting = v.frame()
@@ -740,8 +740,9 @@ def long_table(e, entries):
     return at
 
 
-def test_long_sample_slot_65(engines):
-    """SAMP 65 (L1): un sample di 15 s, oltre il limite stock (5.46 s nello slot, 10.9 s in SP TWINSHOT)."""
+def test_long_sample_in_the_list(engines):
+    """Una lista di sample: gli slot stock pieni, poi i sample lunghi. Qui slot 1 pieno (SAMP 1), il lungo e' SAMP 2:
+    15 s, oltre il limite stock (5.46 s nello slot, 10.9 s in SP TWINSHOT)."""
     e, _ = engines
     load_sample(e, sine(4800), 0)
     at = long_table(e, [])
@@ -753,39 +754,41 @@ def test_long_sample_slot_65(engines):
         part = data[k:k + 65536]
         e.uc.mem_write(pcm + 2 * k, struct.pack(f">{len(part)}h", *part))
     long_table(e, [(pcm, n)])
-    samp = 64 << 8                                      # SAMP 65
+    samp = 1 << 8                                       # SAMP 2: il primo lungo
     start = play(e, [0x4000, 0x300, 0, samp, 0, 0x7800, 0, 0x6400])
     assert abs(freq(start[TAIL:]) - 500) < 40
     late = play(e, [0x4000, 0x300, 0, samp, 100 << 8, 0x1400, 0, 0x6400])   # STRT 100/120: 12.5 s
     assert abs(freq(late[TAIL:]) - 3000) < 150
-    none = play(e, [0x4000, 0x300, 0, 65 << 8, 0, 0x7800, 0, 0x6400])        # L2: nessun file
+    none = play(e, [0x4000, 0x300, 0, 2 << 8, 0, 0x7800, 0, 0x6400])         # SAMP 3: oltre la lista
     assert peak(none[TAIL:]) == 0                       # (nei primi blocchi la coda del suono di prima)
     e.uc.mem_write(at, bytes(8))                        # niente tabella: lo slot lungo tace, lo stock no
     assert peak(play(e, [0x4000, 0x300, 0, samp, 0, 0x7800, 0, 0x6400])[TAIL:]) == 0
     assert peak(play(e, ONESHOT)) > 0
 
 
-def test_pool_page():
-    """SYN 3/3, POOL: knob A = SAMP; i sample lunghi (mods/long-samples, header LSHD) intorno a SAMP, nome e durata,
-    e la forma d'onda di quello scelto. Senza sample lunghi: NO LONG SAMPLES."""
+def test_sample_menu():
+    """Menu dei sample: girando D (SAMP) sulla pagina 1/2 un riquadro elenca gli slot intorno al valore, stock 1..64
+    poi i sample lunghi (mods/long-samples, header LSHD) con nome e durata, e la forma d'onda; sparisce col valore
+    evidenziato. Sotto L1 si torna agli slot stock, mostrati."""
     from syn_view import SynView
     v = SynView(["long-samples", "sampler"], machine=44)
     ui = v.ui
-    v.page(2)
-    assert v.knobs() == [504, 0, 0, 0, 0, 0, 0, 0, 0] and v.title() == b"SAMPLE POOL"
-    empty = screens_pixels(v.frame())
-    assert sum(empty[y][x] for y in range(12, 37) for x in range(45, 128)) > 30      # NO LONG SAMPLES
     tab = ui.sym["ls_table"]
     names = struct.unpack(">3I", ui.uc.mem_read(ui.sym["ls_header"], 12))[2]
     ui.put(tab, ">II", 0x5348_4C53, 6)
     for i in range(6):
         ui.put(tab + 8 + 8 * i, ">II", 0x4010_0000 + i * 0x10_0000, (i + 5) * 48000)
         ui.uc.mem_write(names + 16 * i, f"SAMPLE {i}".encode().ljust(16, b"\0"))
-    v.set_value(0, 0x15, 65 << 8)                                  # SAMP 66 = L2
-    listed = screens_pixels(v.frame())
-    assert listed != empty
-    assert struct.unpack(">H", ui.uc.mem_read(0x1000_05B0, 2))[0] == 66   # forma d'onda chiesta alla CPU #2
-    ui.put(0x1000_05B4, ">HH", 66, 112)
-    ui.uc.mem_write(0x1000_05C0, bytes([90] * 112))
-    drawn = screens_pixels(v.frame())
-    assert sum(drawn[y][x] for y in range(40, 61) for x in range(16, 128)) > 1000     # la forma d'onda
+    v.page(0)
+    v.set_value(0, 0x15, 1 << 8)                                   # SAMP 2 (nessuno stock: il secondo lungo)
+    v.highlight(None)
+    plain = screens_pixels(v.frame())
+    v.highlight(3)
+    menu = screens_pixels(v.frame())
+    assert menu != plain
+    assert all(menu[y][127] for y in range(11, 64))                # il riquadro
+    assert sum(menu[y][x] for y in range(12, 43) for x in range(22, 126)) > 300     # le righe
+    v.set_value(0, 0x15, 4 << 8)                                   # SAMP 5: la lista scorre
+    assert screens_pixels(v.frame()) != menu
+    v.highlight(None)
+    assert screens_pixels(v.frame()) != menu                       # senza giro: la pagina

@@ -1,6 +1,6 @@
 # long-samples
 
-Samples longer than 5 s. The storage is **Synfact's** ([GSM1980/synfact-dev](https://github.com/GSM1980/synfact-dev), on [elekloader](https://github.com/irpina/elekloader) by irpina; GPL-2.0-or-later), ported to OS 1.42. The SAMPLER machines play them as slots 65–128 (`L1`–`L64`).
+Samples longer than 5 s. The storage is **Synfact's** ([GSM1980/synfact-dev](https://github.com/GSM1980/synfact-dev), on [elekloader](https://github.com/irpina/elekloader) by irpina; GPL-2.0-or-later), ported to OS 1.42. The SAMPLER machines play them in the same list as the stock samples, after them.
 
 ## Use
 
@@ -14,8 +14,8 @@ Samples longer than 5 s. The storage is **Synfact's** ([GSM1980/synfact-dev](htt
    python -m elekloader.sdk.syntakt.long_samples put pad.wav --yes-write-device
    ```
 4. Power cycle. "PREPARING SAMPLES" now also sends the long samples to the voice CPU.
-5. On a SAMPLER track, turn `SAMP` past 64: `L1` is the first file of the catalogue, `L2` the second, …
-   SYN 2/3 shows the file's name (8 characters) and length in seconds as the page title, with its waveform. SYN 3/3, **SAMPLE POOL**, lists the long samples with name and length: turn knob A to pick one.
+5. On a SAMPLER track, turn `SAMP`: after the stock samples come the long ones, in catalogue order (or in the order the web builder's **Samples** page assigns).
+   Turn `SAMP` (knob D of SYN 1/2): a menu lists every sample, stock and long ones in one list, with name and length. SYN 2/2 shows the picked one's name, length and waveform.
 
 A whole folder at once (names cut to 32 characters, made unique; `--dry-run` first to see them):
 ```sh

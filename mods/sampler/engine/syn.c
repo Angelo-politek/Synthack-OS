@@ -93,30 +93,35 @@ static voice_t voices[VOICES];
 static int32_t *hb_ptr[VOICES];
 static sm_grid_t grids[STOCK_SLOTS];                     /* a cache: slot & 63, checked on (data, len) */
 
-/* Slot 0..127 -> length and pointer. 64..127: the table long-samples (main CPU) sends after the stock image,
- * at POOL + 2048 x ceil(stock bytes / 2048); stock bytes = 64 x 4 + 2 x the lengths. */
+/* SAMP 0..127 -> length and pointer. One list of samples, as the main CPU shows it (main/smp_main.c): the stock
+ * slots that hold a sample, in slot order, then the long samples mods/long-samples sends after the stock image (at
+ * POOL + 2048 x ceil(stock bytes / 2048); stock bytes = 64 x 4 + 2 x the lengths). */
 static int sample_at(int slot, uint32_t *len, uint32_t *ptr) {
     *len = *ptr = 0;
     if (slot < 0 || slot >= SLOTS)
         return 0;
-    if (slot < STOCK_SLOTS) {
-        *len = SAMPLES[2 * slot];
-        *ptr = SAMPLES[2 * slot + 1];
-        if (*len > MAX_LEN)
-            *len = MAX_LEN;
-    } else {
-        uint32_t bytes = 4 * STOCK_SLOTS;
-        for (int k = 0; k < STOCK_SLOTS; k++)
-            bytes += 2 * SAMPLES[2 * k];
-        volatile const uint32_t *t = (volatile const uint32_t *)(POOL + ((bytes + 2047) & ~2047u));
-        uint32_t n = (uint32_t)(slot - STOCK_SLOTS);
-        if (bytes > 0x4000000u - 2048 || t[0] != LONG_MAGIC || n >= t[1] || n >= 64)
-            return 0;
-        *ptr = t[2 + 2 * n];
-        *len = t[3 + 2 * n];
-        if (*len > LONG_MAX || *ptr < POOL || *ptr + 2 * *len > POOL + 0x4000000u)
-            *len = *ptr = 0;
+    uint32_t bytes = 4 * STOCK_SLOTS;
+    int k = 0;
+    for (int s = 0; s < STOCK_SLOTS; s++) {
+        uint32_t l = SAMPLES[2 * s], p = SAMPLES[2 * s + 1];
+        bytes += 2 * l;
+        if (l && p) {
+            if (k == slot) {
+                *len = l > MAX_LEN ? MAX_LEN : l;
+                *ptr = p;
+                return 1;
+            }
+            k++;
+        }
     }
+    volatile const uint32_t *t = (volatile const uint32_t *)(POOL + ((bytes + 2047) & ~2047u));
+    uint32_t n = (uint32_t)(slot - k);
+    if (bytes > 0x4000000u - 2048 || t[0] != LONG_MAGIC || n >= t[1] || n >= 64)
+        return 0;
+    *ptr = t[2 + 2 * n];
+    *len = t[3 + 2 * n];
+    if (*len > LONG_MAX || *ptr < POOL || *ptr + 2 * *len > POOL + 0x4000000u)
+        *len = *ptr = 0;
     return *len && *ptr;
 }
 static int16_t win[WIN];

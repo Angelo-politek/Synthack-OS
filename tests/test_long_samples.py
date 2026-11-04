@@ -105,6 +105,16 @@ def test_ensure_put_plan_and_pages(m):
     m.uc.mem_write(SCRATCH, b"pad-12s\0")
     r = m.call(s["core_hzfs_put"], [io, SCRATCH, len(m.body), 0, STREAM, 0, SCRATCH + 64], count=2_000_000_000)
     assert r == 1, r
+    # il catalogo scritto dal codice C, come lo legge il caricatore del web builder (web-builder/test/samples.test.ts)
+    fixture = ROOT.parent / "web-builder" / "test" / "fixtures" / "hzfs-catalogue.bin"
+    cats = [m.disk.read(k * 0x80000 // 512, 0x200) for k in (0x600, 0x601)]
+    cat = next(c for c in cats if c[:4] == b"HZFS" and struct.unpack(">I", c[12:16])[0] == 1)
+    size = struct.unpack(">I", cat[36:40])[0]
+    want = cat[:size]
+    if not fixture.exists():
+        fixture.parent.mkdir(parents=True, exist_ok=True)
+        fixture.write_bytes(want)
+    assert fixture.read_bytes() == want
     # immagine stock: un solo campione da 4800 nello slot 1
     stock = 4 * 64 + 2 * 4800
     m.uc.mem_write(TOTAL, struct.pack(">I", stock))

@@ -34,10 +34,14 @@ Value texts and short names as on the Digitakt 1.54 (`NOTE`, `OFF`, `MODE`, `SLI
 | `TUNE` | −60 … +24 semitones |
 | `PLAY` | `FWD`, `REV`, `FWD.L`, `REV.L` (loop) |
 | `BR` | bit reduction 0–127 |
-| `SAMP` | slot 1–64 |
+| `SAMP` | sample 1… in the list (stock and long samples together) |
 | `LEV` | sample level 0–127, 100 = as SP TWINSHOT |
 
-**SYN 3/3, SAMPLE POOL** (with [long-samples](../long-samples)): knob A is `SAMP`. Four long samples around it, `L` number, name (8 characters) and length; `>` marks the one the track plays, its waveform underneath. Turning A picks a sample for the machine (p-lockable, like any value). Without long samples: `NO LONG SAMPLES`.
+**Sample menu**: turn knob D (`SAMP`) on SYN 1/2 and a box opens over the page, as the LFO destination menu does: the samples around the value, number, name and length, `>` on the one picked, its waveform underneath. It closes when you stop turning.
+
+**One list of samples**: `SAMP` is the position in one list: the stock slots that hold a sample (as Transfer filled them), in slot order, then the long samples of [long-samples](../long-samples). Empty slots are skipped; the knob stops at the last sample.
+
+`[!]` Since 2026-11-05 `SAMP` counts samples, not slots. Sounds saved before point at another sample when stock slots are empty in between.
 
 | Page 2/3 | Shows |
 |---|---|

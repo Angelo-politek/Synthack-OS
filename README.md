@@ -35,7 +35,7 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 | PIN lock | planned | PIN at power-on. OS reflash still recovers. |
 | New LFO shapes · 3rd LFO / mod matrix | planned | |
 | Arpeggiator · Euclidean UI | planned | |
-| [Long samples](mods/long-samples) | `[wip]` | Samples longer than 5 s, Synfact's HZFS storage and tool; SAMPLER slots 65–128. Not tested on the device |
+| [Long samples](mods/long-samples) | `[wip]` | Samples longer than 5 s (Synfact's HZFS), sent from the web builder or Synfact's tool; one list with the stock samples, sample menu on the SAMPLER's knob D. Checked on the device: upload and playback |
 
 ## Known issues
 

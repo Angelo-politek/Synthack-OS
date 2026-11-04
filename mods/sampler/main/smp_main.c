@@ -45,6 +45,7 @@ typedef int32_t s32;
 #define WAVE_REQ (*(volatile uint16_t *)SHARED(0x5B0))
 #define WAVE_SLOT (*(volatile const uint16_t *)SHARED(0x5B4))
 #define WAVE_DONE (*(volatile const uint16_t *)SHARED(0x5B6))
+#define WAVE_LEN (*(volatile const uint32_t *)SHARED(0x5B8))   /* length in samples of the slot drawn */
 #define WAVE ((volatile const uint8_t *)SHARED(0x5C0))
 #define WAVE_COLS 112
 
@@ -177,6 +178,101 @@ static u32 id_of(const void *fn, u32 field) {
     return off % OBJ_SIZE ? 0 : id;
 }
 
+/* ---- one list of samples, as the voice CPU plays them (engine/syn.c, sample_at): the stock slots that hold a
+ * sample, in slot order, from the image the OS sent to the voice CPU (0x4D84F2C5, total at 0x4D84F2C1), then the
+ * long samples of mods/long-samples (header LSHD). SAMP is the position in this list. */
+#define IMAGE ((const volatile uint8_t *)0x4D84F2C5u)
+#define IMAGE_TOTAL ((const volatile uint8_t *)0x4D84F2C1u)
+#define POOL_OBJ (*(const volatile u32 *)0x444E239Cu)        /* sample storage: names of the stock slots */
+#define DESC_SAMP_MAX (*(volatile u32 *)(0x40233E9Cu + 12))   /* descriptor 504 (SAMP), its maximum */
+
+static u32 be32(const volatile uint8_t *p) { return (u32)p[0] << 24 | (u32)p[1] << 16 | (u32)p[2] << 8 | p[3]; }
+
+static struct { u32 n; uint8_t slot[64]; u32 frames[64]; } stock;
+
+static void stock_scan(void) {                  /* keeps the last image that adds up */
+    u32 total = be32(IMAGE_TOTAL), pos = 0, n = 0;
+    uint8_t slot[64];
+    u32 frames[64];
+    if (total < 256 || total > 0x2000000)
+        return;
+    for (u32 sl = 0; sl < 64; sl++) {
+        if (pos + 4 > total)
+            return;
+        u32 l = be32(IMAGE + pos);
+        pos += 4 + 2 * l;
+        if (l) {
+            slot[n] = (uint8_t)sl;
+            frames[n++] = l;
+        }
+    }
+    if (pos != total)
+        return;
+    stock.n = n;
+    for (u32 i = 0; i < n; i++) {
+        stock.slot[i] = slot[i];
+        stock.frames[i] = frames[i];
+    }
+}
+
+static const u32 *long_table(u32 *count, const char **names) {
+    const u32 *h = (const u32 *)LS_HDR;
+    *count = 0;
+    if (h[0] != 0x4C534844u)
+        return 0;
+    const u32 *t = (const u32 *)h[1];
+    if (t[0] != 0x53484C53u)
+        return 0;
+    *count = t[1] > 64 ? 64 : t[1];
+    *names = (const char *)h[2];
+    return t;
+}
+
+static u32 samples_count(void) {
+    u32 c;
+    const char *nm;
+    stock_scan();
+    long_table(&c, &nm);
+    u32 n = stock.n + c;
+    DESC_SAMP_MAX = (n ? (n > 128 ? 127 : n - 1) : 0) << 8;   /* the knob stops at the last sample */
+    return n;
+}
+
+/* name (up to max characters, capitals) and length of sample i of the list; 0 if there is none */
+static u32 sample_info(u32 i, char *name, int max) {
+    const char *src = 0;
+    char num[12];
+    u32 frames = 0, c;
+    const char *nm = 0;
+    const u32 *t = long_table(&c, &nm);
+    if (i < stock.n) {
+        u32 obj = POOL_OBJ;
+        frames = stock.frames[i];
+        if (obj)
+            src = (const char *)(obj + 0x12E28 + 24 * stock.slot[i]);
+        if (!src || !src[0]) {
+            char *b = num;
+            const char *w = "SAMPLE ";
+            while (*w)
+                *b++ = *w++;
+            b = put_u(b, stock.slot[i] + 1u);
+            *b = 0;
+            src = num;
+        }
+    } else if (t && i - stock.n < c) {
+        src = nm + 16 * (i - stock.n);
+        frames = t[3 + 2 * (i - stock.n)];
+    } else {
+        name[0] = 0;
+        return 0;
+    }
+    int k = 0;
+    for (; k < max && k < 16 && src[k]; k++)
+        name[k] = src[k] >= 'a' && src[k] <= 'z' ? (char)(src[k] - 32) : src[k];
+    name[k] = 0;
+    return frames;
+}
+
 static void format(u32 id, s32 value, char *buf, int t) {
     u32 v = clampi(value, 0x7F00), i = v >> 8;
     char *b = buf;
@@ -184,13 +280,11 @@ static void format(u32 id, s32 value, char *buf, int t) {
     case ID_PLAY:
         b = put_s(b, play_names[clampi((s32)i, 3)]);
         break;
-    case ID_SAMP:                               /* slot 1..64, long samples L1..L64 (mods/long-samples) */
-        if (i < 64) {
+    case ID_SAMP:                               /* position in the list of samples, or -- */
+        if (i < samples_count())
             b = put_u(b, i + 1);
-        } else {
-            *b++ = 'L';
-            b = put_u(b, i - 63);
-        }
+        else
+            b = put_s(b, "--");
         break;
     case ID_P5:                                 /* STRT | SEG | STRT | SLICE */
         if (t == M_WERP)
@@ -411,8 +505,6 @@ static const u32 page2[9] = {0, 0, 0, 0, ID_P5, ID_P6, ID_P7, ID_H, 10};
 static u32 sm_record(void *view, u32 page, u32 knob) {
     int t = track_type();
     fit_knobs(t);
-    if (page == 2)                              /* POOL: knob A = SAMP, the list follows it */
-        return knob == 0 ? ID_SAMP : 0;
     if (page == 1) {
         set_row(ID_H, &xpar[t], LIX_X);
         return knob < 9 ? page2[knob] : 0;
@@ -423,37 +515,30 @@ static u32 sm_record(void *view, u32 page, u32 knob) {
 
 /* the Digitakt's machine names, then the page */
 static const char *const titles[4][2] = {
-    {"SAMPLE 1/3", "SAMPLE 2/3"}, {"WERP 1/3", "WERP 2/3"}, {"REPITCH 1/3", "REPITCH 2/3"}, {"SLICE 1/3", "SLICE 2/3"}};
+    {"SAMPLE 1/2", "SAMPLE 2/2"}, {"WERP 1/2", "WERP 2/2"}, {"REPITCH 1/2", "REPITCH 2/2"}, {"SLICE 1/2", "SLICE 2/2"}};
 
-/* page 2/2 of a long sample (SAMP 65..128): its name and length, from mods/long-samples' header at LS_HDR
- * ('LSHD', table, names), when that mod is in the build */
-static char long_title[20];
+/* page 2/2: the sample's name and length as the title */
+static char sample_title[20];
 
-static const char *long_name(u32 slot) {
-    const u32 *h = (const u32 *)LS_HDR;
-    if (slot < 64 || h[0] != 0x4C534844u)
+static const char *title_of(u32 i) {
+    char name[12];
+    if (i >= samples_count())
         return 0;
-    const u32 *t = (const u32 *)h[1];
-    u32 n = slot - 64;
-    if (t[0] != 0x53484C53u || n >= t[1])
-        return 0;
-    const char *name = (const char *)h[2] + 16 * n;
-    char *b = long_title;
-    for (int k = 0; k < 8 && name[k]; k++)
-        *b++ = name[k] >= 'a' && name[k] <= 'z' ? (char)(name[k] - 32) : name[k];
+    u32 frames = sample_info(i, name, 8);
+    char *b = sample_title, *n = name;
+    while (*n)
+        *b++ = *n++;
     *b++ = ' ';
-    b = put_u(b, (t[3 + 2 * n] + 24000) / 48000);
+    b = put_u(b, (frames + 24000) / 48000);
     *b++ = 'S';
     *b = 0;
-    return long_title;
+    return sample_title;
 }
 
 static const char *sm_title(void *view, u32 page) {
     (void)view;
-    if (page == 2)
-        return "SAMPLE POOL";
     s32 t = active_track();
-    const char *l = page == 1 && t >= 0 ? long_name((u32)clampi(value(t, LIX_SAMP) >> 8, 127)) : 0;
+    const char *l = page == 1 && t >= 0 ? title_of((u32)clampi(value(t, LIX_SAMP) >> 8, 127)) : 0;
     return l ? l : titles[track_type()][page == 1];
 }
 
@@ -461,58 +546,65 @@ static const char *sm_title(void *view, u32 page) {
  * the OS writes a turned value on) */
 #define WAVE_TOP 13
 #define WAVE_H 23
-/* page 3/3, POOL: the long samples (mods/long-samples) around the track's SAMP, name and length, and the waveform
- * of the one picked. Knob A is SAMP: turning it picks a sample for the machine (p-lockable as any value). */
-#define POOL_X 45
-#define POOL_ROWS 4
-static void pool_line(void *bm, int row, u32 n, const char *name, u32 frames, int picked) {
-    char line[24], *b = line;
+/* Sample menu: while knob D (SAMP) of page 1/2 is being turned (the OS highlights it, then lets it go), a box over
+ * the page lists the samples around the value, as the LFO destination menu does: one list, name and length, the
+ * waveform of the one picked underneath. */
+#define MENU_X 20
+#define MENU_ROWS 5
+#define KNOB_D 3
+
+static void menu_line(void *bm, int row, u32 i, int picked) {
+    char line[24], name[16], *b = line;
+    u32 frames = sample_info(i, name, 11);
     *b++ = picked ? '>' : ' ';
-    *b++ = 'L';
-    b = put_u(b, n + 1);
+    b = put_u(b, i + 1);
     *b++ = ' ';
-    for (int k = 0; k < 8 && name[k]; k++)
-        *b++ = name[k] >= 'a' && name[k] <= 'z' ? (char)(name[k] - 32) : name[k];
-    u32 sec = (frames + 24000) / 48000;
-    while (b < line + 16 - (sec >= 100 ? 4 : sec >= 10 ? 3 : 2))
-        *b++ = ' ';
-    b = put_u(b, sec);
-    *b++ = 'S';
+    for (char *n = name; *n;)
+        *b++ = *n++;
+    if (frames) {
+        u32 tenths = (frames + 2400) / 4800, sec = tenths / 10;
+        int w = sec >= 100 ? 4 : sec >= 10 ? 3 : 4;           /* "12S", "1.5S", "120S" */
+        while (b < line + 21 - w)
+            *b++ = ' ';
+        b = put_u(b, sec);
+        if (sec < 10) {
+            *b++ = '.';
+            *b++ = (char)('0' + tenths % 10);
+        }
+        *b++ = 'S';
+    }
     *b = 0;
-    SP_DRAW_TEXT(bm, SP_FONT, POOL_X, 45 - 6 * row, 0, 0, "XXXXXXXXXXXXXXXX", "%s", line);   /* y from the bottom */
+    SP_DRAW_TEXT(bm, SP_FONT, MENU_X + 2, 63 - 13 - 6 * row - 5, 0, 0, "XXXXXXXXXXXXXXXXXXXXX", "%s", line);
 }
 
-static void pool_draw(void *bm, s32 t) {
-    const u32 *h = (const u32 *)LS_HDR;
-    const u32 *tab = h[0] == 0x4C534844u ? (const u32 *)h[1] : 0;
-    u32 count = tab && tab[0] == 0x53484C53u ? tab[1] : 0;
-    u32 slot = (u32)clampi(value(t, LIX_SAMP) >> 8, 127);
-    sp_clear(bm, POOL_X - 2, 12, 128, 37);
-    sp_clear(bm, 16, 38, 128, 64);
-    if (!count) {
-        SP_DRAW_TEXT(bm, SP_FONT, POOL_X, 45, 0, 0, "XXXXXXXXXXXXXXXX", "%s", "NO LONG SAMPLES");
-        return;
-    }
-    s32 cur = slot >= 64 ? (s32)slot - 64 : -1, first = cur - 1;
-    if (first > (s32)count - POOL_ROWS)
-        first = (s32)count - POOL_ROWS;
+static void menu_draw(void *bm, s32 t) {
+    s32 n = (s32)samples_count(), cur = clampi(value(t, LIX_SAMP) >> 8, 127);
+    s32 first = cur - MENU_ROWS / 2;
+    if (first > n - MENU_ROWS)
+        first = n - MENU_ROWS;
     if (first < 0)
         first = 0;
-    for (int r = 0; r < POOL_ROWS && first + r < (s32)count; r++) {
-        u32 n = (u32)(first + r);
-        pool_line(bm, r, n, (const char *)h[2] + 16 * n, tab[3 + 2 * n], (s32)n == cur);
+    sp_clear(bm, MENU_X, 11, 128, 64);
+    sp_hline(bm, MENU_X, 127, 11, 1);
+    sp_hline(bm, MENU_X, 127, 63, 1);
+    sp_vline(bm, MENU_X, 11, 63, 1);
+    sp_vline(bm, 127, 11, 63, 1);
+    if (!n) {
+        SP_DRAW_TEXT(bm, SP_FONT, MENU_X + 2, 63 - 13 - 5, 0, 0, "XXXXXXXXXXXXXXXXXXXXX", "%s", " NO SAMPLES");
+        return;
     }
-    if (cur >= 0 && wave_ready(slot)) {
+    for (int r = 0; r < MENU_ROWS && first + r < n; r++)
+        menu_line(bm, r, (u32)(first + r), first + r == cur);
+    if (cur < n && wave_ready((u32)cur)) {
         part_t all = {0, 0x7800, -1, 0, 0};
-        draw_wave(bm, 16, 40, 112, 20, &all, 0);
+        draw_wave(bm, MENU_X + 3, 44, 102, 17, &all, 0);
     }
 }
 
 static void sm_draw(void *view, void *bm, u32 page) {
-    (void)view;
     s32 t = active_track();
-    if (page == 2 && t >= 0) {
-        pool_draw(bm, t);
+    if (page == 0 && t >= 0 && SP_HIGHLIGHT(view, KNOB_D)) {
+        menu_draw(bm, t);
         return;
     }
     if (page != 1 || t < 0)
@@ -526,7 +618,7 @@ static void sm_draw(void *view, void *bm, u32 page) {
     }
 }
 
-static const sp_machine_t sm_pages = {ID_TUNE, 3, sm_record, sm_title, sm_draw};
+static const sp_machine_t sm_pages = {ID_TUNE, 2, sm_record, sm_title, sm_draw};
 
 void sm_boot(void) {
     sp_register(&sm_pages);
