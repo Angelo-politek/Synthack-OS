@@ -57,9 +57,27 @@ void ls_plan(void)
     if (r != ST_HZ_OK)
         return;
     next = 1;                                               /* extra page 0 = the table */
-    for (i = 0; i < core_hzfs_count(&fs) && nfiles < MAX_FILES; i++) {
+    /* order: the catalogue's 64 associations (+0x40, Synfact's slot map, set by the web builder's Samples page),
+     * else the catalogue order */
+    const u8 *map = fs.copy[fs.best] + 0x40;
+    u32 mapped = 0, n = core_hzfs_count(&fs);
+    for (k = 0; k < 64; k++)
+        mapped |= (u32)map[4 * k] << 24 | (u32)map[4 * k + 1] << 16 | (u32)map[4 * k + 2] << 8 | map[4 * k + 3];
+    for (u32 pos = 0; pos < (mapped ? 64u : n) && nfiles < MAX_FILES; pos++) {
         u32 pages;
-        if (core_hzfs_entry(&fs, i, &e) != ST_HZ_OK || e.bytes < 64 || !e.frames)
+        if (mapped) {
+            u32 id = (u32)map[4 * pos] << 24 | (u32)map[4 * pos + 1] << 16 | (u32)map[4 * pos + 2] << 8 | map[4 * pos + 3];
+            for (i = 0; id && i < n; i++)
+                if (core_hzfs_entry(&fs, i, &e) == ST_HZ_OK && e.id == id)
+                    break;
+            if (!id || i == n)
+                continue;
+        } else {
+            i = pos;
+            if (core_hzfs_entry(&fs, i, &e) != ST_HZ_OK)
+                continue;
+        }
+        if (e.bytes < 64 || !e.frames)
             continue;
         pages = (e.bytes + 2047) >> 11;
         if (stock_pages + next + pages > POOL_PAGES)

@@ -19,6 +19,10 @@ Builds a SyntHack OS `.syx` in the browser from your own stock `Syntakt_OS1.42.s
 
 The `.c` files are from [elektron-firmware-tool](https://github.com/mischa85/elektron-firmware-tool) by Marcel Bierling (MIT, see `public/THIRD-PARTY-NOTICES.txt`).
 
+## Samples page
+
+`samples.html`: long samples over WebMIDI (Synfact's protocol). `src/core/datarpc.ts` (Data RPC SysEx, objects), `src/core/hzfs.ts` (catalogue, put, remove, order = the catalogue's slot map), `src/core/wav.ts` (WAV to 48 kHz mono PCM16): ports of Synfact's `data_rpc.py`, `sample_catalog.py`, `long_samples.py` (GPL-2.0-or-later). `test/samples.test.ts` runs them against a device double; the catalogue the device's C code writes is a fixture (`test/fixtures/hzfs-catalogue.bin`, from `tests/test_long_samples.py`).
+
 ## Mod cards
 
 The page lists every mod with a `mods/<name>/mod.json` card:

@@ -6,7 +6,7 @@ Samples longer than 5 s. The storage is **Synfact's** ([GSM1980/synfact-dev](htt
 
 1. Build with `mods/long-samples` and `mods/sampler`. Flash.
 2. Back up your projects and samples with Transfer first. This mod writes the internal eMMC (high zone only).
-3. Send a sample with Synfact's tool, from a checkout of synfact-dev, Syntakt connected over USB, Transfer closed. First apply our patch for OS 1.42 to the tool (`synfact-tool-os142.patch`: OS 1.42 answers "Reader did not complete" when the tool closes a header probe; the job is released all the same, `0x4010AA2E`):
+3. Send samples from the web builder's **Samples** page (WebMIDI, Chrome or Edge: list, add WAV files, order, remove), or with Synfact's tool, from a checkout of synfact-dev, Syntakt connected over USB, Transfer closed. First apply our patch for OS 1.42 to the tool (`synfact-tool-os142.patch`: OS 1.42 answers "Reader did not complete" when the tool closes a header probe; the job is released all the same, `0x4010AA2E`):
    ```sh
    git apply ../Synthack-OS/mods/long-samples/synfact-tool-os142.patch
    pip install python-rtmidi

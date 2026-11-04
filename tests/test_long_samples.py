@@ -209,3 +209,36 @@ def test_header_for_the_sampler(m):
     m.call(s["ls_plan"], count=400_000_000)
     assert bytes(m.uc.mem_read(names, 16)).split(b"\0")[0] == b"MagMag Vocal 17"   # 15 caratteri + 0
     assert struct.unpack(">I", m.uc.mem_read(table + 12, 4))[0] == 11 * 48000
+
+
+def test_plan_follows_the_slot_map(m):
+    """Le 64 associazioni del catalogo (+0x40, slot map di Synfact, scritte dalla pagina Samples del web builder):
+    il piano segue quell'ordine; tutte a zero: l'ordine del catalogo."""
+    import zlib
+    s = m.sym
+    io = s["core_hzfs_native_io"]
+    m.disk.s.clear()
+    assert m.call(s["core_hzfs_ensure"], [io], count=400_000_000) == 1
+    for name, sec in ((b"first\0", 2), (b"second\0", 3)):
+        m.body = samp(sec * 48000)
+        m.uc.mem_write(SCRATCH, name)
+        assert m.call(s["core_hzfs_put"], [io, SCRATCH, len(m.body), 0, STREAM, 0, SCRATCH + 64],
+                      count=2_000_000_000) == 1
+    m.uc.mem_write(TOTAL, struct.pack(">I", 256))
+
+    def frames():
+        m.call(s["ls_plan"], count=400_000_000)
+        n = struct.unpack(">I", m.uc.mem_read(s["ls_table"] + 4, 4))[0]
+        return [struct.unpack(">I", m.uc.mem_read(s["ls_table"] + 12 + 8 * i, 4))[0] // 48000 for i in range(n)]
+    assert frames() == [2, 3]
+    cats = {k: bytearray(m.disk.read(k * 0x80000 // 512, 0x200)) for k in (0x600, 0x601)}
+    k = max((k for k in cats if cats[k][:4] == b"HZFS"), key=lambda k: struct.unpack(">I", cats[k][8:12])[0])
+    for k in (k,):                                        # associazione 0 -> id 2, nella copia piu' recente
+        lba = k * 0x80000 // 512
+        raw = cats[k]
+        size = struct.unpack(">I", raw[36:40])[0]
+        struct.pack_into(">I", raw, 0x40, 2)
+        raw[32:36] = bytes(4)
+        struct.pack_into(">I", raw, 32, zlib.crc32(bytes(raw[:size]), 0xFFFFFFFF) & 0xFFFFFFFF)
+        m.disk.write(lba, bytes(raw))
+    assert frames() == [3]                                # solo il secondo, alla posizione 1

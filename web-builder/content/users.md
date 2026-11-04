@@ -313,19 +313,20 @@ Saved with the sound. Every parameter is p-lockable.
 
 ## Long samples
 
-`[wip]` Not tested on the device yet. Back up projects and samples with Transfer first.
+`[wip]` Back up projects and samples with Transfer first: this writes the Syntakt's internal memory.
 
-Transfer cuts samples at 5 s. Longer samples go through [Synfact](https://github.com/GSM1980/synfact-dev)'s tool over MIDI, into their own storage on the internal memory.
+Transfer cuts samples at 5 s. Longer samples go through the **Samples** page of this site (or [Synfact](https://github.com/GSM1980/synfact-dev)'s tool), into their own storage on the internal memory.
 
 1. Build with **Long samples** and **SAMPLER**. Flash.
-2. On the computer, from a checkout of synfact-dev, Transfer closed: `pip install python-rtmidi`, then `python -m elekloader.sdk.syntakt.long_samples put pad.wav --yes-write-device`.
-3. Power cycle. "PREPARING SAMPLES" takes longer: it also sends the long samples.
-4. On a SAMPLER track, turn `SAMP` (knob D, SYN 1/2): a menu lists all your samples, stock and long ones in one list, with name and length. Stop on the one you want.
+2. Close Transfer. Open the **Samples** page in Chrome or Edge, **Connect to the Syntakt**, allow MIDI with SysEx.
+3. **Add WAV files**: any rate, mono or stereo; the page converts them to 48 kHz mono. Order them with ↑ ↓ and **Save this order**.
+4. Power cycle the Syntakt. "PREPARING SAMPLES" takes longer: it also sends the long samples.
+5. On a SAMPLER track, turn `SAMP` (knob D, SYN 1/2): a menu lists all your samples, stock and long ones in one list, with name and length.
 
 | | |
 |---|---|
 | Length | up to ~5.8 min per file, ~31 MB in all with the stock samples |
-| Files | the first 64 |
+| Files | the first 64 of the order |
 
 ## Boot splash
 
