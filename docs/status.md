@@ -13,8 +13,8 @@ Snapshot of `dev`, 2026-11-04. Target: SyntHack 1.0 on Syntakt OS 1.42, with the
 | Feature mods | 6: splash, master-comp, dual-mono, readable-values, perf-fx, fx3 |
 | Machines | 2: sy-fm4, sampler. Not tested on 1.42 hardware |
 | Infra mods | 9: modarea, modarea7, vparams, kitstore, projstore, fastmix, syn-pages, xparams, mod-zero (example) |
-| Audio CPU | `[!]` above stock with fx3 or the machines (cache misses, see [fx3 CPU](#fx3-cpu)) |
-| Sample length | `[wip]` the stock upload cuts at 5 s. Port of Synfact's long samples ([plan](#sample-management)) |
+| Audio CPU | `[wip]` fx3 alone ~95 %, every mod ~101 % (cache misses, see [fx3 CPU](#fx3-cpu)) |
+| Sample length | `[wip]` long samples ported from Synfact ([long-samples](../mods/long-samples)): emulator-tested, device test open |
 
 ## Release 1.0
 
@@ -50,30 +50,27 @@ Cycles: extra CPU #1 cycles per block, worst case, cache model at CPI 1.0 (`AUDI
 
 ## fx3 CPU
 
-Why the UI lags:
+Why the UI lags: the MCF54418 has 8 KB instruction and 8 KB data caches; the stock interrupt runs ~1 200 distinct 16-byte code lines (~19 KB) per block. Every line of code a mod runs, and every DDR data line it touches, is a DDR read in every block. Instruction counts miss this.
 
-1. The MCF54418 has an 8 KB instruction cache and an 8 KB data cache. The stock interrupt runs ~1 200 distinct 16-byte code lines (~19 KB) per block. Nothing stays in the cache between blocks.
-2. So each line of code a mod runs, and each DDR data line it touches, costs a DDR read every block. Instruction counts miss this: fastmix's −10 000 instructions bought fx3 room on paper, not in time.
-3. Cache model (`tools/emu/cycles.py`), calibrated on the stock 89 %:
+Measured on the device with [cpu-meter](../mods/cpu-meter) (2026-11-04): every mod at 110 % and more. The cache model at CPI 1.0 had predicted 107 %: that calibration is the right one.
 
-| Build, scene `max` | Instructions | CPI 1.0 | CPI 1.5 |
-|---|---|---|---|
-| stock | 68 434 | 89 % | 89 % |
-| fastmix | 57 434 | 88.6 % | 82.8 % |
-| fx3 | 60 338 | 97.6 % | 89.6 % |
-| all audio mods | 62 036 | 107 % | 96.6 % |
+Fixes (2026-11-04), cache model, worst case (scene `max`, after the gain ramps):
 
-The user report (fx3 lags) fits CPI ≈ 1.0.
+| Build | Before | After |
+|---|---|---|
+| stock | 89 % | 89 % |
+| fx3 | 97.6 % | 95.5 % |
+| fx3 + master-comp + dual-mono | — | 99.2 % |
+| machines (sy-fm4, sampler) | 94 % | 89 % |
+| every mod | 107 % (110+ measured) | 101.2 % |
 
-Plan:
+1. `[ok]` fastmix: smoothing unhooked (−2 700 cycles): its DDR copy cost more than it saved.
+2. `[ok]` xparams: copy in a loop (−4 500), then in long words (half the shared-RAM accesses).
+3. `[ok]` fx3: knob-derived values computed when a knob moves, not every block; TYPE change no longer overruns.
+4. `[ ]` fx3: `fx3_run`'s steady path in assembly (~50 code lines → ~20, ~−1 600 cycles); input sends skipped when off.
+5. `[ ]` Measure again with cpu-meter: `2-fx3-meter`, `3-all-meter`.
 
-1. `[wip]` Measure on the device with [cpu-meter](../mods/cpu-meter) (DTIM0 at interrupt entry and exit, shown on the parameter pages): a build with fx3, 12 tracks sending, chorus at maximum, DEL and REV up. That point fixes CPI and the miss penalty.
-2. `[ ]` fx3: compute the knob-derived values (rates, delays, feedback, divisions) in `sync()`, only when a knob moves. Then the steady path of `fx3_run` in compact assembly. Target: −40 code lines (~−2 000 cycles).
-3. `[ ]` fastmix: smoothing without the DDR copy, if the device shows the copy costs more than it saves.
-4. `[ ]` xparams: write changed words only, if shared-RAM accesses are slow on the device.
-5. `[ ]` Release gate in `tests/test_cycles.py`: every combination ≤ the calibrated limit.
-
-Done (2026-11-04): cpu-meter diagnostic mod; cache model and tests; site load indicator in cycles (limit 10 000 ≈ interrupt at 95 %); xparams −4 500 cycles; fx3 TYPE-change overrun removed.
+Until 4–5: don't build fx3 together with master-comp, dual-mono and the machines. The site's load indicator marks it.
 
 ## Sample management
 
@@ -120,9 +117,9 @@ The other services (`fw_mmc_read`, `fw_mmc_write`, `fw_malloc`, …, in their `f
 Steps:
 
 1. `[ok]` Mod area 64 → 128 KB (`HEAP_BLOCK_SIZE`): room for the port (`+0xFFF0`…`+0x1FFF0`).
-2. `[ ]` `long-samples` mod, storage only: `hzfs.c`, `high-storage.c/.s`, `crc.c`, the route and write-guard hooks. Tests: host build of `hzfs.c` against a block-device double (their `tests/`); the route and the guard in the emulator. Device: `long_samples init/put/get/ls` round trip.
-3. `[ ]` Project pool and boot upload (`sample-pool.c`, the pool hooks above); CPU #2 side in modarea7.
-4. `[ ]` SAMPLER machines on pool positions 65–128 (`SAMP` 1–128).
+2. `[ok]` [long-samples](../mods/long-samples): Synfact's storage (`hzfs.c`, `crc.c`, `high-storage.c` unchanged), route and write guard. Emulator: eMMC double, catalogues, put, route, guard. `[ ]` Device: `long_samples ls/put/get` round trip.
+3. `[ok]` Boot upload (ours, at Synfact's sites `0x40082FB6`/`0x40082FCE`, plan at `0x4008287A`): a table and the files after the stock pages. `[ ]` Synfact's project pool (128 positions saved in the project) not ported: files map to slots in catalogue order.
+4. `[ok]` SAMPLER machines on slots 65–128 (`SAMP` 1–128, `L1`–`L64`). Engine test: 15 s sample played from 12.5 s.
 5. `[ ]` Web builder: a long-sample uploader over WebMIDI (port of `long_samples.py`), optional.
 
 `[!]` Steps 2–3 write the internal eMMC. Test on the device only after the emulator and host tests, with a backup of the projects (Transfer).

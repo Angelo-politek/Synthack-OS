@@ -110,7 +110,9 @@ def test_worst_case_load_of_all_mods():
 # interrupt intero (tools/emu/isr.py), scena "max": tutte le mandate al massimo, FX3 phaser con retroazione e
 # mandate, compressore, ingresso mono, guadagni fermi. 2026-11-03: stock 68 484, tutte le mod 73 230 prima,
 # 61 670 con fastmix e la copia di sy-fm4 srotolata (-6 814); pesate (movem = registri) 71 729 -> 66 230.
-WHOLE_VS_STOCK = -6000
+# 2026-11-04: smussamento di fastmix non piu' agganciato (costava piu' tempo di quanto ne risparmiasse: righe di
+# cache, tools/emu/cycles.py e tests/test_cycles.py), copia di xparams a parole lunghe: 67 144 contro 68 484.
+WHOLE_VS_STOCK = -1000
 
 
 def test_whole_interrupt_with_every_mod_is_faster_than_stock():

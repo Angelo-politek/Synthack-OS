@@ -29,6 +29,7 @@ HOOKS = [(0x4008_EF8C, "4fefffd0702048d7", "fm_sum10", "somma a 10 canali: jmp f
          (0x4008_F0B6, "4fefffd848d73cfc", "fm_sum8", "somma a 8 canali: jmp fm_sum8 ; nop")]
 SMOOTH, SMOOTH_ORIG, SMOOTH_BACK = 0x4009_79D6, "2a3c7c290000204b2c3c03d70000", 0x4009_7A2A
 WSL_BINUTILS = "~/tools/m68k/root"
+SMOOTH_HOOK = False                     # vedi main(): il gancio dello smussamento costa piu' di quanto risparmia
 
 
 def sha(b: bytes) -> str:
@@ -86,9 +87,13 @@ def main() -> None:
     old = sec3[SMOOTH - LOAD:SMOOTH - LOAD + 14]
     if old.hex() != SMOOTH_ORIG:
         raise SystemExit(f"{SMOOTH:#x}: byte inattesi {old.hex()}")
-    patches.append({"section": 3, "addr": f"{SMOOTH:#010X}", "len": 14, "expect_sha256": sha(old),
-                    "hex": struct.pack(">HIHIH", 0x4EB9, syms["fm_smooth"], 0x4EF9, SMOOTH_BACK, 0x4E71).hex(),
-                    "what": "smussamento dei parametri: jsr fm_smooth ; jmp 0x40097A2A ; nop"})
+    # 2026-11-04: smussamento non agganciato. Sul dispositivo (cpu-meter, tools/emu/cycles.py tarato) costa piu'
+    # di quanto risparmia: -5 300 istruzioni ma una copia di 1.9 KB degli ingressi in DDR, 117 righe di cache
+    # mancate a ogni blocco. fm_smooth resta nel blob (tests/test_fastmix.py lo prova ancora contro l'OS).
+    if SMOOTH_HOOK:
+        patches.append({"section": 3, "addr": f"{SMOOTH:#010X}", "len": 14, "expect_sha256": sha(old),
+                        "hex": struct.pack(">HIHIH", 0x4EB9, syms["fm_smooth"], 0x4EF9, SMOOTH_BACK, 0x4E71).hex(),
+                        "what": "smussamento dei parametri: jsr fm_smooth ; jmp 0x40097A2A ; nop"})
     spec = {
         "name": "fastmix", "os": "1.42", "requires": ["modarea"],
         "description": "Routine dell'interrupt audio riscritte piu' veloci con lo stesso risultato: somme dei bus "

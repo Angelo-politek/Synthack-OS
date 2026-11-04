@@ -26,7 +26,7 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 | [Mod area](mods/modarea) | `[ok]` infra | 128 KB for mod code in a reserved block of the OS heap. |
 | [Virtual parameters](mods/vparams) | `[ok]` infra | Mods add their own parameters to OS pages. |
 | [Kit storage](mods/kitstore) | `[ok]` infra | 36 words of mod settings saved with the kit. |
-| [Faster mixing](mods/fastmix) | `[ok]` infra | OS audio routines rewritten: same sound, ~11 000 fewer instructions per block. The time saved depends on cache misses: to measure on the device. Added with the audio mods. |
+| [Faster mixing](mods/fastmix) | `[ok]` infra | OS bus sums rewritten: same sound, ~3 200 cycles less per block. Added with the audio mods. |
 | [Project storage](mods/projstore) | `[ok]` infra | 256 bytes of mod settings saved with the project. |
 | [Web builder](web-builder) | `[wip]` | Build your `.syx` in the browser. Nothing uploaded. Same bytes as `build.py`. Not online yet. |
 | [SY FM4](mods/sy-fm4) | `[wip]` machine | SY TONE becomes a 4-operator FM machine (Rxuting, MIT). Three SYN pages, algorithm drawn. Not tested on 1.42 hardware. |
@@ -35,14 +35,14 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 | PIN lock | planned | PIN at power-on. OS reflash still recovers. |
 | New LFO shapes · 3rd LFO / mod matrix | planned | |
 | Arpeggiator · Euclidean UI | planned | |
-| Sample management: samples longer than 5 s, one pool | planned | [Plan](docs/status.md#sample-management) |
+| [Long samples](mods/long-samples) | `[wip]` | Samples longer than 5 s, Synfact's HZFS storage and tool; SAMPLER slots 65–128. Not tested on the device |
 
 ## Known issues
 
 | Issue | Status |
 |---|---|
-| UI lag with many tracks sent to FX3 | `[wip]` cause found: cache misses, not instructions ([fx3 CPU](docs/status.md#fx3-cpu)). Device measurement needed |
-| Samples cut at ~5 s by the OS | `[wip]` [sample management](docs/status.md#sample-management) |
+| UI lag with FX3 | `[wip]` cause: cache misses. fx3 alone ~95 %, every mod together ~101 %: don't combine fx3 with master-comp, dual-mono and the machines yet ([fx3 CPU](docs/status.md#fx3-cpu)) |
+| Samples cut at 5 s by the stock upload | `[wip]` [long-samples](mods/long-samples) (Synfact's HZFS): emulator-tested, device test open |
 | Bus compressor: toggling *global* for the external input mixer also copies the compressor settings | known |
 | v0.8.0 and earlier: projects with SP TWINSHOT samples can crash at boot ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)) | fixed in v0.8.1. Flash the stock OS; projects and samples are not affected |
 

@@ -64,9 +64,9 @@ Instructions per 32-sample block, emulator. The stock OS uses ~89 % of the CPU a
 | One track: CHOR / FLNG / PHSR / CRSH | ~1,300 / ~1,500 / ~1,700 / ~850 |
 | Worst case: 12 tracks and the input sending, maximum feedback and sends | ~2,750 (ceiling 2,770 in `tests/test_cpu_budget.py`) |
 
-With the caches (`tools/emu/cycles.py`, worst case): ~164 code lines and ~41 data lines in DDR per block, ~15,000 cycles over fastmix (CPI 1.0 estimate), ~9 % of the block. Interrupt at ~90–98 % against 89 % stock.
+With the caches (`tools/emu/cycles.py`, calibrated with cpu-meter): ~14,400 cycles per block over fastmix, ~8.6 % of the block. Interrupt at ~95.5 % with fx3 alone, 89 % stock. Measured on the device with every mod: 110 % and more before the 2026-11-04 fixes (fastmix smoothing off, xparams long words, fx3 knob values precomputed), ~101 % estimated after.
 
-`[!]` `[wip]` UI lag with many tracks sending: the cost is in cache misses, not instructions. Biggest part: the C control code of `fx3_run` (76 lines, ~700 instructions). Plan in [docs/status.md](../../docs/status.md#fx3-cpu).
+`[!]` `[wip]` With fx3, master-comp and dual-mono together the interrupt is at ~99 %, with every mod ~101 %: the UI lags. fx3 alone, or the other mods without fx3, stay at or below ~95 %. Next: `fx3_run`'s steady path in assembly ([docs/status.md](../../docs/status.md#fx3-cpu)).
 
 ## Build and test
 

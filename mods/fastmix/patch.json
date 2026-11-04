@@ -221,14 +221,6 @@
       "expect_sha256": "dc335d0aed0cc4febec4501776825159505f5b413de340f6e74208856577c47b",
       "hex": "4ef9444f39c04e71",
       "what": "somma a 8 canali: jmp fm_sum8 ; nop"
-    },
-    {
-      "section": 3,
-      "addr": "0X400979D6",
-      "len": 14,
-      "expect_sha256": "c404b4e2535432cc3959e8093d4d0a0f2761473f78a70b89c202a5d696bc9a08",
-      "hex": "4eb9444f3dde4ef940097a2a4e71",
-      "what": "smussamento dei parametri: jsr fm_smooth ; jmp 0x40097A2A ; nop"
     }
   ]
 }

@@ -22,14 +22,14 @@
       "sec7": 0
     },
     "fastmix": {
-      "cpu": -600,
+      "cpu": -3200,
       "modarea": 4080,
       "kit": 0,
       "project": 0,
       "sec7": 0
     },
     "fx3": {
-      "cpu": 15000,
+      "cpu": 14400,
       "modarea": 20480,
       "kit": 0,
       "project": 0,
@@ -50,7 +50,7 @@
       "sec7": 0
     },
     "master-comp": {
-      "cpu": 3700,
+      "cpu": 3600,
       "modarea": 8192,
       "kit": 0,
       "project": 0,
@@ -134,7 +134,7 @@
       "sec7": 0
     },
     "xparams": {
-      "cpu": 5200,
+      "cpu": 2900,
       "modarea": 1536,
       "kit": 0,
       "project": 0,

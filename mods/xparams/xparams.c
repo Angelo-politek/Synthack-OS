@@ -111,20 +111,21 @@ __attribute__((optimize("O2"))) void xp_dma_wait(void) {
             ;
         DMA_PENDING = 0;
     }
-    /* One move.w (a0)+,(a1)+ a word, the words of a track unrolled, the tracks in a loop: ~190 instructions in
-     * ~70 bytes of code. The audio interrupt does not fit the 8 KB instruction cache, so every 16 bytes of code
+    /* One move.l (a0)+,(a1)+ per two words, the words of a track unrolled, the tracks in a loop: ~120 instructions in
+     * ~60 bytes of code. The audio interrupt does not fit the 8 KB instruction cache, so every 16 bytes of code
      * it runs cost a line fill each block: the fully unrolled copy (144 move.w d16(An),d16(An), 870 bytes) ran
-     * fewer instructions and cost more time (tools/emu/cycles.py). */
-    volatile uint16_t *dst = SHARED_MAIN, *raw = SHARED_RAW;
+     * fewer instructions and cost more time (tools/emu/cycles.py). Long words halve the accesses to the shared
+     * RAM, which is outside the cache; the source of odd tracks is 2-aligned (the V4 core reads it in two). */
+    volatile uint32_t *dst = (volatile uint32_t *)SHARED_MAIN, *raw = (volatile uint32_t *)SHARED_RAW;
     for (int t = 0; t < 8; t++) {
-        volatile const uint16_t *src = SEQ_VALUES + 0xe + t * 0x47 + XP_FIRST;
-#pragma GCC unroll 8
-        for (int k = 0; k < XP_N; k++)
+        volatile const uint32_t *src = (volatile const uint32_t *)(SEQ_VALUES + 0xe + t * 0x47 + XP_FIRST);
+#pragma GCC unroll 4
+        for (int k = 0; k < XP_N / 2; k++)
             *dst++ = *src++;
         /* the machine words as set: the voice frames carry them smoothed */
-        src = SEQ_VALUES + 0xe + t * 0x47 + XP_RAW_FIRST;
-#pragma GCC unroll 10
-        for (int k = 0; k < XP_RAW_N; k++)
+        src = (volatile const uint32_t *)(SEQ_VALUES + 0xe + t * 0x47 + XP_RAW_FIRST);
+#pragma GCC unroll 5
+        for (int k = 0; k < XP_RAW_N / 2; k++)
             *raw++ = *src++;
     }
 }

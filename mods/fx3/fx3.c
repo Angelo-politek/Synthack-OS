@@ -170,7 +170,9 @@ static void dress(void)
         ui[96] = 1;
 }
 
-/* a ogni blocco: parametri dal kit (cambia col pattern), solo se le parole sono cambiate */
+static void derive(void);
+
+/* a ogni blocco: parametri dal kit (cambia col pattern), solo se le parole sono cambiate; poi i valori derivati */
 static void sync(void)
 {
     const char *k = kit();
@@ -182,6 +184,7 @@ static void sync(void)
     seen[1] = hi;
     for (i = 0; i < NP; i++)
         fx3_p[i] = (unsigned char)decode(word(k, i >> 1), i);
+    derive();
 }
 
 /* ---- effetti */
@@ -210,12 +213,37 @@ static s32 bip(u32 v, s32 max)                           /* 0..127, centro 64 ->
 
 static const s32 zero[H] = {0};
 
+/* Valori che dipendono solo dalle manopole, ricalcolati da sync() quando cambiano (2026-11-04: prima a ogni
+ * blocco, ~500 byte di codice con quattro divisioni; l'interrupt non sta nella cache istruzioni da 8 KB e ogni
+ * riga di codice eseguita costa una lettura dalla DDR a ogni blocco, tools/emu/cycles.py). */
+struct drv { u32 base, dep, off, inc, pinc, px, pdep; s32 pfb, pw; u32 cn, csh; s32 cg; };
+static struct drv dv DATA;
+#define CHO_FB    (*(volatile s32 *)((char *)DL_M - 4))
+
+static void derive(void)
+{
+    u32 fl = fx3_p[P_TYPE] == FLNG;
+
+    dv.base = q8((fl ? TIME_F : TIME_C)[fx3_p[P_TIME]]);
+    dv.dep = q8((fl ? DEP_F : DEP_C)[fx3_p[P_DEP]]);
+    dv.off = (u32)fx3_p[P_WID] * 0x01020408u;              /* 0..180 gradi */
+    dv.inc = inc(fl ? RATE_F : RATE_C);
+    CHO_FB = fl ? bip(fx3_p[P_FDBK], 31130) : 29490 * (s32)fx3_p[P_FDBK] / 127; /* 95 % / 90 % */
+    dv.pinc = inc(RATE_F);
+    dv.px = FIDX_P[fx3_p[P_TIME]];
+    dv.pdep = 49152u * fx3_p[P_DEP] / 127;                 /* 0..6 ottave */
+    dv.pfb = bip(fx3_p[P_FDBK], 29491);                    /* 90 % */
+    dv.pw = 16384 * (s32)fx3_p[P_WID] / 127;               /* Q14 */
+    dv.cn = 1 + (31 * fx3_p[P_SPD] + 63) / 127;
+    dv.csh = (15 * fx3_p[P_DEP] + 63) / 127;               /* bit tolti */
+    dv.cg = DRV_G[fx3_p[P_TIME]];
+}
+
 /* CHOR / FLNG: ciclo in assembly (fx3_cho, sotto): 16 campioni, due prese interpolate dalla linea
  * doppia, retroazione mono saturata a 16 bit; due varianti (con/senza retroazione). Le posizioni partono
  * sotto DL e in un blocco avanzano di 16 +- MAXD campioni: le letture restano nella copia, senza ritorno
  * a capo. La retroazione sta subito prima della linea (muls.l non accetta indirizzi assoluti). */
 struct cho { s16 *line; const s32 *in; s32 *wet; u32 pl, pr, il, ir, w; s32 yl, yr; };
-#define CHO_FB    (*(volatile s32 *)((char *)DL_M - 4))
 void fx3_cho(struct cho *c);
 void fx3_sum(s32 *dst, const s32 *g, u32 which);         /* dst[n] = -sum g[k] (x_k[2n] + x_k[2n+1]) */
 void fx3_sum1(s32 *dst, u32 src, s32 g, u32 add);         /* una traccia: dst[n] (+)= -g (x[2n] + x[2n+1]) */
@@ -231,12 +259,11 @@ static u32 glide(u32 to, u32 from)                       /* TIME girato di colpo
 /* una linea mono, due prese (L/R) modulate da un LFO calcolato a inizio e fine blocco e interpolato
  * linearmente (le posizioni di lettura avanzano di 1 - pendenza a campione). Ritorna 1 se la coda e'
  * (quasi) muta. */
-static u32 chorus(const s32 *in, u32 fl)
+static u32 chorus(const s32 *in)
 {
     struct cho c;
-    u32 base = q8((fl ? TIME_F : TIME_C)[fx3_p[P_TIME]]), dep = q8((fl ? DEP_F : DEP_C)[fx3_p[P_DEP]]);
-    u32 off = (u32)fx3_p[P_WID] * 0x01020408u;             /* 0..180 gradi */
-    u32 end = phase + inc(fl ? RATE_F : RATE_C);
+    u32 base = dv.base, dep = dv.dep, off = dv.off;
+    u32 end = phase + dv.inc;
     u32 el = glide(base + ((dep * (u32)lfo(end)) >> 15), dpos[0]);
     u32 er = glide(base + ((dep * (u32)lfo(end + off)) >> 15), dpos[1]);
 
@@ -248,7 +275,6 @@ static u32 chorus(const s32 *in, u32 fl)
     c.il = 256 - (u32)(((s32)(el - dpos[0])) >> 4);
     c.ir = 256 - (u32)(((s32)(er - dpos[1])) >> 4);
     c.w = wpos;
-    CHO_FB = fl ? bip(fx3_p[P_FDBK], 31130) : 29490 * (s32)fx3_p[P_FDBK] / 127; /* 95 % / 90 % */
     fx3_cho(&c);
     wpos = c.w & (DL - 1);                                 /* multiplo di H: nel blocco non torna a capo */
     phase = end;
@@ -268,8 +294,8 @@ void fx3_phs(struct phs *p);
 
 static u32 phaser(const s32 *in)
 {
-    u32 end = phase + inc(RATE_F);
-    u32 x = FIDX_P[fx3_p[P_TIME]] + (49152u * fx3_p[P_DEP] / 127 * (u32)lfo(end) >> 15);  /* 0..6 ottave */
+    u32 end = phase + dv.pinc;
+    u32 x = dv.px + (dv.pdep * (u32)lfo(end) >> 15);      /* 0..6 ottave */
     u32 i, f;
 
     if (x > (PH_N - 2) << 8)
@@ -279,8 +305,8 @@ static u32 phaser(const s32 *in)
     ph.in = in;
     ph.wet = fx3_wet;
     ph.a = PH_A[i] + (((PH_A[i + 1] - PH_A[i]) * (s32)f) >> 8);
-    ph.fb = bip(fx3_p[P_FDBK], 29491);                     /* 90 % */
-    ph.w = 16384 * (s32)fx3_p[P_WID] / 127;                /* Q14 */
+    ph.fb = dv.pfb;
+    ph.w = dv.pw;
     fx3_phs(&ph);
     phase = end;
     return (u32)(ph.s[4] + 10) <= 20 && (u32)(fx3_wet[2 * H - 2] + 10) <= 20 && (u32)(fx3_wet[2 * H - 1] + 10) <= 20;
@@ -292,9 +318,8 @@ static s32 cr_hold DATA = 0;
 
 static u32 crusher(const s32 *in)
 {
-    u32 n = 1 + (31 * fx3_p[P_SPD] + 63) / 127, k;
-    u32 sh = (15 * fx3_p[P_DEP] + 63) / 127;               /* bit tolti */
-    s32 g = DRV_G[fx3_p[P_TIME]], mask = -(1 << sh), *w = fx3_wet;
+    u32 n = dv.cn, k;
+    s32 g = dv.cg, mask = -(1 << dv.csh), *w = fx3_wet;
 
     for (k = 0; k < H; k++) {
         if (++cr_cnt >= n) {
@@ -422,7 +447,7 @@ void fx3_run(void)
         silent = crusher(in);
         break;
     default:
-        silent = chorus(in, dsp_type == FLNG);
+        silent = chorus(in);
     }
     quiet = loud || !silent ? 0 : quiet + 1;
     if (vol)                                               /* ROUTING (FUNC+FX), tasto 13: nella FX track */

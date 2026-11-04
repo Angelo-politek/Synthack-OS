@@ -38,14 +38,15 @@ OUT = REPO / "web-builder" / "src" / "budget.json"
 # scena "max": tutte le mandate, guadagni fermi): -11 000 con o senza le altre mod. Qui -10 000. Nei blocchi in
 # cui i guadagni sono in rampa o i parametri si muovono (dopo un cambio di kit) il credito sparisce (+~400).
 # xparams (2026-11-04): copia in un ciclo per traccia (362, piu' istruzioni, meno codice: vedi AUDIO_CYCLES).
-AUDIO_CPU = {"fx3": 2749, "master-comp": 578, "dual-mono": 324 + 133, "xparams": 362, "sampler": 8, "fastmix": -10000}
+AUDIO_CPU = {"fx3": 2749, "master-comp": 578, "dual-mono": 324 + 133, "xparams": 362, "sampler": 8, "fastmix": -5400}  # fastmix: solo le somme dal 2026-11-04
 
-# cicli in piu' per blocco (2026-11-04, tools/emu/cycles.py, scena "max", taratura prudente CPI 1.0: una riga
+# cicli in piu' per blocco (2026-11-04 sera: fastmix senza smussamento, xparams a parole lunghe, fx3 con i valori
+# derivati precalcolati; tools/emu/cycles.py, scena "max", taratura prudente CPI 1.0: una riga
 # mancata ~54 cicli). L'interrupt non sta nella cache istruzioni da 8 KB: ogni 16 byte di codice eseguito e ogni
 # riga di dati in DDR costano una lettura dalla DDR a ogni blocco. fx3, master-comp, dual-mono contati sopra
 # fastmix; sampler e sy-fm4 sopra xparams; fastmix sopra lo stock. Il sito somma questi valori.
-AUDIO_CYCLES = {"fx3": 15000, "master-comp": 3700, "dual-mono": 2400, "xparams": 5200, "sampler": 400, "sy-fm4": 0,
-                "fastmix": -600}
+AUDIO_CYCLES = {"fx3": 14400, "master-comp": 3600, "dual-mono": 2400, "xparams": 2900, "sampler": 400, "sy-fm4": 0,
+                "fastmix": -3200}
 
 SEC7_ROOM = 127_695
 

@@ -61,6 +61,9 @@ class Machine:
         if patched:
             for p in self.spec["patches"]:
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
+            # smussamento: non piu' agganciato nella build (make_patch.SMOOTH_HOOK), qui si prova ancora fm_smooth
+            fm = int(self.spec["symbols"]["fm_smooth"], 16)
+            uc.mem_write(0x4009_79D6, struct.pack(">HIHIH", 0x4EB9, fm, 0x4EF9, 0x4009_7A2A, 0x4E71))
             sites += [int(a, 16) for a in self.spec["emac_sites"]]
         uc.mem_write(RET, b"\x4e\x75")
         self.emac = UnicornEmac(uc, sites)
@@ -183,8 +186,7 @@ def test_patched_bytes():
     sym = {k: int(v, 16) for k, v in spec["symbols"].items()}
     hooks = {int(p["addr"], 16): bytes.fromhex(p["hex"]) for p in spec["patches"] if not p.get("append")}
     want = {a: struct.pack(">HIH", 0x4EF9, sym[f"fm_sum{n}"], 0x4E71) for n, a in SUMS.items()}
-    want[0x4009_79D6] = struct.pack(">HIHIH", 0x4EB9, sym["fm_smooth"], 0x4EF9, 0x4009_7A2A, 0x4E71)
-    assert hooks == want
+    assert hooks == want                                        # smussamento non agganciato (2026-11-04)
     code = [p for p in spec["patches"] if p.get("append")]
     assert len(code) == 1 and int(code[0]["ram"], 16) == modarea_layout.RAM + 0xF000
     assert int(code[0]["addr"], 16) == modarea_layout.IMG + 0xF000

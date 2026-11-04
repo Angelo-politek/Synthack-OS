@@ -311,6 +311,22 @@ Saved with the sound. Every parameter is p-lockable.
 
 `[!]` The track's AMP envelope still shapes the sound. `HOLD` at `NOTE` (127) holds it for the trig's length only: for whole samples, use a long `HOLD` or `DEC` at `INF`.
 
+## Long samples
+
+`[wip]` Not tested on the device yet. Back up projects and samples with Transfer first.
+
+Transfer cuts samples at 5 s. Longer samples go through [Synfact](https://github.com/GSM1980/synfact-dev)'s tool over MIDI, into their own storage on the internal memory.
+
+1. Build with **Long samples** and **SAMPLER**. Flash.
+2. On the computer, from a checkout of synfact-dev, Transfer closed: `pip install python-rtmidi`, then `python -m elekloader.sdk.syntakt.long_samples put pad.wav --yes-write-device`.
+3. Power cycle. "PREPARING SAMPLES" takes longer: it also sends the long samples.
+4. On a SAMPLER track, turn `SAMP` past 64: `L1`, `L2`, … are the files in the order `long_samples ls` lists them.
+
+| | |
+|---|---|
+| Length | up to ~5.8 min per file, ~31 MB in all with the stock samples |
+| Files | the first 64 |
+
 ## Boot splash
 
 The SyntHack logo, version and your name after the official intro. Part of every build.
@@ -326,7 +342,7 @@ The SyntHack logo, version and your name after the official intro. Part of every
 
 | Issue | Workaround | Status |
 |---|---|---|
-| UI lag with many tracks sent to FX3 and high feedback | Send fewer tracks or lower FDBK | `[wip]` being optimized |
+| UI lag with FX3 together with the compressor, dual mono and the machines | Leave one of them out (the load meter on the site shows it) | `[wip]` being optimized |
 | Bus compressor: toggling *global* for the external input mixer also copies the compressor settings | — | known |
 
 ## Support
