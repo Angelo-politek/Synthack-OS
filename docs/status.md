@@ -67,13 +67,13 @@ The user report (fx3 lags) fits CPI ≈ 1.0.
 
 Plan:
 
-1. `[ ]` Measure on the device, DTIM0 at interrupt entry and exit: a build with fx3, 12 tracks sending, chorus at maximum, DEL and REV up. That point fixes CPI and the miss penalty.
+1. `[wip]` Measure on the device with [cpu-meter](../mods/cpu-meter) (DTIM0 at interrupt entry and exit, shown on the parameter pages): a build with fx3, 12 tracks sending, chorus at maximum, DEL and REV up. That point fixes CPI and the miss penalty.
 2. `[ ]` fx3: compute the knob-derived values (rates, delays, feedback, divisions) in `sync()`, only when a knob moves. Then the steady path of `fx3_run` in compact assembly. Target: −40 code lines (~−2 000 cycles).
 3. `[ ]` fastmix: smoothing without the DDR copy, if the device shows the copy costs more than it saves.
 4. `[ ]` xparams: write changed words only, if shared-RAM accesses are slow on the device.
 5. `[ ]` Release gate in `tests/test_cycles.py`: every combination ≤ the calibrated limit.
 
-Done (2026-11-04): cache model and tests; site load indicator in cycles (limit 10 000 ≈ interrupt at 95 %); xparams −4 500 cycles; fx3 TYPE-change overrun removed.
+Done (2026-11-04): cpu-meter diagnostic mod; cache model and tests; site load indicator in cycles (limit 10 000 ≈ interrupt at 95 %); xparams −4 500 cycles; fx3 TYPE-change overrun removed.
 
 ## Sample management
 
