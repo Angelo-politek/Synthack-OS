@@ -620,7 +620,7 @@ def test_syn_pages():
     v = SynView(["sampler"], machine=44)
     ui = v.ui
     lix = lambda: struct.unpack(">I", ui.uc.mem_read(DESC + 52 * 503 + 4, 4))[0]   # noqa: E731
-    assert v.knobs() == [497, 498, 499, 504, 501, 502, 500, 503, 10] and v.pages() == 2
+    assert v.knobs() == [497, 498, 499, 504, 501, 502, 500, 503, 10] and v.pages() == 3
     assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 1/2"
     v.set_value(0, 0x15, 5 << 8)                                   # SAMP 6
     v.page(1)
@@ -763,3 +763,29 @@ def test_long_sample_slot_65(engines):
     e.uc.mem_write(at, bytes(8))                        # niente tabella: lo slot lungo tace, lo stock no
     assert peak(play(e, [0x4000, 0x300, 0, samp, 0, 0x7800, 0, 0x6400])[TAIL:]) == 0
     assert peak(play(e, ONESHOT)) > 0
+
+
+def test_pool_page():
+    """SYN 3/3, POOL: knob A = SAMP; i sample lunghi (mods/long-samples, header LSHD) intorno a SAMP, nome e durata,
+    e la forma d'onda di quello scelto. Senza sample lunghi: NO LONG SAMPLES."""
+    from syn_view import SynView
+    v = SynView(["long-samples", "sampler"], machine=44)
+    ui = v.ui
+    v.page(2)
+    assert v.knobs() == [504, 0, 0, 0, 0, 0, 0, 0, 0] and v.title() == b"SAMPLE POOL"
+    empty = screens_pixels(v.frame())
+    assert sum(empty[y][x] for y in range(12, 37) for x in range(45, 128)) > 30      # NO LONG SAMPLES
+    tab = ui.sym["ls_table"]
+    names = struct.unpack(">3I", ui.uc.mem_read(ui.sym["ls_header"], 12))[2]
+    ui.put(tab, ">II", 0x5348_4C53, 6)
+    for i in range(6):
+        ui.put(tab + 8 + 8 * i, ">II", 0x4010_0000 + i * 0x10_0000, (i + 5) * 48000)
+        ui.uc.mem_write(names + 16 * i, f"SAMPLE {i}".encode().ljust(16, b"\0"))
+    v.set_value(0, 0x15, 65 << 8)                                  # SAMP 66 = L2
+    listed = screens_pixels(v.frame())
+    assert listed != empty
+    assert struct.unpack(">H", ui.uc.mem_read(0x1000_05B0, 2))[0] == 66   # forma d'onda chiesta alla CPU #2
+    ui.put(0x1000_05B4, ">HH", 66, 112)
+    ui.uc.mem_write(0x1000_05C0, bytes([90] * 112))
+    drawn = screens_pixels(v.frame())
+    assert sum(drawn[y][x] for y in range(40, 61) for x in range(16, 128)) > 1000     # la forma d'onda

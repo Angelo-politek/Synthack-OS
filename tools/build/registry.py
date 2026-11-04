@@ -33,12 +33,13 @@ MODAREA = [
     (0x7420, 0x7E00, "syn-pages", "machine table (synpages_layout.TABLE), SRC view: pages, titles, drawing"),
     (0x7E00, 0x8000, "vparams", "code"),
     (0x8000, 0x8180, "vparams", "table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS)"),
-    (0x8180, 0xA000, "sampler", "main CPU side: pages, knob graphics, waveform, value texts, tempo to shared RAM"),
+    # 0x8180..0xA000: free (sampler moved to +0x18000 on 2026-11-04)
     (0xA000, 0xDFF0, "fx3", "code and data"),
     (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
     (0xF000, 0xFFF0, "fastmix", "code and data: faster OS audio routines"),
     (0xFFF0, 0x18000, "long-samples", "Synfact HZFS storage, plan and upload of long samples (GPL-2.0-or-later)"),
-    # 0x18000..0x1FFF0: free
+    (0x18000, 0x1B000, "sampler", "main CPU side: pages (1/3..3/3 POOL), knob graphics, waveform, value texts, tempo"),
+    # 0x1B000..0x1FFF0: free
 ]
 
 # ---- sezione 3, riempimento del linker 0x40339740..0x4033A000 (byte a zero non usati dall'OS)

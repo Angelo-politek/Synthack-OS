@@ -19,12 +19,13 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x7420` | `0x7e00` | syn-pages | machine table (synpages_layout.TABLE), SRC view: pages, titles, drawing |
 | `0x7e00` | `0x8000` | vparams | code |
 | `0x8000` | `0x8180` | vparams | table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS) |
-| `0x8180` | `0xa000` | sampler | main CPU side: pages, knob graphics, waveform, value texts, tempo to shared RAM |
+| `0x8180` | `0xa000` | **free** |  |
 | `0xa000` | `0xdff0` | fx3 | code and data |
 | `0xdff0` | `0xf000` | fx3 | feedback (+0xDFFC) and delay line (+0xE000, 4 KB) |
 | `0xf000` | `0xfff0` | fastmix | code and data: faster OS audio routines |
 | `0xfff0` | `0x00018000` | long-samples | Synfact HZFS storage, plan and upload of long samples (GPL-2.0-or-later) |
-| `0x00018000` | `0x0001fff0` | **free** |  |
+| `0x00018000` | `0x0001b000` | sampler | main CPU side: pages (1/3..3/3 POOL), knob graphics, waveform, value texts, tempo |
+| `0x0001b000` | `0x0001fff0` | **free** |  |
 
 Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams.
 

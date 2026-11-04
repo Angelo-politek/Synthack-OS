@@ -411,6 +411,8 @@ static const u32 page2[9] = {0, 0, 0, 0, ID_P5, ID_P6, ID_P7, ID_H, 10};
 static u32 sm_record(void *view, u32 page, u32 knob) {
     int t = track_type();
     fit_knobs(t);
+    if (page == 2)                              /* POOL: knob A = SAMP, the list follows it */
+        return knob == 0 ? ID_SAMP : 0;
     if (page == 1) {
         set_row(ID_H, &xpar[t], LIX_X);
         return knob < 9 ? page2[knob] : 0;
@@ -448,6 +450,8 @@ static const char *long_name(u32 slot) {
 
 static const char *sm_title(void *view, u32 page) {
     (void)view;
+    if (page == 2)
+        return "SAMPLE POOL";
     s32 t = active_track();
     const char *l = page == 1 && t >= 0 ? long_name((u32)clampi(value(t, LIX_SAMP) >> 8, 127)) : 0;
     return l ? l : titles[track_type()][page == 1];
@@ -457,9 +461,60 @@ static const char *sm_title(void *view, u32 page) {
  * the OS writes a turned value on) */
 #define WAVE_TOP 13
 #define WAVE_H 23
+/* page 3/3, POOL: the long samples (mods/long-samples) around the track's SAMP, name and length, and the waveform
+ * of the one picked. Knob A is SAMP: turning it picks a sample for the machine (p-lockable as any value). */
+#define POOL_X 45
+#define POOL_ROWS 4
+static void pool_line(void *bm, int row, u32 n, const char *name, u32 frames, int picked) {
+    char line[24], *b = line;
+    *b++ = picked ? '>' : ' ';
+    *b++ = 'L';
+    b = put_u(b, n + 1);
+    *b++ = ' ';
+    for (int k = 0; k < 8 && name[k]; k++)
+        *b++ = name[k] >= 'a' && name[k] <= 'z' ? (char)(name[k] - 32) : name[k];
+    u32 sec = (frames + 24000) / 48000;
+    while (b < line + 16 - (sec >= 100 ? 4 : sec >= 10 ? 3 : 2))
+        *b++ = ' ';
+    b = put_u(b, sec);
+    *b++ = 'S';
+    *b = 0;
+    SP_DRAW_TEXT(bm, SP_FONT, POOL_X, 45 - 6 * row, 0, 0, "XXXXXXXXXXXXXXXX", "%s", line);   /* y from the bottom */
+}
+
+static void pool_draw(void *bm, s32 t) {
+    const u32 *h = (const u32 *)LS_HDR;
+    const u32 *tab = h[0] == 0x4C534844u ? (const u32 *)h[1] : 0;
+    u32 count = tab && tab[0] == 0x53484C53u ? tab[1] : 0;
+    u32 slot = (u32)clampi(value(t, LIX_SAMP) >> 8, 127);
+    sp_clear(bm, POOL_X - 2, 12, 128, 37);
+    sp_clear(bm, 16, 38, 128, 64);
+    if (!count) {
+        SP_DRAW_TEXT(bm, SP_FONT, POOL_X, 45, 0, 0, "XXXXXXXXXXXXXXXX", "%s", "NO LONG SAMPLES");
+        return;
+    }
+    s32 cur = slot >= 64 ? (s32)slot - 64 : -1, first = cur - 1;
+    if (first > (s32)count - POOL_ROWS)
+        first = (s32)count - POOL_ROWS;
+    if (first < 0)
+        first = 0;
+    for (int r = 0; r < POOL_ROWS && first + r < (s32)count; r++) {
+        u32 n = (u32)(first + r);
+        pool_line(bm, r, n, (const char *)h[2] + 16 * n, tab[3 + 2 * n], (s32)n == cur);
+    }
+    if (cur >= 0 && wave_ready(slot)) {
+        part_t all = {0, 0x7800, -1, 0, 0};
+        draw_wave(bm, 16, 40, 112, 20, &all, 0);
+    }
+}
+
 static void sm_draw(void *view, void *bm, u32 page) {
     (void)view;
     s32 t = active_track();
+    if (page == 2 && t >= 0) {
+        pool_draw(bm, t);
+        return;
+    }
     if (page != 1 || t < 0)
         return;
     sp_clear(bm, 16, WAVE_TOP, 128, 37);
@@ -471,7 +526,7 @@ static void sm_draw(void *view, void *bm, u32 page) {
     }
 }
 
-static const sp_machine_t sm_pages = {ID_TUNE, 2, sm_record, sm_title, sm_draw};
+static const sp_machine_t sm_pages = {ID_TUNE, 3, sm_record, sm_title, sm_draw};
 
 void sm_boot(void) {
     sp_register(&sm_pages);
