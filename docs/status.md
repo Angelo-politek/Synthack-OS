@@ -127,6 +127,22 @@ Steps:
 
 Found here before the decision (still valid, OS 1.42): stock slots at `(k + 8) × 0x80000`, header check `0x401132EC` (`0x7FFC0`), slot read `0x401133CE`, pool image `0x40082334`, upload `0x40082F90`, CPU #2 pool `0x4004F750` (64 MB) and its parser `0x40000D06`.
 
+## Synfact features to port
+
+SyntHack is GPL-2.0-or-later since 2026-11-04: Synfact's mods can be ported. They run on Synfact's core (hook bus, events) and OS 1.41: each port maps their hook sites to 1.42 (`tools/build/osmap.py`, as for long samples) and replaces the events with SyntHack hooks.
+
+| Synfact mod | Size | What | Fits the roadmap |
+|---|---|---|---|
+| `lfo3-st` | ~4 800 lines | a third LFO on every track | 3rd LFO `[ ]` |
+| `arp-st` | ~1 450 | Digitone-style arpeggiator on the audio tracks | Arpeggiator `[ ]` |
+| `poly-st` | ~1 900 | polyphonic play for digital and compatible analog tracks | new |
+| `recorder-st` | ~1 500 | record, trim, normalize, save samples | new (resampling) |
+| `system-info-st` | ~400 | CPU and RAM pages in SETTINGS | overlaps cpu-meter |
+| `modulation-skip-st` | ~270 | modulation destinations | new |
+| `sample-manager-st` + core pool | — | sample library in folders, pool saved per project | after the SAMPLER menu |
+
+Order: arpeggiator (smallest of the roadmap), then the third LFO. Every port: CPU cost with `tools/emu/cycles.py` before the device (the interrupt has ~5 % left with fx3).
+
 ## Next session
 
 1. Device measurement (fx3 CPU, item 1).
