@@ -37,7 +37,7 @@ LOAD = 0x4000_0400
 MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
 CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # retroazione a +0xDFFC, linea a +0xE000 (4 KB)
 TOOLS = "~/tools/m68k/root"
-CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x}u -DDM_HDR={DL.HDR:#x}u -DKS_FX3_R={DL.FX3_R:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
+CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x} -DDM_HDR={DL.HDR:#x} -DKS_FX3_R={DL.FX3_R:#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
 FS = 24000                              # il chorus lavora a 24 kHz
 DESC = 0x4022_D83C
 P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_EFD0, 0x41B9_ECD0, 0x41B9_EBD0, 0x41B9_E5D0
@@ -139,7 +139,9 @@ def txt_db(g: float) -> str:
 
 
 def tables() -> str:
-    arr = lambda t, name, vals: f"static const {t} {name}[{len(vals)}] = {{{', '.join(str(v) for v in vals)}}};\n"
+    # SIN_T e PH_A le legge solo l'assembly: globali (una static non usata dal C sparirebbe con un avviso)
+    arr = lambda t, name, vals: (f"{'' if name in ('SIN_T', 'PH_A') else 'static '}const {t} {name}[{len(vals)}] = "
+                                 f"{{{', '.join(str(v) for v in vals)}}};\n")
     txt = lambda name, vals: (f"static const char {name}[128][8] = {{" +
                               ", ".join(json.dumps(v) for v in vals) + "};\n")
     out = "/* generato da mods/fx3/make_patch.py */\n"
@@ -173,7 +175,7 @@ def build_blob() -> tuple[bytes, dict[str, int], str]:
         warn = wsl(env + f"{gcc} {CFLAGS} -c fx3.c -o fx3.o")
         if "warning" in warn:
             raise SystemExit(warn)
-        wsl(env + f"$R/usr/bin/m68k-linux-gnu-ld -N -Ttext={CODE_BASE:#x} -e fx3_run -o fx3.elf fx3.o")
+        wsl(env + f"$R/usr/bin/m68k-linux-gnu-ld -N -Ttext={CODE_BASE:#x} -e fx3_mix_hook -o fx3.elf fx3.o")
         undef = wsl(env + "$R/usr/bin/m68k-linux-gnu-nm -u fx3.elf").strip()
         if undef:
             raise SystemExit(f"simboli esterni non permessi (libgcc?): {undef}")
@@ -274,11 +276,11 @@ def main() -> None:
         "generated_by": "mods/fx3/make_patch.py",
         "symbols": {k: f"{syms[k]:#010x}" for k in (
             "fx3_trk_hook", "fx3_del_hook", "fx3_macsr", "fx3_mix_hook", "fx3_page_stub", "fx3_amp_stub",
-            "fx3_run", "fx3_dsnd", "fx3_ret", "fx3_get", "fx3_set", "fx3_p", "fx3_tgt", "fx3_cur", "fx3_moving",
+            "fx3_s", "fx3_ret", "fx3_get", "fx3_set", "fx3_p", "fx3_tgt", "fx3_cur", "fx3_moving",
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_clr", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
-            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rsnd", "fx3_rev_hook", "fx3_addsat", "fx3_in", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set",
+            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rev_hook", "fx3_addsat", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set",
             "fx3_route", "fx3_rt_key", "fx3_rt_get", "fx3_rt_draw")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,

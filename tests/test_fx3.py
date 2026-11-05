@@ -97,6 +97,15 @@ class Machine:
         self.call(SET, [0x5000_0000, IDS[name], v << 8, 1])
 
 
+def wet16(m):
+    """Uscita dell'effetto: 32 valori a 16 bit, L/R alternati (scala 16 bit, 24 kHz)."""
+    return list(struct.unpack(">32h", m.uc.mem_read(m.sym["fx3_wet"], 64)))
+
+
+def put_wet(m, vals):
+    m.uc.mem_write(m.sym["fx3_wet"], struct.pack(">32h", *vals))
+
+
 def frac(a, b):
     return ((a >> 16) * (b >> 16)) << 1
 
@@ -231,7 +240,7 @@ def test_chorus_without_depth_is_a_pure_delay(m):
     bus5 = impulse(m)
     m.put(OUT_A, [0] * 64)
     run_block(m)
-    wet = m.longs(m.sym["fx3_wet"], 32)
+    wet = wet16(m)
     y = bus5 >> 16
     k = 5 + 24 - 16
     assert wet[2 * k] == y != 0
@@ -333,7 +342,7 @@ def test_type_change_spreads_the_line_clear(m):
     assert max(costs) < full, (costs, full)                     # mai piu' di un blocco con l'effetto
     line = m.uc.mem_read(MA + 0xE000, 4096)
     assert line == bytes(4096)                                  # linea e copia vuote
-    assert m.longs(m.sym["fx3_wet"], 32) == [0] * 32            # muto durante lo svuotamento
+    assert wet16(m) == [0] * 32            # muto durante lo svuotamento
     run_block(m)
     assert block_cost(m) < 2400                                 # il phaser riparte
 
@@ -375,7 +384,7 @@ def test_bus_loop_replacement_is_the_os_loop_then_the_send(m, gain):
         wet = [rnd.randrange(-32768, 32768) for _ in range(32)]
         h0 = [rnd.randrange(-2 ** 28, 2 ** 28), rnd.randrange(-2 ** 28, 2 ** 28)]
         st = 0x5000_3800
-        m.put(m.sym["fx3_wet"], wet)
+        put_wet(m, wet)
         m.put(DLY_IN + 0x300, ana)
         m.put(DLY_IN, bus)
         m.put(st, h0)
@@ -406,7 +415,7 @@ def test_return_added_with_os_sign(m):
     h0 = [123456, -654321]
     st = 0x5000_3800
     for gain in (32767, -20000, 1):
-        m.put(m.sym["fx3_wet"], wet)
+        put_wet(m, wet)
         m.put(st, h0)
         m.put(OUT_A, [1000] * 64)
         m.call(m.sym["fx3_ret"], [m.sym["fx3_wet"], gain, OUT_A, st])
@@ -572,7 +581,7 @@ def test_send_to_delay_adds_scaled_chorus(m):
     settle(m, DEP=0, TIME=0, FDBK=0, DSND=127)
     impulse(m)
     run_block(m)
-    wet = m.longs(m.sym["fx3_wet"], 32)                        # DEL = 127: guadagno 32767
+    wet = wet16(m)                        # DEL = 127: guadagno 32767
     assert any(wet)
     m.put(DLY_IN, [7] * 64)
     run_block(m)                                                # nel delay al blocco dopo
@@ -588,13 +597,13 @@ def test_send_to_delay_with_and_without_feedback(m, fb):
     settle(m, DEP=40, TIME=20, FDBK=fb, DSND=100)
     impulse(m)
     ds = round(32767 * (100 / 127) ** 2)
-    prev, h, seen = m.longs(m.sym["fx3_wet"], 32), [0, 0], False
+    prev, h, seen = wet16(m), [0, 0], False
     for _ in range(12):                                         # TIME 20: ~68 campioni a 24 kHz
         m.put(DLY_IN, [5] * 64)
         run_block(m)
         want, h = ret_ref(prev, -ds, [5] * 64, h)
         assert m.longs(DLY_IN, 64) == want
-        prev = m.longs(m.sym["fx3_wet"], 32)
+        prev = wet16(m)
         seen |= any(prev)
     assert seen
 
@@ -783,7 +792,7 @@ def test_phaser_matches_the_model(m, fdbk):
     for _ in range(6):
         run_block(m)
         bus = m.longs(m.sym["fx3_bus"], 16)
-        assert m.longs(m.sym["fx3_wet"], 32) == phaser_ref(bus, st, ph_coef(70), fb, w)
+        assert wet16(m) == phaser_ref(bus, st, ph_coef(70), fb, w)
 
 
 def test_crusher_matches_the_model(m):
@@ -803,7 +812,7 @@ def test_crusher_matches_the_model(m):
                 cnt = 0
                 hold = s16(((b >> 16) * g) >> 8) & -(1 << sh)
             want += [hold, hold]
-        assert m.longs(m.sym["fx3_wet"], 32) == want
+        assert wet16(m) == want
         seen |= set(want)
     assert len(seen) > 4
 
@@ -819,7 +828,7 @@ def test_type_change_drops_the_old_tail(m):
     m.param("FDBK", 64)                                         # flanger senza retroazione
     run_block(m)
     run_block(m)
-    assert m.longs(m.sym["fx3_wet"], 32) == [0] * 32          # linea svuotata al cambio
+    assert wet16(m) == [0] * 32          # linea svuotata al cambio
 
 
 @pytest.mark.parametrize("t", [0, 1])
@@ -1059,7 +1068,7 @@ def test_send_to_reverb_into_its_input_bus(m):
     settle(m, DEP=40, TIME=20, RSND=100)
     impulse(m)
     rs = round(32767 * (100 / 127) ** 2)
-    prev, h, seen = m.longs(m.sym["fx3_wet"], 32), [0, 0], False
+    prev, h, seen = wet16(m), [0, 0], False
     m.uc.mem_write(REVERB, b"\x4e\x75")
     for _ in range(12):                                         # ordine dell'OS: riverbero, poi somme
         m.put(DLY_IN, [5] * 64)
@@ -1068,7 +1077,7 @@ def test_send_to_reverb_into_its_input_bus(m):
         want, h = ret_ref(prev, -rs, [5] * 64, h)
         assert m.longs(DLY_IN, 64) == want
         run_block(m)
-        prev = m.longs(m.sym["fx3_wet"], 32)
+        prev = wet16(m)
         seen |= any(prev)
     assert seen
 
