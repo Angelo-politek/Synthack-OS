@@ -144,6 +144,14 @@ SyntHack is GPL-2.0-or-later since 2026-11-04: Synfact's mods can be ported. The
 
 Order: arpeggiator (smallest of the roadmap), then the third LFO. Every port: CPU cost with `tools/emu/cycles.py` before the device (the interrupt has ~5 % left with fx3).
 
+### Port for 1.0 (2026-11-05)
+
+All four ports go into 1.0: third LFO, arpeggiator, POLY, recorder. Plan: M0 tools, M1 sfcore, M2 modulation-skip, M3 recorder, M4–M6 LFO3, M7 ARP, M8 POLY.
+
+1. `[ok]` M0: `tools/emu/cycles.py` counts no cache miss for code run from SRAM (stock calibration unchanged: the stock interrupt runs no SRAM code). `tools/build/budget.py` profiles: measured combinations, the site's sum is never below them; the CPU meter shows % of the block and turns red with the heaviest mods named. Over budget still builds.
+2. `[ok]` M1: mod area 128 → 256 KB. After boot (emulator, new project) the largest free heap block is 8 MB, 13.3 MB free in all. Registry: space for sfcore, xstore, recorder, lfo3, arp, poly; SRAM section; sfcore module table. [sfcore](../mods/sfcore): event bus, native transactions, host API 12; chained after perf-fx, cpu-meter, fx3, long-samples, sampler. Audio/native adapters only in builds that use them (`"uses"`, `"service"`). `[ ]` Device: boot, project in PLAY, perf-fx, cpu-meter.
+3. `[ok]` M2: [modulation-skip](../mods/modulation-skip), hot data in SRAM. Bit for bit equal to stock in the emulator. Skipped block −6 174 cycles, recomputed +2 594; every mod 101.7 % → 98.0 % of the block. `[ ]` Device: VERIFY build with cpu-meter for a session (`E000`), then ON.
+
 ## Next session
 
 1. Device measurement (fx3 CPU, item 1).

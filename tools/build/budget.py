@@ -47,8 +47,38 @@ AUDIO_CPU = {"fx3": 2749, "master-comp": 578, "dual-mono": 324 + 133, "xparams":
 # fastmix; sampler e sy-fm4 sopra xparams; fastmix sopra lo stock. Il sito somma questi valori.
 AUDIO_CYCLES = {"fx3": 14400, "master-comp": 3600, "dual-mono": 2400, "xparams": 2900, "sampler": 400, "sy-fm4": 0,
                 "fastmix": -3200}
+# cpu-meter (2026-11-05): lettura del timer all'ingresso e all'uscita dell'interrupt, 10 righe di codice: 735 cicli.
+# Senza, il profilo "every mod" sul sito restava sotto il misurato (20 500 contro 21 131).
+AUDIO_CYCLES["cpu-meter"] = 800
+# modulation-skip (2026-11-05): blocco saltato -6 178 cicli (-6 447 istruzioni pesate); ogni mod insieme 21 131 ->
+# 14 956. Qui un credito prudente: nei blocchi con ingressi cambiati (nota con altra velocity, LFO/parametri mossi,
+# 1 su 64 di controllo) gira lo stock piu' la registrazione (tests/test_modulation_skip.py).
+# sfcore: solo interfaccia (0); gli adattatori audio e nativi si contano nella mod che li usa ("uses").
+AUDIO_CYCLES["modulation-skip"] = -5000
+AUDIO_CPU["modulation-skip"] = -5500
 
 SEC7_ROOM = 127_695
+
+# blocco audio e carico dello stock (tools/emu/cycles.py): il sito mostra la CPU anche in % del blocco
+BLOCK = 166_666
+STOCK_LOAD = 0.89
+
+# profili: combinazioni misurate intere nell'emulatore (tools/emu/cycles.py, scena "max", CPI 1.0), cicli in piu'
+# per blocco rispetto allo stock. Il sito somma AUDIO_CYCLES delle mod scelte (dipendenze comprese): per ogni
+# profilo la somma non deve stare sotto il misurato (tests/test_cycles.py), cosi' qualunque combinazione oltre il
+# limite si vede in rosso. Le combinazioni pesanti si possono costruire: il sito avverte, non blocca.
+PROFILES = {
+    # 2026-11-05: 169 463 cicli, 101,7 % del blocco (stock a riposo 89 %)
+    "every mod but modulation-skip": {"mods": [
+        "cpu-meter", "dual-mono", "fastmix", "fx3", "kitstore", "long-samples", "master-comp", "modarea", "modarea7",
+        "perf-fx", "projstore", "readable-values", "sampler", "splash", "sy-fm4", "syn-pages", "vparams", "xparams"],
+        "cycles": 21130},
+    # 2026-11-05: 163 289 cicli, 98,0 % (blocco saltato da modulation-skip)
+    "every mod": {"mods": [
+        "cpu-meter", "dual-mono", "fastmix", "fx3", "kitstore", "long-samples", "master-comp", "modarea", "modarea7",
+        "modulation-skip", "perf-fx", "projstore", "readable-values", "sampler", "sfcore", "splash", "sy-fm4",
+        "syn-pages", "vparams", "xparams"], "cycles": 14956},
+}
 
 LIMITS = {
     # stock a riposo ~89 % del blocco (166 666 cicli): 10 000 cicli in piu' = interrupt al ~95 %. Provvisorio, da
@@ -79,7 +109,13 @@ def static(name: str) -> dict:
 
 
 def data() -> dict:
-    return {"limits": LIMITS, "mods": {n: static(n) for n in mods()}}
+    return {"limits": LIMITS, "audio": {"block": BLOCK, "stock": STOCK_LOAD}, "mods": {n: static(n) for n in mods()}}
+
+
+def shown(names: list[str]) -> int:
+    """Cicli che il sito mostra per queste mod (dipendenze comprese), come web-builder/src/load.ts."""
+    order, _ = build.resolve([REPO / "mods" / n for n in names])
+    return sum(AUDIO_CYCLES.get(build.read_spec(d)["name"], 0) for d in order)
 
 
 def main() -> int:
