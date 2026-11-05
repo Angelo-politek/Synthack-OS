@@ -54,10 +54,28 @@ def test_allocations_disjoint_and_inside():
         rows = sorted(table)
         assert all(lo <= a < b <= hi for a, b, _, _ in rows)
         assert all(x[1] <= y[0] for x, y in zip(rows, rows[1:]))
-    assert all(who in specs() for _, _, who, _ in R.MODAREA + R.SEC3_FILL)
+    assert all(who in specs() or who in R.PLANNED for _, _, who, _ in R.MODAREA + R.SEC3_FILL)
+    assert not R.PLANNED & set(specs()), "una mod scritta non e' piu' in PLANNED"
+
+
+def test_sram_inside_the_free_tails_and_disjoint():
+    rows = sorted(R.SRAM)
+    assert all(any(lo <= a < b <= hi for lo, hi in R.SRAM_FREE) for a, b, _, _ in rows)
+    assert all(x[1] <= y[0] for x, y in zip(rows, rows[1:]))
+    assert {w for *_, w, _ in rows} <= set(specs()) | R.PLANNED
+
+
+def test_sram_writes_inside_own_space():
+    """Patch che scrivono SRAM al caricamento non ce ne sono: le mod la riempiono a runtime. I simboli in SRAM che
+    una mod esporta (patch.json, "sram") devono stare nel suo spazio."""
+    for name, sp in specs().items():
+        for sym, a in sp.get("sram", {}).items():
+            a = int(a, 16)
+            assert owners(R.SRAM, a, a + 1) == {name}, f"{name}: {sym} a {a:#x} fuori dal suo spazio in SRAM"
 
 
 BOOT = MA.RAM + MA.BOOT_LIST
+SFC = MA.RAM + R.SFCORE_TABLE
 
 
 def test_mod_area_writes_inside_own_space():
@@ -68,6 +86,9 @@ def test_mod_area_writes_inside_own_space():
         elif BOOT <= ram < BOOT + 4 * MA.BOOT_N:
             assert (ram - BOOT) % 4 == 0 and n == 4
             assert R.BOOT_SLOTS.get((ram - BOOT) // 4) == name, f"{name}: posto {(ram - BOOT) // 4} della lista di avvio"
+        elif SFC <= ram < SFC + 4 * R.SFCORE_N:
+            assert (ram - SFC) % 4 == 0 and n == 4
+            assert R.SFCORE_SLOTS.get((ram - SFC) // 4) == name, f"{name}: posto {(ram - SFC) // 4} dei moduli sfcore"
         elif VP_TABLE <= ram < VP_TABLE + 12 * VP_N:
             slot = (ram - VP_TABLE) // 12
             pid = struct.unpack(">H", bytes.fromhex(p["hex"])[:2])[0]
@@ -86,6 +107,10 @@ def test_engine_area_and_boot_slots():
             if p["section"] == 3 and BOOT <= ram < BOOT + 4 * MA.BOOT_N}
     assert used == R.BOOT_SLOTS
     assert set(R.BOOT_SLOTS.values()) | {w for *_, w, _ in R.ENGINE} <= set(specs())
+    mods = {(ram - SFC) // 4: name for name, p, ram, n in patches(fixed=False)
+            if p["section"] == 3 and SFC <= ram < SFC + 4 * R.SFCORE_N}
+    assert mods == {s: w for s, w in R.SFCORE_SLOTS.items() if w in specs()}
+    assert set(R.SFCORE_SLOTS.values()) <= set(specs()) | R.PLANNED
 
 
 def test_shared_ram_disjoint():

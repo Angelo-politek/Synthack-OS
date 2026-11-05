@@ -39,7 +39,7 @@ class Machine:
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
-        uc.mem_map(0x444E_1000, 0x3_0000)
+        uc.mem_map(0x444E_1000, 0x5_0000)
         uc.mem_map(0x5000_0000, 0x4_0000)
         if hooked:
             for p in spec["patches"]:

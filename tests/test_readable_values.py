@@ -29,7 +29,7 @@ import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
 MA = modarea_layout.RAM                                    # area mod (mods/modarea)
-MA_PAGE, MA_MAP = 0x444E_1000, 0x3_0000                     # area mod e radice dell'interfaccia (0x444E2334)
+MA_PAGE, MA_MAP = 0x444E_1000, 0x5_0000                     # area mod e radice dell'interfaccia (0x444E2334)
 assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
 SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"

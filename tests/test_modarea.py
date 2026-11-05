@@ -58,7 +58,7 @@ def area_image():
 
 def test_layout_is_the_first_heap_block():
     assert (RAM, SIZE, BLOCK) == (L.RAM, L.SIZE, L.HEAP_BLOCK)
-    assert BLOCK == HEAP_LO and RAM == BLOCK + 0x10 and RAM + SIZE == BLOCK + L.HEAP_BLOCK_SIZE == BLOCK + 0x2_0000
+    assert BLOCK == HEAP_LO and RAM == BLOCK + 0x10 and RAM + SIZE == BLOCK + L.HEAP_BLOCK_SIZE == BLOCK + 0x4_0000
     assert BSS_LO < RAM < RAM + SIZE < BSS_HI
 
 
@@ -173,3 +173,16 @@ def test_first_allocation_reserves_the_area_and_no_other_block_touches_it(built)
     assert big and not big <= BLOCK < big + 0x80_0000
     assert writes == []                                         # l'allocatore non ha mai scritto nell'area
     assert bytes(uc.mem_read(RAM, len(img))) == img
+
+
+def test_heap_left_after_the_256_kb_area():
+    """Avvio con progetto nuovo (tools/emu/screens.py): l'area e' il blocco 0, la seconda meta' del pool (8 MB) resta
+    libera intera. Il registratore (port di Synfact) vuole un blocco da 8 MB per 60 s di PCM (2026-11-05: 13,3 MB
+    liberi in tutto). Sul device i campioni e un progetto grande ne usano di piu': da misurare (RAM M di cpu-meter)."""
+    sys.path.insert(0, str(ROOT / "tools" / "emu"))
+    import screens
+    ui = screens.UI([])
+    p = ui.call(ALLOC, [8 << 20])
+    assert p and HEAP_LO + (8 << 20) <= p < HEAP_HI, hex(p)
+    ui.call(FREE, [p])
+    assert ui.call(ALLOC, [(8 << 20) + 16]) == 0                 # niente di piu' grande: e' la meta' del pool

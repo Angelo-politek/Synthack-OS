@@ -8,7 +8,7 @@ Two **ColdFire MCF5441x** (V4, EMAC, no FPU, ~250 MHz). 64 KB internal SRAM at `
 | `0x40338740–0x40339000` | linker fill, **free** (used by splash, dual-mono, mod-area loader) |
 | `0x40339000–0x40347B90` | initial SRAM content, copied at boot |
 | `0x40339000–0x45565490` | BSS, **zeroed at boot** |
-| `0x444E38C0–0x454E38C0` | OS heap (buddy allocator `0x4010350C`, free `0x40103712`, 16 MB, 16-byte units); first 128 KB block = **mod area** |
+| `0x444E38C0–0x454E38C0` | OS heap (buddy allocator `0x4010350C`, free `0x40103712`, 16 MB, 16-byte units); first 256 KB block = **mod area** |
 | `0x45565490–0x48000000` | no code or data reference, **but used at runtime** (sample loading writes all over it, #4) |
 | `0x48000000` | boot stack top |
 | `0x4D570000…`, `0x4FC00000…` | delay / reverb lines |

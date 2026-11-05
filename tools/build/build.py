@@ -22,6 +22,9 @@ Patch accodate ("append": true, solo "hex"): byte NUOVI oltre la fine della sezi
 mod, vedi mods/modarea); lo spazio tra la fine stock e "addr" viene riempito di zeri. Non hanno
 impronta (non sostituiscono byte Elektron). Nella sezione 7 solo con modarea7 (area dei motori).
 
+Servizi: una patch con "service": "sfcore:native" si applica solo se una mod della build dichiara
+"uses": ["sfcore:native"] (adattatori di sfcore installati solo se qualcuno li usa: niente costo altrimenti).
+
 Dipendenze: una mod dichiara "requires": ["modarea", ...]. Le mod richieste e non indicate vengono
 aggiunte da sole (cercate tra le cartelle indicate, poi in mods/), prima di chi le richiede.
 
@@ -147,8 +150,20 @@ def named_splash(spec: dict, name: str) -> dict:
     return {**spec, "patches": [{**first, "hex": data.hex()}, *spec["patches"][1:]]}
 
 
-def load_mod(moddir: Path, os_version: str, splash_name: str = "") -> list[Patch]:
+def services(moddirs: list[Path]) -> set[str]:
+    """Servizi chiesti dalle mod della build ("uses": ["sfcore:native", ...])."""
+    return {u for d in moddirs for u in read_spec(d).get("uses", [])}
+
+
+def active(p: dict, uses: set[str]) -> bool:
+    """Una patch con "service" si applica solo se una mod della build usa quel servizio (adattatori di sfcore)."""
+    return "service" not in p or p["service"] in uses
+
+
+def load_mod(moddir: Path, os_version: str, splash_name: str = "", uses: set[str] | None = None) -> list[Patch]:
     spec = read_spec(moddir)
+    if uses is not None:
+        spec = {**spec, "patches": [p for p in spec["patches"] if active(p, uses)]}
     name = spec["name"]
     if name == "splash" and render.clean_name(splash_name):
         spec = named_splash(spec, splash_name)
@@ -277,7 +292,8 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print, splash_name: s
     moddirs, added = resolve(moddirs)
     if added:
         log(f"  dipendenze aggiunte: {', '.join(added)}")
-    patches = [p for d in moddirs for p in load_mod(d, version, splash_name)]
+    uses = services(moddirs)
+    patches = [p for d in moddirs for p in load_mod(d, version, splash_name, uses)]
     needed = sorted({p.section for p in patches})
 
     with tempfile.TemporaryDirectory(prefix="syntakt-build-") as tmp:

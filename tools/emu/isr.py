@@ -57,8 +57,8 @@ class Stats:
 
 
 class Isr:
-    def __init__(self, mods=(), setup=None):
-        self.ui = screens.UI(list(mods), setup=setup)
+    def __init__(self, mods=(), setup=None, uses=(), extra=None):
+        self.ui = screens.UI(list(mods), setup=setup, uses=uses, extra=extra)
         self.uc = self.ui.uc
         self.sym = self.ui.sym
         self.mods = set(self.ui.mods)

@@ -95,8 +95,9 @@ class EmuError(RuntimeError):
 
 
 class UI:
-    def __init__(self, mods: list[str] = (), sec3: bytes | None = None, setup=None):
-        """setup(ui): chiamata prima di costruire la vista (impostazioni lette dal costruttore)."""
+    def __init__(self, mods: list[str] = (), sec3: bytes | None = None, setup=None, uses=(), extra=None):
+        """setup(ui): chiamata prima di costruire la vista (impostazioni lette dal costruttore). uses: servizi in piu'
+        (patch con "service", come se una mod li usasse). extra(uc): prima dell'avvio (moduli di prova dei test)."""
         self.mods = with_deps(list(mods))
         self.setup = setup
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
@@ -105,14 +106,17 @@ class UI:
             uc.mem_map(base, size)
         uc.mem_write(LOAD, sec3 or section3())
         self.sym: dict[str, int] = {}
-        for m in self.mods:
-            spec = json.loads((REPO / "mods" / m / "patch.json").read_text(encoding="utf-8"))
+        specs = [json.loads((REPO / "mods" / m / "patch.json").read_text(encoding="utf-8")) for m in self.mods]
+        self.uses = {u for sp in specs for u in sp.get("uses", [])} | set(uses)
+        for spec in specs:
             for p in spec["patches"]:
-                if p["section"] != 3:                   # sezione 7: CPU #2, non qui
+                if p["section"] != 3 or p.get("service", None) not in self.uses | {None}:   # sezione 7: CPU #2
                     continue
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
             self.sym.update({k: int(v, 16) for k, v in spec.get("symbols", {}).items()})
         uc.mem_write(RET, b"\x4e\x75")
+        if extra:
+            extra(uc)
         self.ring: collections.deque[int] = collections.deque(maxlen=32)
         uc.hook_add(UC_HOOK_BLOCK, lambda _uc, a, _s, _d: self.ring.append(a))
         uc.hook_add(UC_HOOK_MEM_UNMAPPED, self._unmapped)
@@ -165,6 +169,8 @@ class UI:
             self.setup(self)
         self.view = self.call(MALLOC, [PAGES_VIEW_SIZE])
         self.call(PAGES_VIEW, [self.view], count=200_000_000)
+        if "sfcore_bind" in self.sym:                   # sfcore: moduli legati al primo tick dell'interfaccia
+            self.call(self.sym["sfcore_bind"])
 
     # ------------------------------------------------------------------ viste
     def tab(self, name: str) -> int:

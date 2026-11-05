@@ -33,14 +33,40 @@ MODAREA = [
     (0x7420, 0x7E00, "syn-pages", "machine table (synpages_layout.TABLE), SRC view: pages, titles, drawing"),
     (0x7E00, 0x8000, "vparams", "code"),
     (0x8000, 0x8180, "vparams", "table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS)"),
-    # 0x8180..0xA000: free (sampler moved to +0x18000 on 2026-11-04)
+    (0x8180, 0xA000, "modulation-skip", "code (Synfact port), shadow of the machine data; hot data in SRAM (SRAM)"),
     (0xA000, 0xDFF0, "fx3", "code and data"),
     (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
     (0xF000, 0xFFF0, "fastmix", "code and data: faster OS audio routines"),
     (0xFFF0, 0x18000, "long-samples", "Synfact HZFS storage, plan and upload of long samples (GPL-2.0-or-later)"),
     (0x18000, 0x1B000, "sampler", "main CPU side: pages, sample menu, one list of samples, knob graphics, waveform, value texts, tempo"),
-    # 0x1B000..0x1FFF0: free
+    (0x1B000, 0x1B020, "sfcore", "module table: 8 pointers to Synfact module descriptors, written by each port (SFCORE_SLOTS)"),
+    (0x1B040, 0x1FFF0, "sfcore", "Synfact core subset: event bus, adapters, native transactions, host API (GPL-2.0-or-later)"),
+    # 256 KB area from 2026-11-05: the Synfact ports, claimed before their code exists (port plan)
+    (0x20000, 0x26000, "recorder", "planned: code and small data (PCM and large state in the OS heap)"),
+    (0x26000, 0x2A000, "lfo3", "planned: engine (source of the SRAM copy), page, actions"),
+    (0x2A000, 0x32000, "xstore", "planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks)"),
+    (0x32000, 0x38000, "arp", "planned: arpeggiator (cells in the OS heap)"),
+    (0x38000, 0x3E000, "poly", "planned: POLY with its native kernels"),
+    # 0x3E000..0x3FFF0: free
 ]
+
+# ---- mod con spazio prenotato ma non ancora scritte (port di Synfact, piano 2026-11-05): ammesse come proprietarie
+PLANNED = {"recorder", "lfo3", "xstore", "arp", "poly"}
+
+# ---- tabella dei moduli di sfcore (area mod + SFCORE_TABLE): posto -> mod. sfcore li inizializza in quest'ordine.
+SFCORE_TABLE, SFCORE_N = 0x1B000, 8
+SFCORE_SLOTS = {0: "modulation-skip", 1: "xstore", 2: "recorder", 3: "lfo3", 4: "arp", 5: "poly"}
+
+# ---- SRAM interna della CPU #1 (0x80000000): code che l'avvio stock azzera (0x4000045C) e che nessun operando
+# assoluto della 1.42 usa (tests/test_sfcore.py controlla che l'OS non le legga ne' scriva). Dati e codice qui non
+# mancano mai la cache (tools/emu/cycles.py). Fine esclusa.
+SRAM = [
+    (0x8000_7330, 0x8000_7780, "lfo3", "planned: copy of the LFO3 kernel (render.s, 1 088 B)"),
+    (0x8000_7780, 0x8000_8000, "modulation-skip", "destinations: address, value before and after (6 B each)"),
+    (0x8000_F860, 0x8000_FC20, "lfo3", "planned: LFO3 state, RNG and parameter bank (944 B)"),
+    (0x8000_FC20, 0x8001_0000, "modulation-skip", "state, input tables, destination bitmap"),
+]
+SRAM_FREE = [(0x8000_7330, 0x8000_8000), (0x8000_F860, 0x8001_0000)]
 
 # ---- sezione 3, riempimento del linker 0x40339740..0x4033A000 (byte a zero non usati dall'OS)
 SEC3_FREE = (0x4033_9740, 0x4033_A000)
@@ -63,7 +89,7 @@ ENGINE = [
 ]
 
 # ---- lista di avvio dell'area mod: posto -> mod (modarea_layout.boot_slot)
-BOOT_SLOTS = {0: "sy-fm4", 1: "sampler", 2: "xparams"}
+BOOT_SLOTS = {0: "sy-fm4", 1: "sampler", 2: "xparams", 3: "sfcore"}
 
 # ---- RAM condivisa tra le CPU: offset (CPU #1 a 0x10000000 + offset, CPU #2 a offset). Fine esclusa.
 SHARED_RAM = [
@@ -146,6 +172,14 @@ def markdown() -> str:
     L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in sorted(rows)]
     L += ["", f"Boot list (`+{modarea_layout.BOOT_LIST:#06x}`, {modarea_layout.BOOT_N} pointers called after unpacking): "
           + ", ".join(f"slot {s} {who}" for s, who in sorted(BOOT_SLOTS.items())) + ".",
+          "", f"sfcore module table (`+{SFCORE_TABLE:#06x}`, {SFCORE_N} pointers, initialized in this order): "
+          + ", ".join(f"slot {s} {who}" for s, who in sorted(SFCORE_SLOTS.items())) + ".",
+          "", "Planned (space claimed, code not written yet): " + ", ".join(sorted(PLANNED)) + ".",
+          "", "## SRAM (CPU #1, internal: never a cache miss)", "",
+          "Free tails that the stock boot zeroes: " + ", ".join(f"`{a:#010x}–{b:#010x}`" for a, b in SRAM_FREE) + ".",
+          "", "| From | To | Mod | Use |", "|---|---|---|---|"]
+    L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in SRAM]
+    L += ["",
           "", "## Engine area (CPU #2, `mods/modarea7`, RAM `0x47000000`, offsets)", "",
           "| From | To | Mod | Use |", "|---|---|---|---|"]
     L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in sorted(ENGINE)]
