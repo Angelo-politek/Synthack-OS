@@ -341,6 +341,19 @@ int sm_mgr(void *dst, const void *src, int op) {
 
 /* ---- the waveform */
 
+/* The sample whose waveform the SYN pages draw: the SAMP value the page shows (the sound's, or a held trig's lock),
+ * read when the OS asks for the page's knobs before drawing (sm_record). Not the value the sequencer plays: with SAMP
+ * locked on some trigs that one changes trig by trig, the knob graphic of SAMP and the graphics of STRT/LEN asked
+ * the voice CPU for two samples in each frame, each request restarted the other's waveform, and every restart made
+ * the page draw again (sm_block): the UI drew without a pause until the lock was removed. One sample per frame now. */
+#define PARAM_VALUE ((u32 (*)(void *, u32, uint8_t *))0x40039160u)   /* ParameterPageView::getParamValueToShow */
+static u32 wave_slot;
+
+static void shown_sample(void *view) {
+    uint8_t locked;
+    wave_slot = clampi((s32)PARAM_VALUE(view, ID_SAMP, &locked), 0x7F00) >> 8;
+}
+
 /* ask the voice CPU for slot's waveform; 1 once all of it is there */
 static int wave_ready(u32 slot) {
     WAVE_REQ = (uint16_t)(slot + 1);
@@ -464,7 +477,7 @@ void sm_gfx(const void *fn, s32 val, void *bm, s32 x, s32 y) {
         stock_gfx(ID_STOCK_BR, val, bm, x, y);
         return;
     case ID_SAMP:
-        if (wave_ready(i)) {
+        if (i == wave_slot && wave_ready(i)) {
             part_t all = {0, 0x7800, -1, 0, 0};
             draw_wave(bm, x + 1, top + 1, 24, 15, &all, 0);
             return;
@@ -474,7 +487,7 @@ void sm_gfx(const void *fn, s32 val, void *bm, s32 x, s32 y) {
     case ID_P6:
     case ID_P7:
         if ((ty == M_ONESHOT || ty == M_REPITCH) && !(ty == M_REPITCH && id == ID_P7) &&
-            wave_ready(clampi(value(t, LIX_SAMP) >> 8, 127))) {
+            wave_ready(wave_slot)) {
             part_t p = part_of(t);
             if (id != ID_P7)
                 p.l = -1;
@@ -505,6 +518,8 @@ static const u32 page2[9] = {0, 0, 0, 0, ID_P5, ID_P6, ID_P7, ID_H, 10};
 static u32 sm_record(void *view, u32 page, u32 knob) {
     int t = track_type();
     fit_knobs(t);
+    if (knob == 0)
+        shown_sample(view);
     if (page == 1) {
         set_row(ID_H, &xpar[t], LIX_X);
         return knob < 9 ? page2[knob] : 0;
@@ -538,7 +553,7 @@ static const char *title_of(u32 i) {
 static const char *sm_title(void *view, u32 page) {
     (void)view;
     s32 t = active_track();
-    const char *l = page == 1 && t >= 0 ? title_of((u32)clampi(value(t, LIX_SAMP) >> 8, 127)) : 0;
+    const char *l = page == 1 && t >= 0 ? title_of(wave_slot) : 0;
     return l ? l : titles[track_type()][page == 1];
 }
 
@@ -578,7 +593,8 @@ static void menu_line(void *bm, int row, u32 i, int picked) {
 }
 
 static void menu_draw(void *bm, s32 t) {
-    s32 n = (s32)samples_count(), cur = clampi(value(t, LIX_SAMP) >> 8, 127);
+    s32 n = (s32)samples_count(), cur = (s32)wave_slot;
+    (void)t;
     s32 first = cur - MENU_ROWS / 2;
     if (first > n - MENU_ROWS)
         first = n - MENU_ROWS;
@@ -610,7 +626,7 @@ static void sm_draw(void *view, void *bm, u32 page) {
     if (page != 1 || t < 0)
         return;
     sp_clear(bm, 16, WAVE_TOP, 128, 37);
-    if (wave_ready(clampi(value(t, LIX_SAMP) >> 8, 127))) {
+    if (wave_ready(wave_slot)) {
         part_t p = part_of(t);
         draw_wave(bm, 16, WAVE_TOP, 112, WAVE_H, &p, 1);
     } else {

@@ -60,6 +60,13 @@ class SynView:
     def set_value(self, track: int, lix: int, value: int) -> None:
         self.ui.put(SEQ_VALUES + 2 * (0xE + track * 0x47 + lix), ">H", value)
 
+    def set_sound_value(self, track: int, lix: int, value: int) -> None:
+        """Value of the track's sound (data + 20 + 2 * lix): the one the page shows."""
+        ui = self.ui
+        sound = ui.call(0x4000_F04C, [ui.project + 304, track])
+        data = ui.call(ui.long(ui.long(sound) + 40), [sound])
+        ui.put(data + 20 + 2 * lix, ">H", value)
+
     def title(self, fn: int | None = None) -> bytes:
         """Slot 19: std::string per valore, costruita all'indirizzo in a0 e restituita in d0; la stringa (GCC) e'
         un puntatore ai caratteri."""

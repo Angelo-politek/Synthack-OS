@@ -622,7 +622,9 @@ def test_syn_pages():
     lix = lambda: struct.unpack(">I", ui.uc.mem_read(DESC + 52 * 503 + 4, 4))[0]   # noqa: E731
     assert v.knobs() == [497, 498, 499, 504, 501, 502, 500, 503, 10] and v.pages() == 2
     assert lix() == 0x19 and short(ui, 503) == "LEV" and v.title() == b"SAMPLE 1/2"
-    v.set_value(0, 0x15, 5 << 8)                                   # SAMP 6
+    sound = ui.call(0x4000_F04C, [ui.project + 304, 0])            # SAMP 6 in the sound (the value shown)
+    data = ui.call(ui.long(ui.long(sound) + 40), [sound])
+    ui.put(data + 20 + 2 * 0x15, ">H", 5 << 8)
     v.page(1)
     assert v.knobs() == [0, 0, 0, 0, 501, 502, 500, 503, 10]
     assert lix() == 0x36 and short(ui, 503) == "XFAD" and v.title() == b"SAMPLE 2/2"   # H: il parametro della machine
@@ -789,6 +791,41 @@ def test_project_list_of_long_samples(engines):
         e.uc.mem_write(at, bytes(8))
 
 
+def test_samp_lock_asks_for_one_waveform():
+    """Device bug (REPITCH, long samples only, SYN 1/2 open, SAMP locked on some trigs): UI and audio lagged until the
+    lock was removed. The knob graphic of SAMP asked the voice CPU for the waveform of the value shown, those of STRT
+    and LEN for the value the sequencer plays: two samples per frame, each request restarted the other's waveform and
+    every restart made the page draw again (sm_block), without end. Now every graphic of a frame asks for the shown
+    sample. Model of the voice CPU (engine/syn.c, wave_step): a new request starts the waveform again."""
+    from syn_view import SynView
+    from unicorn import UC_HOOK_MEM_WRITE
+    v = SynView(["long-samples", "sampler"], machine=44)
+    ui = v.ui
+    ui.put(0x4D84_F2C1, ">I", 256)                                 # stock image without samples
+    tab = ui.sym["ls_table"]
+    ui.put(tab, ">II", 0x5348_4C53, 2)
+    for i in range(2):
+        ui.put(tab + 8 + 8 * i, ">II", 0x4210_0000 + i * 0x10_0000, (20 + i) * 48000)
+    v.set_value(0, 0x1A, 2 << 8)                                   # REPITCH
+    reqs = []
+    ui.uc.hook_add(UC_HOOK_MEM_WRITE, lambda uc, a, addr, size, val, d: reqs.append(val),
+                   begin=0x1000_05B0, end=0x1000_05B1)
+    restarts, slot = 0, None
+    for page in (0, 1):
+        v.page(page)
+        v.highlight(None)
+        for f in range(12):
+            v.set_value(0, 0x15, (f // 2 % 2) << 8)                # SAMP 1 / SAMP 2 (locked) trig by trig
+            reqs.clear()
+            v.frame()
+            assert set(reqs) == {1}, (page, f, reqs)               # the shown sample (the sound's: SAMP 1)
+            for r in reqs:
+                if r != slot:
+                    slot, restarts = r, restarts + 1
+            ui.put(0x1000_05B4, ">HH", slot, 112)                  # the voice CPU's waveform, done
+    assert restarts == 1
+
+
 def test_sample_menu():
     """Menu dei sample: girando D (SAMP) sulla pagina 1/2 un riquadro elenca gli slot intorno al valore, stock 1..64
     poi i sample lunghi (mods/long-samples, header LSHD) con nome e durata, e la forma d'onda; sparisce col valore
@@ -803,7 +840,7 @@ def test_sample_menu():
         ui.put(tab + 8 + 8 * i, ">II", 0x4010_0000 + i * 0x10_0000, (i + 5) * 48000)
         ui.uc.mem_write(names + 16 * i, f"SAMPLE {i}".encode().ljust(16, b"\0"))
     v.page(0)
-    v.set_value(0, 0x15, 1 << 8)                                   # SAMP 2 (nessuno stock: il secondo lungo)
+    v.set_sound_value(0, 0x15, 1 << 8)                             # SAMP 2 (nessuno stock: il secondo lungo)
     v.highlight(None)
     plain = screens_pixels(v.frame())
     v.highlight(3)
@@ -811,7 +848,7 @@ def test_sample_menu():
     assert menu != plain
     assert all(menu[y][127] for y in range(11, 64))                # il riquadro
     assert sum(menu[y][x] for y in range(12, 43) for x in range(22, 126)) > 300     # le righe
-    v.set_value(0, 0x15, 4 << 8)                                   # SAMP 5: la lista scorre
+    v.set_sound_value(0, 0x15, 4 << 8)                             # SAMP 5: la lista scorre
     assert screens_pixels(v.frame()) != menu
     v.highlight(None)
     assert screens_pixels(v.frame()) != menu                       # senza giro: la pagina
