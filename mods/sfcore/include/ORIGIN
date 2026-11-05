@@ -1,0 +1,3 @@
+Synfact (https://github.com/GSM1980/synfact-dev), commit 1a6d0c74469db4c30423be29c90e0b07ba7f8003, 2026-11-03:
+elekloader/sdk/include/syntakt/*.h, unchanged. GPL-2.0-or-later, GSM1980 and contributors, on elekloader by irpina.
+The 1.41 addresses in machines.h are Synfact's SMZ services: sfcore does not provide them.

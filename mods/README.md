@@ -13,7 +13,9 @@ One folder per mod. Target: Syntakt OS 1.42.
 | [long-samples](long-samples) | feature | Samples longer than 5 s: Synfact's HZFS storage on the eMMC, sent to the voice CPU at boot; the SAMPLER plays them in one list with the stock samples | modarea |
 | [sy-fm4](sy-fm4) | machine | SY TONE becomes a 4-operator FM machine (Rxuting, MIT); three SYN pages, algorithm drawn on 3/3; ALGO 0 = SY TONE | modarea, modarea7, syn-pages, xparams, fastmix |
 | [sampler](sampler) | machine | SP TWINSHOT becomes the Digitakt's sample machines: ONESHOT, WERP, REPITCH, SLICE, four machines in the menu; SYN 1/2 as the Digitakt's, 2/2 waveform and one parameter of each machine | modarea, modarea7, syn-pages, xparams |
-| [modarea](modarea) | infra | Unpacks the compressed mod code at boot into a 128 KB block of the OS heap; boot list for setup functions | — |
+| [modulation-skip](modulation-skip) | feature | Skips the stock modulation matrix in audio blocks where it would write the same values (Synfact port, data in SRAM) | modarea, sfcore |
+| [sfcore](sfcore) | infra | Synfact core subset for its ported modules: module table, event bus, native transactions, host API 12 | modarea |
+| [modarea](modarea) | infra | Unpacks the compressed mod code at boot into a 256 KB block of the OS heap; boot list for setup functions | — |
 | [modarea7](modarea7) | infra | Room for machine code on the sound engine (CPU #2): section 7 travels compressed | — |
 | [syn-pages](syn-pages) | infra | SYN pages of its own for a machine: up to 4 pages, names, drawing | modarea |
 | [xparams](xparams) | infra | Eight more parameters per track (logical indices 0x36–0x3D): saved, p-lockable, sent to the voice CPU | modarea |

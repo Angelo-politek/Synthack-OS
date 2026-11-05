@@ -25,12 +25,14 @@ export interface PatchSpec {
   append?: boolean;
   hex?: string;
   ascii?: string;
+  service?: string;        // applied only if a mod of the build uses it (sfcore adapters)
 }
 
 export interface ModSpec {
   name: string;
   os?: string;
   requires?: string[];
+  uses?: string[];
   layout?: Record<string, unknown>;
   layout7?: Record<string, string>;
   patches: PatchSpec[];
@@ -99,10 +101,15 @@ export function resolve(names: string[], specs: Record<string, ModSpec>): { orde
   return { order, added };
 }
 
-function loadMod(spec: ModSpec, os: string): Patch[] {
+/** Services the mods of a build ask for ("uses"): patches with that "service" are applied, the others skipped. */
+export function services(specs: ModSpec[]): Set<string> {
+  return new Set(specs.flatMap((s) => s.uses ?? []));
+}
+
+function loadMod(spec: ModSpec, os: string, uses: Set<string>): Patch[] {
   const name = spec.name;
   if (spec.os !== os) throw new BuildError(`${name}: written for OS ${spec.os}, not ${os}`);
-  return spec.patches.map((p, i) => {
+  return spec.patches.filter((p) => p.service === undefined || uses.has(p.service)).map((p, i) => {
     let data: Uint8Array;
     if (p.ascii !== undefined) data = new TextEncoder().encode(p.ascii);
     else if (p.hex !== undefined) data = fromHex(p.hex);
@@ -228,7 +235,8 @@ export function build(stock: Uint8Array, mods: string[], specs: Record<string, M
   if (added.length) log.push(`dependencies added: ${added.join(", ")}`);
   const name = cleanName(opts.splashName ?? "");
   const modSpecs = order.map((n) => (n === "splash" ? namedSplash(specs[n], name) : specs[n]));
-  const patches = modSpecs.flatMap((s) => loadMod(s, version));
+  const uses = services(modSpecs);
+  const patches = modSpecs.flatMap((s) => loadMod(s, version, uses));
   const needed = [...new Set(patches.map((p) => p.section))].sort((a, b) => a - b);
 
   onProgress({ stage: "patch" });

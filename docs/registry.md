@@ -19,15 +19,40 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x7420` | `0x7e00` | syn-pages | machine table (synpages_layout.TABLE), SRC view: pages, titles, drawing |
 | `0x7e00` | `0x8000` | vparams | code |
 | `0x8000` | `0x8180` | vparams | table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS) |
-| `0x8180` | `0xa000` | **free** |  |
+| `0x8180` | `0xa000` | modulation-skip | code (Synfact port), shadow of the machine data; hot data in SRAM (SRAM) |
 | `0xa000` | `0xdff0` | fx3 | code and data |
 | `0xdff0` | `0xf000` | fx3 | delay line (+0xE000, 4 KB); +0xDFF0..+0xE000 unused since 2026-11-05 |
 | `0xf000` | `0xfff0` | fastmix | code and data: faster OS audio routines |
 | `0xfff0` | `0x00018000` | long-samples | Synfact HZFS storage, plan and upload of long samples (GPL-2.0-or-later) |
 | `0x00018000` | `0x0001b000` | sampler | main CPU side: pages, sample menu, one list of samples, knob graphics, waveform, value texts, tempo |
-| `0x0001b000` | `0x0001fff0` | **free** |  |
+| `0x0001b000` | `0x0001b020` | sfcore | module table: 8 pointers to Synfact module descriptors, written by each port (SFCORE_SLOTS) |
+| `0x0001b020` | `0x0001b040` | **free** |  |
+| `0x0001b040` | `0x0001fff0` | sfcore | Synfact core subset: event bus, adapters, native transactions, host API (GPL-2.0-or-later) |
+| `0x0001fff0` | `0x00020000` | **free** |  |
+| `0x00020000` | `0x00026000` | recorder | planned: code and small data (PCM and large state in the OS heap) |
+| `0x00026000` | `0x0002a000` | lfo3 | planned: engine (source of the SRAM copy), page, actions |
+| `0x0002a000` | `0x00032000` | xstore | planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks) |
+| `0x00032000` | `0x00038000` | arp | planned: arpeggiator (cells in the OS heap) |
+| `0x00038000` | `0x0003e000` | poly | planned: POLY with its native kernels |
+| `0x0003e000` | `0x0003fff0` | **free** |  |
 
-Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams.
+Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams, slot 3 sfcore.
+
+sfcore module table (`+0x1b000`, 8 pointers, initialized in this order): slot 0 modulation-skip, slot 1 xstore, slot 2 recorder, slot 3 lfo3, slot 4 arp, slot 5 poly.
+
+Planned (space claimed, code not written yet): arp, lfo3, poly, recorder, xstore.
+
+## SRAM (CPU #1, internal: never a cache miss)
+
+Free tails that the stock boot zeroes: `0x80007330–0x80008000`, `0x8000f860–0x80010000`.
+
+| From | To | Mod | Use |
+|---|---|---|---|
+| `0x80007330` | `0x80007780` | lfo3 | planned: copy of the LFO3 kernel (render.s, 1 088 B) |
+| `0x80007780` | `0x80008000` | modulation-skip | destinations: address, value before and after (6 B each) |
+| `0x8000f860` | `0x8000fc20` | lfo3 | planned: LFO3 state, RNG and parameter bank (944 B) |
+| `0x8000fc20` | `0x80010000` | modulation-skip | state, input tables, destination bitmap |
+
 
 ## Engine area (CPU #2, `mods/modarea7`, RAM `0x47000000`, offsets)
 

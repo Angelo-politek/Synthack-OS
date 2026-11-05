@@ -9,6 +9,7 @@
   "credits": "Synfact (GSM1980), elekloader (irpina)",
   "generated_by": "mods/long-samples/make_patch.py",
   "symbols": {
+    "core_crc_update": "0x444f61ec",
     "core_fs_route": "0x444f4926",
     "core_fs_write": "0x444f4970",
     "core_high_check_header": "0x444f62c2",

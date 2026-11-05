@@ -158,7 +158,7 @@ function update(): void {
   } catch (e) {
     deps = e instanceof Error ? e.message : String(e);
   }
-  updateLoad($("load"), order, order.filter((n) => !measured(n)).map(titleOf));
+  updateLoad($("load"), order, order.filter((n) => !measured(n)).map(titleOf), titleOf);
   $("deps").textContent = deps;
   const list = mods.map(titleOf);
   $("summary").textContent = `Boot splash${list.length ? " + " + list.join(", ") : " only (no mods selected)"}.`;

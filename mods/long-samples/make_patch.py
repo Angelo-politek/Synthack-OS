@@ -108,7 +108,7 @@ def main() -> None:
         "license": "GPL-2.0-or-later", "credits": "Synfact (GSM1980), elekloader (irpina)",
         "generated_by": "mods/long-samples/make_patch.py",
         "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items())
-                    if k.startswith(("ls_", "core_hzfs", "core_high", "core_fs_", "core_sample"))},
+                    if k.startswith(("ls_", "core_hzfs", "core_high", "core_fs_", "core_sample", "core_crc"))},
         "patches": patches,
     }
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

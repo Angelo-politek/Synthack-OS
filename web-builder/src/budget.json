@@ -1,14 +1,18 @@
 {
   "limits": {
     "cpu": 10000,
-    "modarea": 131056,
+    "modarea": 262128,
     "kit": 36,
     "project": 256,
     "sec7": 127695
   },
+  "audio": {
+    "block": 166666,
+    "stock": 0.89
+  },
   "mods": {
     "cpu-meter": {
-      "cpu": 0,
+      "cpu": 800,
       "modarea": 768,
       "kit": 0,
       "project": 0,
@@ -77,6 +81,13 @@
       "project": 0,
       "sec7": 0
     },
+    "modulation-skip": {
+      "cpu": -5000,
+      "modarea": 7808,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
     "perf-fx": {
       "cpu": 0,
       "modarea": 4096,
@@ -104,6 +115,13 @@
       "kit": 0,
       "project": 0,
       "sec7": 12996
+    },
+    "sfcore": {
+      "cpu": 0,
+      "modarea": 20432,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
     },
     "splash": {
       "cpu": 0,

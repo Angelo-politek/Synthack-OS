@@ -7,7 +7,9 @@ fuori cache. Modello (MCF54418, core V4e, configurazione dell'OS a 0x40000554):
 - CACR = 0xA50CE100: istruzioni in cache ovunque (IDCM = 0); dati fuori cache per default (DDCM = 10,
   inhibited precise); ACR0 = 0x4007E020: dati in cache (copyback) solo in 0x40000000-0x47FFFFFF.
   Le linee di delay e riverbero dell'OS (0x4D570000, 0x4FC00000) sono quindi fuori cache;
-- SRAM interna 0x80000000-0x8000FFFF: nessuna mancata;
+- SRAM interna 0x80000000-0x8000FFFF: nessuna mancata, ne' per i dati ne' per le istruzioni (il codice copiato in
+  SRAM, come il kernel di LFO3 di Synfact, non passa dalla cache istruzioni: dal 2026-11-05; fino ad allora contava
+  come codice in DDR);
 - RAM condivisa 0x10000000 e periferiche 0xFC000000: fuori cache, IO cicli per accesso (stima);
 - 0x4FE00000-0x4FFFFFFF: impalcatura dell'emulatore (pila, bitmap), non conta.
 
@@ -37,6 +39,7 @@ BLOCK = CLOCK * 32 // 48_000          # cicli in un blocco da 32 campioni: 166 6
 STOCK_LOAD = 0.89                     # misurato sul dispositivo, OS stock a riposo
 IO = 10                               # cicli per accesso alla RAM condivisa o alle periferiche (stima)
 CPIS = (1.0, 1.5)                     # estremi plausibili per il CPI senza mancate
+SRAM_LO, SRAM_HI = 0x8000_0000, 0x8001_0000   # SRAM interna: niente mancate, dati o istruzioni
 
 
 class Cache:
@@ -100,7 +103,7 @@ class Cycles:
         m.uc.hook_add(UC_HOOK_MEM_READ | UC_HOOK_MEM_WRITE, self._data)
 
     def _fetch(self, uc, pc, size, _):
-        if self.on:
+        if self.on and not SRAM_LO <= pc < SRAM_HI:
             self.ic.touch(pc)
             if (pc + size - 1) >> 4 != pc >> 4:
                 self.ic.touch(pc + size - 1)

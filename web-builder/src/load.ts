@@ -2,6 +2,7 @@
 // comprese). Dati da tools/build/budget.py: misure nell'emulatore e spazio prenotato nel registro.
 
 import budget from "./budget.json";
+import { audioLoad, overBudget, type Budget } from "./cpu.ts";
 
 interface Cost { cpu: number; modarea: number; kit: number; project: number; sec7: number }
 type Key = "cpu" | "modarea" | "kit" | "sec7";
@@ -10,11 +11,12 @@ const LIMITS = budget.limits as Record<Key, number>;
 const COSTS = budget.mods as Record<string, Cost>;
 
 const METERS: { key: Key; label: string; kb: boolean; over: string; note: string }[] = [
-  { key: "cpu", label: "Audio CPU", kb: false, over: "Audio CPU above ~10 000 extra cycles per block: the UI is likely to lag.",
+  { key: "cpu", label: "Audio CPU", kb: false, over: "",
     note: "Extra CPU cycles per audio block on CPU #1, worst case, cache misses included (estimate). "
-      + "The stock OS uses ~89 % of each block; 10 000 cycles more is ~95 %. Below zero: faster than the stock OS." },
+      + "The stock OS uses ~89 % of each block; 10 000 cycles more is ~95 %. Below zero: faster than the stock OS. "
+      + "Heavier combinations still build: the meter turns red." },
   { key: "modarea", label: "Mod RAM", kb: true, over: "Mod RAM full: these mods don't fit together.",
-    note: "RAM reserved for mod code and data (64 KB)." },
+    note: "RAM reserved for mod code and data (256 KB)." },
   { key: "kit", label: "Kit words", kb: false, over: "Kit words full: these mods don't fit together.",
     note: "Spare words saved with the kit (kitstore)." },
   { key: "sec7", label: "Engine code", kb: true, over: "Engine code full: these machines don't fit together.",
@@ -39,7 +41,8 @@ export function renderLoad(box: HTMLElement): void {
 }
 
 /** names: mod da costruire, dipendenze comprese; unknown: mod caricate in locale, senza misure. */
-export function updateLoad(box: HTMLElement, names: string[], unknown: string[]): void {
+export function updateLoad(box: HTMLElement, names: string[], unknown: string[], title?: (name: string) => string): void {
+  const cpu = audioLoad(budget as Budget, names);
   const sum = (k: Key): number => names.reduce((s, n) => s + (COSTS[n]?.[k] ?? 0), 0);
   for (const m of METERS) {
     const row = box.querySelector<HTMLElement>(`.meter[data-key="${m.key}"]`)!;
@@ -49,9 +52,10 @@ export function updateLoad(box: HTMLElement, names: string[], unknown: string[])
     row.classList.toggle("over", over);
     row.querySelector<HTMLElement>(".m-fill")!.style.width = `${Math.max(0, Math.min(100, (100 * v) / scale))}%`;
     row.querySelector<HTMLElement>(".m-mark")!.style.left = `${(100 * lim) / scale}%`;
-    row.querySelector<HTMLElement>(".m-val")!.textContent = m.kb ? `${kb(v)} / ${kb(lim)} KB` : `${fmt(v)} / ${fmt(lim)}`;
+    row.querySelector<HTMLElement>(".m-val")!.textContent = m.kb ? `${kb(v)} / ${kb(lim)} KB`
+      : m.key === "cpu" ? `${fmt(v)} / ${fmt(lim)} (~${Math.round(cpu.percent)} %)` : `${fmt(v)} / ${fmt(lim)}`;
   }
-  const overs = METERS.filter((m) => sum(m.key) > LIMITS[m.key]).map((m) => m.over);
+  const overs = METERS.filter((m) => sum(m.key) > LIMITS[m.key]).map((m) => m.key === "cpu" ? overBudget(cpu, title) : m.over);
   const note = box.querySelector(".m-note")!;
   note.classList.toggle("bad", overs.length > 0);
   note.textContent = [...overs, unknown.length ? `Not counted (no measurements yet): ${unknown.join(", ")}.`
