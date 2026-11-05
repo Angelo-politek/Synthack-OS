@@ -6,9 +6,9 @@
 #ifndef ELEKLOADER_ST_PATTERN_H
 #define ELEKLOADER_ST_PATTERN_H
 static __inline__ void *st_pattern_active_track(void *app)
-{return ((void *(*)(void *))0x40019036u)(app);}
+{return (void *)((unsigned int (*)(void *))0x40019036u)(app);}   /* SyntHack: the OS returns pointers in d0 */
 static __inline__ void *st_pattern_track_data(void *track)
-{return ((void *(*)(void *))(*(unsigned int **)track)[0x28/4])(track);}
+{return (void *)((unsigned int (*)(void *))(*(unsigned int **)track)[0x28/4])(track);}
 static __inline__ unsigned int st_pattern_track_length(void *track)
 {return ((unsigned int (*)(void *))0x40027f3au)(track);}
 static __inline__ int st_pattern_step_present(void *track,unsigned int step)

@@ -108,7 +108,9 @@ def test_build_with_every_mod_and_every_service(tmp_path):
     m = build.build(SY, every + [user], tmp_path / "o.syx", log=lambda *_: None)
     assert "sfcore" in m["mods"] and m["boot_margin"] >= bootcheck.MIN_MARGIN
     # senza chi li usa, gli adattatori non ci sono: la build e' quella di prima
-    a = build.build(SY, every, tmp_path / "a.syx", log=lambda *_: None)
+    plain = [d for d in every if "sfcore" not in json.loads((d / "patch.json").read_text(encoding="utf-8"))
+             .get("requires", []) and d.name != "sfcore"]          # modulation-skip richiede sfcore
+    a = build.build(SY, plain, tmp_path / "a.syx", log=lambda *_: None)
     assert "sfcore" not in a["mods"]
 
 
