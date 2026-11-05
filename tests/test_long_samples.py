@@ -118,10 +118,12 @@ def test_ensure_put_plan_and_pages(m):
     # immagine stock: un solo campione da 4800 nello slot 1
     stock = 4 * 64 + 2 * 4800
     m.uc.mem_write(TOTAL, struct.pack(">I", stock))
+    m.call(s["ls_project_new"])                                                  # nessuna lista del progetto
     m.call(s["ls_plan"], count=400_000_000)
     assert m.long(s["ls_status"]) == 1
     sp = (stock + 2047) // 2048
-    tab = struct.unpack(">4I", m.uc.mem_read(s["ls_table"], 16))
+    tab = struct.unpack(">4I", m.uc.mem_read(s["ls_cpu2"], 16))
+    assert struct.unpack(">4I", m.uc.mem_read(s["ls_table"], 16)) == tab         # lista = ordine di caricamento
     assert tab[0] == 0x5348_4C53 and tab[1] == 1
     assert tab[2] == CPU2_POOL + (sp + 1) * 2048 + 64 and tab[3] == frames
     pages = (len(m.body) + 2047) // 2048
@@ -206,6 +208,7 @@ def test_header_for_the_sampler(m):
     assert m.call(s["core_hzfs_put"], [io, SCRATCH, len(m.body), 0, STREAM, 0, SCRATCH + 64],
                   count=2_000_000_000) == 1
     m.uc.mem_write(TOTAL, struct.pack(">I", 256))
+    m.call(s["ls_project_new"])
     m.call(s["ls_plan"], count=400_000_000)
     assert bytes(m.uc.mem_read(names, 16)).split(b"\0")[0] == b"MagMag Vocal 17"   # 15 caratteri + 0
     assert struct.unpack(">I", m.uc.mem_read(table + 12, 4))[0] == 11 * 48000
@@ -226,10 +229,10 @@ def test_plan_follows_the_slot_map(m):
                       count=2_000_000_000) == 1
     m.uc.mem_write(TOTAL, struct.pack(">I", 256))
 
-    def frames():
+    def frames():                                         # ordine di caricamento (tabella della CPU #2)
         m.call(s["ls_plan"], count=400_000_000)
-        n = struct.unpack(">I", m.uc.mem_read(s["ls_table"] + 4, 4))[0]
-        return [struct.unpack(">I", m.uc.mem_read(s["ls_table"] + 12 + 8 * i, 4))[0] // 48000 for i in range(n)]
+        n = struct.unpack(">I", m.uc.mem_read(s["ls_cpu2"] + 4, 4))[0]
+        return [struct.unpack(">I", m.uc.mem_read(s["ls_cpu2"] + 12 + 8 * i, 4))[0] // 48000 for i in range(n)]
     assert frames() == [2, 3]
     cats = {k: bytearray(m.disk.read(k * 0x80000 // 512, 0x200)) for k in (0x600, 0x601)}
     k = max((k for k in cats if cats[k][:4] == b"HZFS"), key=lambda k: struct.unpack(">I", cats[k][8:12])[0])
@@ -302,3 +305,57 @@ def test_transfer_window(m):
         assert m.long(s["ls_transfer_closes"]) == closes + 1
     finally:
         m.uc.hook_del(h)
+
+
+def test_project_list(m):
+    """The project's list of long samples (projstore, as Synfact's project pool keeps HZFS ids per position): a project
+    without one gets the load order and keeps it (saved with the project); a saved list puts its files first, the
+    others after; a file that is gone leaves its position empty. The voice CPU reads the positions in shared RAM."""
+    import json
+    s = m.sym
+    io = s["core_hzfs_native_io"]
+    rec = int(json.loads((ROOT.parent / "mods" / "projstore" / "patch.json").read_text())["layout"]["data"], 16)
+    m.disk.s.clear()
+    assert m.call(s["core_hzfs_ensure"], [io], count=400_000_000) == 1
+    ids = []
+    for name, sec in ((b"a\0", 2), (b"b\0", 3), (b"c\0", 4)):
+        m.body = samp(sec * 48000)
+        m.uc.mem_write(SCRATCH, name)
+        assert m.call(s["core_hzfs_put"], [io, SCRATCH, len(m.body), 0, STREAM, 0, SCRATCH + 64],
+                      count=2_000_000_000) == 1
+        ids.append(m.long(SCRATCH + 64))
+    m.uc.mem_write(TOTAL, struct.pack(">I", 256))
+
+    def listed():
+        n = m.long(s["ls_table"] + 4)
+        return [m.long(s["ls_table"] + 12 + 8 * i) // 48000 for i in range(n)]
+
+    def shared():
+        magic, n = struct.unpack(">II", m.uc.mem_read(0x1000_0780, 8))
+        return magic, list(m.uc.mem_read(0x1000_0788, n))
+
+    def saved():
+        assert bytes(m.uc.mem_read(rec, 2)) == b"LP"
+        n = m.uc.mem_read(rec + 2, 1)[0]
+        return list(struct.unpack(f">{n}H", m.uc.mem_read(rec + 4, 2 * n)))
+    applied = m.long(s["ls_applied"])
+    m.call(0x4001_D16A, [m.project, 0xFFFF_FFFF], count=400_000_000)   # NEW PROJECT (hook): no list
+    assert m.long(s["ls_applied"]) == applied + 1
+    m.call(s["ls_plan"], count=400_000_000)
+    load = [m.long(s["ls_cpu2"] + 12 + 8 * i) // 48000 for i in range(3)]   # seconds of the files, load order
+    assert sorted(load) == [2, 3, 4]
+    sec = dict(zip((2, 3, 4), ids))
+    assert listed() == load and saved() == [sec[x] for x in load]      # load order, kept with the project
+    assert shared() == (0x4C53_4D31, [0, 1, 2])
+    m.uc.mem_write(rec, b"LP\x02\x00" + struct.pack(">HH", sec[4], sec[2]))  # a project saved with [4 s, 2 s]
+    m.call(s["ls_project_loaded"], [1])
+    assert listed() == [4, 2, 3] and saved() == [sec[4], sec[2], sec[3]]     # the 3 s file after its list
+    assert shared()[1] == [load.index(4), load.index(2), load.index(3)]
+    m.uc.mem_write(rec, b"LP\x02\x00" + struct.pack(">HH", 999, sec[3]))      # a file it names is gone
+    m.call(s["ls_project_loaded"], [1])
+    rest = [x for x in load if x != 3]
+    assert listed() == [0, 3] + rest and saved() == [999, sec[3]] + [sec[x] for x in rest]
+    assert shared()[1] == [0xFF, load.index(3)] + [load.index(x) for x in rest]
+    m.call(s["ls_project_loaded"], [0])                                 # load failed: list unchanged
+    assert saved() == [999, sec[3]] + [sec[x] for x in rest]
+    m.call(s["ls_project_new"])

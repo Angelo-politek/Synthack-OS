@@ -766,6 +766,29 @@ def test_long_sample_in_the_list(engines):
     assert peak(play(e, ONESHOT)) > 0
 
 
+def test_project_list_of_long_samples(engines):
+    """The project's list (mods/long-samples/pool.c, shared RAM 0x780): list position -> file of the table. SAMP 2
+    (the first long one) plays the file the project puts first; an empty position is silent."""
+    e, _ = engines
+    load_sample(e, sine(4800), 0)
+    at = long_table(e, [])
+    a, b = at + 2048 + 64, at + 2048 + 64 + 0x10_0000
+    n = 2 * SR
+    e.uc.mem_write(a, struct.pack(f">{n}h", *sine(n, 500)))
+    e.uc.mem_write(b, struct.pack(f">{n}h", *sine(n, 3000)))
+    long_table(e, [(a, n), (b, n)])
+    samp = [0x4000, 0x300, 0, 1 << 8, 0, 0x7800, 0, 0x6400]
+    try:
+        assert abs(freq(play(e, samp)[TAIL:]) - 500) < 40              # no list: load order
+        e.uc.mem_write(0x780, struct.pack(">II", 0x4C53_4D31, 2) + bytes([1, 0]) + b"\xff" * 62)
+        assert abs(freq(play(e, samp)[TAIL:]) - 3000) < 150            # the project's order
+        e.uc.mem_write(0x788, b"\xff")
+        assert peak(play(e, samp)[TAIL:]) == 0                         # its file is gone: empty position
+    finally:
+        e.uc.mem_write(0x780, bytes(0x48))
+        e.uc.mem_write(at, bytes(8))
+
+
 def test_sample_menu():
     """Menu dei sample: girando D (SAMP) sulla pagina 1/2 un riquadro elenca gli slot intorno al valore, stock 1..64
     poi i sample lunghi (mods/long-samples, header LSHD) con nome e durata, e la forma d'onda; sparisce col valore

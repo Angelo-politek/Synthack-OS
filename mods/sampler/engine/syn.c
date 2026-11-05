@@ -31,6 +31,11 @@
 #define LONG_MAX 0x1000000                                   /* 16 M samples, 5.8 min: CPU #2 holds 64 MB */
 #define POOL 0x4004f750u                                     /* the stock image on CPU #2 (64 MB to 0x4404f750) */
 #define LONG_MAGIC 0x53484c53u                               /* 'SHLS' */
+/* The project's list of long samples (mods/long-samples/pool.c), in shared RAM: list position -> file of the table */
+#define LS_MAP_MAGIC (*(volatile const uint32_t *)0x780)
+#define LS_MAP_COUNT (*(volatile const uint32_t *)0x784)
+#define LS_MAP ((volatile const uint8_t *)0x788)
+#define LS_MAP_ID 0x4c534d31u                                /* 'LSM1' */
 #define FW_HALFBAND ((void (*)(void *, int32_t *, int32_t *))0x400051c6)  /* state at voice + 1388 */
 #define FW_DEC ((void (*)(uint8_t *))0x40003d42)
 #define FW_VCA ((void (*)(int32_t *, uint8_t *))0x400045a0)
@@ -95,7 +100,7 @@ static sm_grid_t grids[STOCK_SLOTS];                     /* a cache: slot & 63, 
 
 /* SAMP 0..127 -> length and pointer. One list of samples, as the main CPU shows it (main/smp_main.c): the stock
  * slots that hold a sample, in slot order, then the long samples mods/long-samples sends after the stock image (at
- * POOL + 2048 x ceil(stock bytes / 2048); stock bytes = 64 x 4 + 2 x the lengths). */
+ * POOL + 2048 x ceil(stock bytes / 2048); stock bytes = 64 x 4 + 2 x the lengths), in the project's order. */
 static int sample_at(int slot, uint32_t *len, uint32_t *ptr) {
     *len = *ptr = 0;
     if (slot < 0 || slot >= SLOTS)
@@ -116,6 +121,10 @@ static int sample_at(int slot, uint32_t *len, uint32_t *ptr) {
     }
     volatile const uint32_t *t = (volatile const uint32_t *)(POOL + ((bytes + 2047) & ~2047u));
     uint32_t n = (uint32_t)(slot - k);
+    if (LS_MAP_MAGIC == LS_MAP_ID) {                    /* the project's list: position -> loaded file */
+        if (n >= LS_MAP_COUNT || n >= 64 || (n = LS_MAP[n]) >= 64)
+            return 0;
+    }
     if (bytes > 0x4000000u - 2048 || t[0] != LONG_MAGIC || n >= t[1] || n >= 64)
         return 0;
     *ptr = t[2 + 2 * n];

@@ -141,6 +141,39 @@ ls_blob:
         jsr ls_plan
         jmp 0x40082e9c
 
+| Synfact's core_pool_load / core_pool_initialize (sample-hooks.s, 1.42 addresses): after the stock body, the
+| project's list of long samples (pool.c)
+        .globl ls_load_hook, ls_new_hook
+ls_load_hook:                               | at 0x4001d6fe: bool load(project, index, x)
+        move.l 12(%sp),-(%sp)
+        move.l 12(%sp),-(%sp)
+        move.l 12(%sp),-(%sp)
+        jsr ls_native_load
+        lea 12(%sp),%sp
+        move.l %d0,-(%sp)
+        move.l %d0,-(%sp)
+        jsr ls_project_loaded
+        addq.l #4,%sp
+        move.l (%sp)+,%d0
+        rts
+ls_native_load:
+        lea -36(%sp),%sp
+        movem.l %d2-%d5/%a2,(%sp)
+        jmp 0x4001d706
+ls_new_hook:                                | at 0x4001d16a: Project::initializeNewProject(this, int)
+        move.l 8(%sp),-(%sp)
+        move.l 8(%sp),-(%sp)
+        jsr ls_native_new
+        addq.l #8,%sp
+        move.l %d0,-(%sp)
+        jsr ls_project_new
+        move.l (%sp)+,%d0
+        rts
+ls_native_new:
+        link %a6,#-88
+        movem.l %d2-%d5/%a2-%a4,(%sp)
+        jmp 0x4001d172
+
 | sample upload to CPU #2 (0x40082f90): page count and page source
         .globl ls_count_hook, ls_map_hook
 ls_count_hook:                              | at 0x40082fb6, in place of move.l 0x4d84f2c1,%d2

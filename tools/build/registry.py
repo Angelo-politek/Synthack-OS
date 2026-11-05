@@ -99,6 +99,8 @@ SHARED_RAM = [
                               "address +0x5BC, 112 peaks +0x5C0"),
     (0x640, 0x6E0, "xparams", "machine words, logical indices 0x11..0x1a of each digital track as set (locks applied, not smoothed), 20 B a track"),
     (0x700, 0x780, "xparams", "logical indices 0x36..0x3d of each digital track, locks applied (sy-fm4 pages 2/3 and 3/3, sampler knob H)"),
+    (0x780, 0x7C8, "long-samples", "the project's list of long samples: 'LSM1' +0x780, count +0x784, 64 positions "
+                                   "+0x788 (index in the CPU #2 table, 0xFF = empty), read by the SAMPLER engine"),
     (0x7F0, 0x7F4, "sampler", "tempo, BPM x 120"),
     (0x800, 0x1000, "OS", "boot-time upload window"),
 ]

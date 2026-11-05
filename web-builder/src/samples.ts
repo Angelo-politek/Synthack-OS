@@ -111,7 +111,7 @@ async function saveOrder(map = order.slice(0, 64).map((e) => e.id)): Promise<voi
 
 async function save(): Promise<void> {
   if (!store || busy) return;
-  await run(async () => { await saveOrder(); log("Order saved. Power cycle the Syntakt to load it."); });
+  await run(async () => { await saveOrder(); log("Order saved. Power cycle the Syntakt to load it. Projects saved with their own list keep it."); });
 }
 
 async function remove(e: Entry): Promise<void> {

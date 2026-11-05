@@ -70,6 +70,7 @@ Free tails that the stock boot zeroes: `0x80007330–0x80008000`, `0x8000f860–
 | `0x05b0` | `0x0630` | sampler | waveform: request +0x5B0, slot +0x5B4, columns done +0x5B6, length +0x5B8, address +0x5BC, 112 peaks +0x5C0 |
 | `0x0640` | `0x06e0` | xparams | machine words, logical indices 0x11..0x1a of each digital track as set (locks applied, not smoothed), 20 B a track |
 | `0x0700` | `0x0780` | xparams | logical indices 0x36..0x3d of each digital track, locks applied (sy-fm4 pages 2/3 and 3/3, sampler knob H) |
+| `0x0780` | `0x07c8` | long-samples | the project's list of long samples: 'LSM1' +0x780, count +0x784, 64 positions +0x788 (index in the CPU #2 table, 0xFF = empty), read by the SAMPLER engine |
 | `0x07f0` | `0x07f4` | sampler | tempo, BPM x 120 |
 | `0x0800` | `0x1000` | OS | boot-time upload window |
 
@@ -181,4 +182,4 @@ Ids without a page often carry a MIDI CC or are aliases: clear the CC, check ali
 | Store | Mod | Slots |
 |---|---|---|
 | kitstore | dual-mono | block 0 word 0, block 0 word 1, block 0 word 2 |
-| projstore | — | 256 bytes, all free |
+| projstore | long-samples | 0–132 |

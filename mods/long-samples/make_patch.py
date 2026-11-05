@@ -21,14 +21,17 @@ REPO = HERE.parents[1]
 sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
 import modarea_layout  # noqa: E402
+import projstore_layout  # noqa: E402
 import registry  # noqa: E402
 
 LOAD = 0x4000_0400
 OFFSET, END = next((a, b) for a, b, who, _ in registry.MODAREA if who == "long-samples")
 CODE_BASE = modarea_layout.RAM + OFFSET
+PS_POOL = (int(json.loads((REPO / "mods" / "projstore" / "patch.json").read_text(encoding="utf-8"))["layout"]["data"], 16)
+           + projstore_layout.PARTS["long-samples"][0])          # lista dei campioni del progetto (pool.c)
 TOOLS = "~/tools/m68k/root"
 CFLAGS = ("-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -fno-tree-loop-distribute-patterns "
-          "-Isynfact -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-misleading-indentation")
+          f"-DPS_POOL={PS_POOL:#x}u -Isynfact -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-misleading-indentation")
 SOURCES = ["synfact/hzfs.c", "synfact/crc.c", "synfact/high-storage.c", "pool.c", "transfer.c"]
 NOP = b"\x4e\x71"
 # (indirizzo 1.42, byte stock, istruzione, simbolo, descrizione); Synfact: mods/core-st/mod.json, siti 1.41
@@ -39,6 +42,10 @@ HOOKS = [
     (0x4008_287A, "4ebafab84eb940082e9c", "jsr", "ls_blob", "immagine dei campioni costruita: piano dei file HZFS"),
     (0x4008_2FB6, "24394d84f2c1", "jsr", "ls_count_hook", "upload alla CPU #2: byte da inviare"),
     (0x4008_2FCE, "203941bbf42433c01000000ce3a8", "jsr", "ls_map_hook", "upload alla CPU #2: sorgente della pagina"),
+    (0x4001_D6FE, "4fefffdc48d7043c", "jmp", "ls_load_hook", "progetto caricato: la sua lista dei campioni lunghi "
+                                                               "(core_pool_load di Synfact)"),
+    (0x4001_D16A, "4e56ffa848d71c3c", "jmp", "ls_new_hook", "NEW PROJECT: lista nell'ordine di caricamento "
+                                                             "(core_pool_initialize di Synfact)"),
 ]
 
 
@@ -103,7 +110,7 @@ def main() -> None:
         patches.append({"section": 3, "addr": f"{addr:#010X}", "len": n, "expect_sha256": sha(old),
                         "hex": new.hex(), "what": what})
     spec = {
-        "name": "long-samples", "os": "1.42", "requires": ["modarea"],
+        "name": "long-samples", "os": "1.42", "requires": ["modarea", "projstore"],
         "description": "Campioni lunghi di Synfact (HZFS nella zona alta della eMMC, caricati con il tool di Synfact) "
                        "inviati alla CPU #2 all'avvio dopo i campioni stock; le machine SAMPLER li suonano come slot 65-128.",
         "license": "GPL-2.0-or-later", "credits": "Synfact (GSM1980), elekloader (irpina)",

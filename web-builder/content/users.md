@@ -324,6 +324,10 @@ Transfer cuts samples at 5 s. Longer samples go through the **Samples** page of 
 5. Power cycle the Syntakt. "PREPARING SAMPLES" takes longer: it also sends the long samples.
 6. On a SAMPLER track, turn `SAMP` (knob D, SYN 1/2): a menu lists all your samples, stock and long ones in one list, with name and length.
 
+While the page writes, the Syntakt shows "SAMPLES ARE BEING TRANSFERRED"; the window closes when the write ends.
+
+Each project keeps its own list of long samples, saved with the project. A project that has none yet takes the order of this page; save it and its `SAMP` values keep pointing at the same samples when you add, remove or reorder samples here. New samples come after the project's list. A position whose sample was removed stays, empty.
+
 | | |
 |---|---|
 | Length | up to ~5.8 min per file, ~31 MB in all with the stock samples |

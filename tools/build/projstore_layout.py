@@ -9,4 +9,4 @@ import modarea_layout
 
 OFFSET = 0x7000                         # nell'area mod: codice, poi i dati
 SIZE = 256                              # byte salvati (multiplo di 4)
-PARTS = {}                              # nome della mod -> (offset nei dati, lunghezza)
+PARTS = {"long-samples": (0, 132)}       # nome della mod -> (offset nei dati, lunghezza): lista dei campioni del progetto
