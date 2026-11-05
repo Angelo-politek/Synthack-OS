@@ -319,9 +319,10 @@ Transfer cuts samples at 5 s. Longer samples go through the **Samples** page of 
 
 1. Build with **Long samples** and **SAMPLER**. Flash.
 2. Close Transfer. Open the **Samples** page in Chrome or Edge, **Connect to the Syntakt**, allow MIDI with SysEx.
-3. **Add WAV files**: any rate, mono or stereo; the page converts them to 48 kHz mono. Order them with ↑ ↓ and **Save this order**.
-4. Power cycle the Syntakt. "PREPARING SAMPLES" takes longer: it also sends the long samples.
-5. On a SAMPLER track, turn `SAMP` (knob D, SYN 1/2): a menu lists all your samples, stock and long ones in one list, with name and length.
+3. **Add WAV files**: any rate, mono or stereo; the page converts them to 48 kHz mono. Before a file is stored an editor opens: its waveform, the start and the end (drag the sliders or click the waveform), the name, **Play** to hear the part picked. Order the samples with ↑ ↓ and **Save this order**. **Rename** changes a stored sample's name; **Edit** reads it back from the Syntakt (slow: a few seconds for 10 s of audio) and opens the editor again.
+4. The bar shows the Syntakt's voice memory at the next boot: stock samples, long samples, free, of 64 MiB. Each row shows how much a sample takes. At boot the long samples load in this order until the memory is full; the ones after stay stored but don't play (shown greyed, *won't load*). The line under the bar shows the free internal storage.
+5. Power cycle the Syntakt. "PREPARING SAMPLES" takes longer: it also sends the long samples.
+6. On a SAMPLER track, turn `SAMP` (knob D, SYN 1/2): a menu lists all your samples, stock and long ones in one list, with name and length.
 
 | | |
 |---|---|

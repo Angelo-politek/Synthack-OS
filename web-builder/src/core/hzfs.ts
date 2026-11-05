@@ -156,7 +156,7 @@ export class Store {
     await this.client.write(k, body, this.cardBytes, progress);
   }
 
-  async readBlocks(first: number, count: number, length: number): Promise<Uint8Array> {
+  async readBlocks(first: number, count: number, length: number, progress?: (a: number, b: number) => void): Promise<Uint8Array> {
     await this.capacity();
     if (first < DATA_FIRST_K || first + count > this.windows || !(length > 0 && length <= count * WINDOW)) throw new Error("read outside the data");
     const out = new Uint8Array(length);
@@ -167,6 +167,7 @@ export class Store {
       const n = Math.min(WINDOW, length - o);
       out.set(chunk.subarray(0, n), o);
       o += n;
+      progress?.(o, length);
     }
     return out;
   }
@@ -247,6 +248,25 @@ export class Store {
     index.entries.splice(i, 1);
     index.slotMap = index.slotMap.map((x) => (x === id ? 0 : x));
     await this.commit(index, copies);
+  }
+
+  async rename(id: number, name: string): Promise<void> {
+    if (!name || enc.encode(name).length > 32 || name.includes("\0")) throw new Error("name must be 1..32 UTF-8 bytes");
+    const { index, copies } = await this.current();
+    const e = index.entries.find((x) => x.id === id);
+    if (!e) throw new Error("sample not found");
+    if (e.name === name) return;
+    if (index.entries.some((x) => x !== e && x.name === name && (x.folder ?? 0) === (e.folder ?? 0))) throw new Error(`"${name}" already exists`);
+    e.name = name;
+    await this.commit(index, copies);
+  }
+
+  /** the SAMP body of a stored sample (read back over MIDI: slow, ~5 s for 10 s of audio) */
+  async body(id: number, progress?: (a: number, b: number) => void): Promise<Uint8Array> {
+    const { index } = await this.current();
+    const e = index.entries.find((x) => x.id === id);
+    if (!e) throw new Error("sample not found");
+    return this.readBlocks(e.first, e.blocks, e.bytes, progress);
   }
 
   /** L1..L64 -> ids (0 = empty); all zero: the device plays the catalogue order */

@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import { concat, crc32, DataClient, decode87, encode87, HDR, objectPack, objectUnpack, RAW_FIRST, Transport, u32, WINDOW, be32, type Link } from "../src/core/datarpc.ts";
 import { Index, Store } from "../src/core/hzfs.ts";
 import { catalogueName, readWav, sampBody, wavBody } from "../src/core/wav.ts";
+import { bodySamples, PAGE, peaks, POOL_PAGES, stockBytes, usage } from "../src/core/sampedit.ts";
 
 const CARD = 0x3100_0000 + 40 * WINDOW;          // high zone: 40 data windows after the catalogues
 
@@ -144,4 +145,29 @@ test("WAV: 16-bit stereo 44.1 kHz to 48 kHz mono, names", () => {
   const used = new Set<string>();
   assert.equal(catalogueName("Avant - D&B 01 MagMag Vocal - 8 bar - 04 (175BPM).wav", used), "Avant - D&B 01 MagMag Vocal - 8");
   assert.equal(catalogueName("Avant - D&B 01 MagMag Vocal - 8 bar - 05.wav", used), "Avant - D&B 01 MagMag Vocal -~2");
+});
+
+test("rename, body read back", async () => {
+  const { store } = setup();
+  const pcm = new Float32Array(48000).map((_, i) => Math.sin(i / 5) * 0.25);
+  const e = await store.put("loop", sampBody(pcm, "loop"));
+  await store.put("other", sampBody(new Float32Array(100), "o"));
+  await assert.rejects(store.rename(e.id, "other"), /already exists/);
+  await assert.rejects(store.rename(e.id, "x".repeat(33)), /1..32/);
+  await store.rename(e.id, "loop 2");
+  const { index } = await store.current();
+  assert.equal(index.entries.find((x) => x.id === e.id)!.name, "loop 2");
+  const back = bodySamples(await store.body(e.id));
+  assert.equal(back.length, pcm.length);
+  assert.ok(back.every((v, i) => Math.abs(v - pcm[i]) < 1 / 32768 + 1e-9));
+});
+
+test("voice memory at boot as ls_plan fills it; waveform peaks", () => {
+  const ent = (id: number, mb: number) => ({ id, first: 0, blocks: 0, bytes: mb * 2 ** 20, frames: 0, crc: 0, created: 0, flags: 0, name: `s${id}` });
+  const u = usage(stockBytes([64 + 2 * 48000, 0, 64 + 2 * 1000]), [ent(1, 10), ent(2, 40), ent(3, 20)]);
+  assert.equal(u.stockPages, Math.ceil((4 + 96000 + 4 + 2000) / PAGE));
+  assert.deepEqual(u.files.map((f) => f.loads), [true, true, false]);       // 10 + 40 fit, 20 more don't
+  assert.equal(u.freePages, POOL_PAGES - u.stockPages - 1 - u.files[0].pages - u.files[1].pages);
+  const p = peaks(Float32Array.from([0, 0.5, -1, 0.25]), 2);
+  assert.deepEqual([...p], [0.5, 1]);
 });

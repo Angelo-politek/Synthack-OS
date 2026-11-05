@@ -4,17 +4,31 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Samples · SyntHack OS</title>
-  <meta name="description" content="Send long samples to your Syntakt over USB MIDI, from the browser: list, upload, order, remove.">
+  <meta name="description" content="Send long samples to your Syntakt over USB MIDI, from the browser: list, trim, rename, order, remove, and see the voice memory they take.">
   <meta name="theme-color" content="#090909">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./src/style.css">
   <style>
+    .sm-panel { margin: 2.8rem auto; max-width: 980px; }
     .sm-table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-variant-numeric: tabular-nums; }
     .sm-table th, .sm-table td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #2a2a2a; }
     .sm-table td.n { width: 3rem; }
+    .sm-table td.act { white-space: nowrap; }
     .sm-table button { margin-right: .25rem; }
+    .sm-table tr.late td { color: var(--muted); }
+    .sm-table .share { color: var(--muted); font-size: .85em; }
     .sm-row { display: flex; gap: .75rem; flex-wrap: wrap; align-items: center; margin: 1rem 0; }
+    .sm-mem { display: flex; height: .9rem; border: 1px solid var(--line-2); border-radius: 3px; overflow: hidden; background: #141414; margin: .4rem 0; }
+    .sm-mem .seg { display: block; height: 100%; }
+    .sm-mem .stock { background: #6a6a6a; }
+    .sm-mem .long { background: var(--accent); }
     #sm-log { white-space: pre-wrap; max-height: 14rem; overflow: auto; }
+    #sm-edit { max-width: 980px; width: calc(100% - 2rem); border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg-2); color: inherit; padding: 1.2rem; }
+    #sm-edit::backdrop { background: rgba(0, 0, 0, .7); }
+    #sm-wave { width: 100%; height: 160px; background: #0d0d0d; display: block; cursor: crosshair; }
+    #sm-edit input[type=range] { width: 100%; }
+    #sm-edit label { display: block; margin: .6rem 0 .2rem; }
+    #sm-name { width: min(100%, 24rem); }
   </style>
 </head>
 <body>
@@ -25,7 +39,8 @@
     <h1>Samples</h1>
     <p class="lead">Send samples longer than 5 s to your Syntakt over USB, from this page. Nothing goes to a server.</p>
   </section>
-  <section class="wrap panel">
+  <div class="wrap">
+  <section class="panel sm-panel">
     <p class="note">Needs a build with <strong>Long samples</strong> and <strong>SAMPLER</strong>, Chrome or Edge (WebMIDI with SysEx), and Transfer closed. Back up your projects first: this writes the Syntakt's internal memory.</p>
     <div class="sm-row">
       <button id="sm-connect" class="btn" type="button">Connect to the Syntakt</button>
@@ -36,17 +51,37 @@
       <div class="sm-row">
         <label class="btn ghost">Add WAV files<input id="sm-files" type="file" accept=".wav,audio/wav" multiple hidden></label>
         <button id="sm-save" class="btn ghost" type="button" disabled>Save this order</button>
-        <span id="sm-free" class="hint"></span>
       </div>
+      <div id="sm-mem" class="sm-mem" title="Voice CPU memory at the next boot"></div>
+      <p id="sm-mem-text" class="hint"></p>
+      <p id="sm-free" class="hint"></p>
       <table class="sm-table">
-        <thead><tr><th>#</th><th>Name</th><th>Length</th><th>Size</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Name</th><th>Length</th><th>Voice memory</th><th></th></tr></thead>
         <tbody id="sm-rows"></tbody>
       </table>
-      <p class="hint">On the Syntakt the long samples come after the stock samples, in this order. Power cycle it to load the changes.</p>
+      <p class="hint">On the Syntakt the long samples come after the stock samples, in this order. At boot the Syntakt loads the stock samples, then the long ones until its 64 MiB of voice memory are full: the others stay stored but don't play. Power cycle it to load the changes.</p>
       <div class="progress" hidden id="sm-prog"><div class="bar" id="sm-bar"></div></div>
     </div>
     <pre id="sm-log" class="log-box mono"></pre>
   </section>
+  </div>
+  <dialog id="sm-edit">
+    <h2>Sample</h2>
+    <canvas id="sm-wave" width="940" height="160"></canvas>
+    <label for="sm-start">Start</label><input id="sm-start" type="range" min="0" step="1">
+    <label for="sm-end">End</label><input id="sm-end" type="range" min="1" step="1">
+    <p id="sm-sel" class="hint"></p>
+    <label for="sm-name">Name</label><input id="sm-name" type="text" maxlength="32">
+    <div class="sm-row">
+      <button id="sm-play" class="btn ghost" type="button">Play</button>
+      <button id="sm-stop" class="btn ghost" type="button">Stop</button>
+      <span class="hint">Click the waveform to move the nearer end.</span>
+    </div>
+    <div class="sm-row">
+      <button id="sm-ok" class="btn" type="button">Store on the Syntakt</button>
+      <button id="sm-cancel" class="btn ghost" type="button">Cancel</button>
+    </div>
+  </dialog>
 </main>
 <!-- @footer -->
 <script type="module" src="./src/samples.ts"></script>

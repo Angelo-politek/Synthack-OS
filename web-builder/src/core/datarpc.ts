@@ -144,6 +144,29 @@ export class DataClient {
   private async call(kind: number, payload: Uint8Array): Promise<Uint8Array> {
     return ok(await this.t.call(kind, payload), kind);
   }
+  /** the length of stock sample slot n (1..64), 0 when the Syntakt has none there: one header probe */
+  async stockLength(n: number): Promise<number> {
+    if (n < 1 || n > 64) throw new Error("stock slots are 1..64");
+    let rx: Uint8Array;
+    try {
+      rx = await this.call(0x54, concat(ascii(`/samples/${n}`), Uint8Array.of(0), be32(this.block), Uint8Array.of(0)));
+    } catch {
+      return 0;
+    }
+    const job = u32(rx, 6), out: number[] = [];
+    try {
+      for (let seq = 0; out.length < 31 && seq < 64; seq++) {
+        rx = await this.call(0x55, concat(be32(job), be32(seq)));
+        if (rx.length < 27 || u32(rx, 6) !== job) throw new Error("invalid read response/job");
+        for (const b of rx.subarray(27)) out.push(b);
+        if (rx[18] && out.length < 31) return 0;
+      }
+      const o = Uint8Array.from(out.slice(0, 31));
+      return out.length >= 31 && o[0] === 0xac ? u32(o, 25) : 0;
+    } finally {
+      try { await this.call(0x56, be32(job)); } catch { /* OS 1.42 answers "Reader did not complete" on an early close */ }
+    }
+  }
   /** a raw high-zone window /samples/(RAW_FIRST + k): the body, or with headerOnly its length */
   async read(k: number, headerOnly = false): Promise<Uint8Array | number> {
     if (k < 0x600 || k >= 0x2000) throw new Error("unsupported read destination");
