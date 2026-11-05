@@ -46,6 +46,13 @@
       "project": 0,
       "sec7": 0
     },
+    "lfo3": {
+      "cpu": 0,
+      "modarea": 16384,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
     "long-samples": {
       "cpu": 0,
       "modarea": 32784,

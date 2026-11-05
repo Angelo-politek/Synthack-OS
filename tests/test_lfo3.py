@@ -1,0 +1,187 @@
+"""lfo3 (mods/lfo3): il terzo LFO di Synfact sulla 1.42.
+
+- Nucleo (synfact/render.s, copia in SRAM): stesso risultato bit per bit dell'LFO1 nativo (0x4011942A) sulle stesse
+  parole, per forme d'onda, modi, moltiplicatori, fade, fase di partenza, trig e casuale (stesso generatore).
+- Nell'interrupt: senza destinazioni LFO3 non costa nulla (sfcore rigioca lo stock); con una destinazione modula la
+  parola di lavoro della traccia prima di LFO1/LFO2.
+- SRAM: nucleo e banco nelle code del registro, il resto della SRAM come prima.
+"""
+
+import json
+import random
+import struct
+import sys
+from pathlib import Path
+
+import pytest
+
+pytest.importorskip("unicorn")
+
+ROOT = Path(__file__).resolve().parents[1]
+SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
+pytestmark = pytest.mark.skipif(not SY.exists(), reason="OS stock assente")
+sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "build"), str(ROOT / "tools" / "unpack")]
+
+SPEC = json.loads((ROOT / "mods" / "lfo3" / "patch.json").read_text(encoding="utf-8"))
+SYM = {k: int(v, 16) for k, v in SPEC["symbols"].items()}
+SF = {k: int(v, 16) for k, v in json.loads((ROOT / "mods" / "sfcore" / "patch.json").read_text(
+    encoding="utf-8"))["symbols"].items()}
+CODE, BANK = 0x8000_7340, 0x8000_F870
+NATIVE_LFO = 0x4011_942A
+NATIVE_STATE = 0x444D_B72C                      # 13 tracce x 80 B: LFO1 (40 B), poi LFO2
+NATIVE_RNG = 0x402D_736C
+WORKING = 0x5000_0000                           # proiezione di lavoro finta: 0x1C B d'intestazione + 13 x 142 B
+TRACK = lambda t: WORKING + 0x1C + 0x8E * t     # noqa: E731
+DEFAULT = (0x7000, 0x300, 0x4000, 0x7F00, 0, 0, 0, 0x4000)
+TEMPO = 0x3840 * 4                              # come dall'OS a 120 BPM (0x402D7360)
+
+
+class Bench:
+    """Un emulatore con l'EMAC (tools/emu/isr.py): chiamate dirette al nucleo nativo e a quello di LFO3."""
+
+    def __init__(self, mods):
+        import isr
+        self.m = isr.Isr(mods)
+        self.ui, self.uc = self.m.ui, self.m.uc
+        self.uc.mem_map(WORKING, 0x1_0000)
+        self.m.emac.state.macsr = 0x20                          # frazionario con segno, come nell'interrupt
+
+    def call(self, fn, args):
+        import isr
+        self.m.st, self.m.stack, self.m.pending = isr.Stats(), [], None
+        self.uc.ctl_flush_tb()
+        try:
+            self.ui.call(fn, args)
+            return self.m.st.n
+        finally:
+            self.m.st = None
+
+    def words(self, a, n):
+        return list(struct.unpack(f">{n}h", self.uc.mem_read(a, 2 * n)))
+
+    def put16(self, a, *v):
+        self.uc.mem_write(a, struct.pack(f">{len(v)}H", *[x & 0xFFFF for x in v]))
+
+
+@pytest.fixture(scope="module")
+def benches():
+    native, lfo3 = Bench([]), Bench(["lfo3"])
+    assert lfo3.ui.long(SF["sfcore_status"] + 4 * 3) == 1      # legato da sfcore (posto 3)
+    assert lfo3.ui.long(SYM["lfo3_in_sram"]) == 1
+    return native, lfo3
+
+
+def working(rnd, t, lfo1):
+    """Parole di lavoro: casuali (0..0x7F00), LFO1 della traccia t = lfo1, LFO2 di tutte senza effetto."""
+    w = bytearray(0x1C + 0x8E * 13)
+    for i in range(0x1C // 2, len(w) // 2):
+        struct.pack_into(">H", w, 2 * i, rnd.randrange(0, 0x7F01))
+    for k in range(13):
+        base = 0x1C + 0x8E * k
+        for j, v in enumerate(DEFAULT):
+            struct.pack_into(">H", w, base + 2 * (1 + j), v)            # LFO1: id interni 1..8
+            struct.pack_into(">H", w, base + 2 * (9 + j), v)            # LFO2: 9..16
+    for j, v in enumerate(lfo1):
+        struct.pack_into(">H", w, 0x1C + 0x8E * t + 2 * (1 + j), v)
+    return bytes(w)
+
+
+CASES = [
+    # SPD, MULT, FADE, DEST (slot<<8), WAVE, SPH, MODE, DEP
+    (0x7000, 0x300, 0x4000, 0x2200, 0, 0, 0, 0x7000),           # TRI, libero
+    (0x5000, 0x500, 0x4000, 0x1200, 1, 0x2000, 1, 0x1000),      # SINE, TRG, fase di partenza
+    (0x7FFE, 0x1000, 0x4000, 0x3000, 2, 0x4000, 2, 0x7FFE),     # SQR, HLD, moltiplicatore fisso
+    (0x2000, 0x0B00, 0x6000, 0x1500, 3, 0, 3, 0x6000),          # SAW, ONE, fade out
+    (0x6000, 0x0300, 0x2000, 0x0500, 4, 0x7F00, 4, 0x2000),     # EXP, HLF, fade in
+    (0x7000, 0x1700, 0x4000, 0x4600, 5, 0x1000, 0, 0x5000),     # RMP, MULT massimo, ultimo slot
+    (0x4800, 0x0200, 0x4000, 0x1A00, 6, 0x3000, 1, 0x7000),     # RND (stesso generatore), TRG
+    (0x0000, 0x0000, 0x0000, 0x1100, 0, 0, 0, 0x0000),          # velocita' negativa, profondita' negativa
+]
+
+
+@pytest.mark.parametrize("case", range(len(CASES)))
+def test_kernel_matches_native_lfo1(benches, case):
+    """Stesse parole d'ingresso, stato iniziale e generatore: stato, uscita e parola modulata identici a ogni blocco.
+    I trig arrivano come dall'interrupt (un bit per traccia)."""
+    native, lfo3 = benches
+    rnd = random.Random(case)
+    p = CASES[case]
+    t = case % 13
+    native.uc.mem_write(NATIVE_STATE, bytes(13 * 80))
+    for k in range(13):
+        native.uc.mem_write(NATIVE_STATE + 80 * k + 16, struct.pack(">I", 0x3FFF_FFFF))
+        native.uc.mem_write(NATIVE_STATE + 80 * k + 56, struct.pack(">I", 0x3FFF_FFFF))
+    rng = (0x1234_5678, 0x9ABC_DEF0)
+    native.uc.mem_write(NATIVE_RNG, struct.pack(">2I", *rng))
+    state = bytearray(13 * 40)
+    for k in range(13):
+        struct.pack_into(">I", state, 40 * k + 16, 0x3FFF_FFFF)
+    lfo3.uc.mem_write(BANK, bytes(state) + struct.pack(">2I", *rng))
+    params = bytearray()
+    for k in range(13):
+        params += struct.pack(">8H", *(p if k == t else DEFAULT))
+    lfo3.uc.mem_write(BANK + 13 * 40 + 8, bytes(params))
+    for block in range(48):
+        w = working(rnd, t, p)
+        trigs = (1 << t) if block % 7 == 3 else 0
+        native.uc.mem_write(WORKING, w)
+        lfo3.uc.mem_write(WORKING, w)
+        native.call(NATIVE_LFO, [WORKING, TEMPO, trigs])
+        lfo3.call(CODE, [WORKING, TEMPO, trigs, BANK + 13 * 40 + 8, BANK, BANK + 13 * 40])
+        a = bytes(native.uc.mem_read(NATIVE_STATE + 80 * t, 40))
+        b = bytes(lfo3.uc.mem_read(BANK + 40 * t, 40))
+        assert a == b, (block, a.hex(), b.hex())
+        slot = p[3] >> 8
+        assert native.words(TRACK(t) + 2 * slot, 1) == lfo3.words(TRACK(t) + 2 * slot, 1), block
+        if p[4] == 6:
+            assert native.uc.mem_read(NATIVE_RNG, 8) == lfo3.uc.mem_read(BANK + 13 * 40, 8)
+
+
+def test_sram_layout_and_build():
+    """Nucleo e banco nelle code del registro (SRAM): il nucleo intero sta prima delle destinazioni di
+    modulation-skip, il banco prima del suo stato."""
+    import registry as R
+    n = SYM["lfo3_render_end"] - SYM["lfo3_render"]
+    tail = [(a, b) for a, b, who, _ in R.SRAM if who == "lfo3"]
+    assert any(a <= CODE and CODE + n <= b for a, b in tail), n
+    assert any(a <= BANK and BANK + 13 * 40 + 8 + 2 * 13 * 16 <= b for a, b in tail)
+
+
+# ------------------------------------------------------------------ interrupt audio
+def run(mods, uses=(), setup=None, blocks=4):
+    import isr
+    m = isr.Isr(mods, uses=uses)
+    if setup:
+        setup(m)
+    m.scene("max")
+    st = m.run()
+    m.fast(blocks)
+    return m, st
+
+
+def test_unused_costs_nothing():
+    """Senza destinazioni l'interesse per l'operazione LFO resta spento: stesse istruzioni di sfcore da solo con
+    l'adattatore dell'LFO (un tst.b), e solo quello: gli altri adattatori nativi non ci sono."""
+    _, a = run(["sfcore"], uses=["sfcore:lfo"])
+    m, b = run(["lfo3"])
+    assert m.ui.long(SYM["lfo3_active"]) == 0
+    print("istruzioni:", a.n, b.n)
+    assert b.n == a.n
+    _, s = run([])
+    assert b.n - s.n <= 4, (s.n, b.n)
+
+
+def test_destination_modulates_before_native_lfos():
+    """DEST della traccia 3 sul volume (slot 0x30), profondita' piena: la parola di lavoro e' quella del
+    blocco piu' la modulazione di LFO3 (stato +28), poi le LFO native. Costo misurato."""
+    def setup(m):
+        bank = BANK + 13 * 40 + 8
+        m.uc.mem_write(bank + 16 * 3, struct.pack(">8H", 0x7000, 0x300, 0x4000, 0x3000, 1, 0, 0, 0x7F00))
+        m.ui.call(SYM["lfo3_update"])
+    _, a = run(["sfcore"], uses=["sfcore:lfo"])
+    m, b = run(["lfo3"], setup=setup)
+    assert m.ui.long(SYM["lfo3_active"]) == 1 << 3
+    delta = struct.unpack(">i", m.uc.mem_read(BANK + 40 * 3 + 28, 4))[0]
+    assert delta != 0
+    print("istruzioni con un LFO3 attivo:", b.n - a.n)
+    assert b.n - a.n < 2600

@@ -32,7 +32,9 @@ UI events are always installed. The others have a `service` in `patch.json`. The
 | `sfcore:render_in` | `0x400A38D6` |
 | `sfcore:main_mix` | `0x4008FB86` |
 | `sfcore:fs` | `0x400B620C` write, `0x4010BA9E` written |
-| `sfcore:native` | 13 sites: [make_patch.py](make_patch.py) |
+| `sfcore:native` | 11 sites: [make_patch.py](make_patch.py) |
+| `sfcore:lfo` | `0x4011942A`, the LFO operation (alone: LFO3 needs no other audio adapter) |
+| `sfcore:sound_set` | `0x40013304`, SOUND_ALLOWED and the parameter provider's Sound setter |
 
 ## Shared sites
 

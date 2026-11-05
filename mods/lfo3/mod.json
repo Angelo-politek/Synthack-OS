@@ -1,0 +1,5 @@
+{
+  "title": "Third LFO",
+  "kind": "feature",
+  "summary": "A third LFO per track and on the FX track (Synfact port). Engine in the CPU's fast internal RAM; costs nothing while it has no destination."
+}

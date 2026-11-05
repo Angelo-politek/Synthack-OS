@@ -1,0 +1,5 @@
+Synfact (https://github.com/GSM1980/synfact-dev), commit 1a6d0c74469db4c30423be29c90e0b07ba7f8003, 2026-11-03:
+mods/lfo3-st/<file>. GPL-2.0-or-later, GSM1980 and contributors, on elekloader by irpina.
+OS 1.41 addresses translated to 1.42 with tools/build/port_source.py, no other change. sha256 of the originals:
+ca1c8d47aad9eb80825704bc2f73f531d72141d2760ef10a40b86e75420ca12d  render.s
+005cefd7c1238c05ed3b02afd7b1396fbf9dc50068fa194af829179420070205  sram.s

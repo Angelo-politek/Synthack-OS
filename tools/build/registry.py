@@ -43,7 +43,7 @@ MODAREA = [
     (0x1B040, 0x1FFF0, "sfcore", "Synfact core subset: event bus, adapters, native transactions, host API (GPL-2.0-or-later)"),
     # 256 KB area from 2026-11-05: the Synfact ports, claimed before their code exists (port plan)
     (0x20000, 0x26000, "recorder", "planned: code and small data (PCM and large state in the OS heap)"),
-    (0x26000, 0x2A000, "lfo3", "planned: engine (source of the SRAM copy), page, actions"),
+    (0x26000, 0x2A000, "lfo3", "third LFO (Synfact port): engine (source of the SRAM copy), page, actions"),
     (0x2A000, 0x32000, "xstore", "planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks)"),
     (0x32000, 0x38000, "arp", "planned: arpeggiator (cells in the OS heap)"),
     (0x38000, 0x3E000, "poly", "planned: POLY with its native kernels"),
@@ -51,7 +51,7 @@ MODAREA = [
 ]
 
 # ---- mod con spazio prenotato ma non ancora scritte (port di Synfact, piano 2026-11-05): ammesse come proprietarie
-PLANNED = {"recorder", "lfo3", "xstore", "arp", "poly"}
+PLANNED = {"recorder", "xstore", "arp", "poly"}
 
 # ---- tabella dei moduli di sfcore (area mod + SFCORE_TABLE): posto -> mod. sfcore li inizializza in quest'ordine.
 SFCORE_TABLE, SFCORE_N = 0x1B000, 8
@@ -61,9 +61,9 @@ SFCORE_SLOTS = {0: "modulation-skip", 1: "xstore", 2: "recorder", 3: "lfo3", 4: 
 # assoluto della 1.42 usa (tests/test_sfcore.py controlla che l'OS non le legga ne' scriva). Dati e codice qui non
 # mancano mai la cache (tools/emu/cycles.py). Fine esclusa.
 SRAM = [
-    (0x8000_7330, 0x8000_7780, "lfo3", "planned: copy of the LFO3 kernel (render.s, 1 088 B)"),
+    (0x8000_7330, 0x8000_7780, "lfo3", "copy of the LFO3 kernel (render.s) from +0x10"),
     (0x8000_7780, 0x8000_8000, "modulation-skip", "destinations: address, value before and after (6 B each)"),
-    (0x8000_F860, 0x8000_FC20, "lfo3", "planned: LFO3 state, RNG and parameter bank (944 B)"),
+    (0x8000_F860, 0x8000_FC20, "lfo3", "LFO3 state, RNG and parameter bank (944 B) from +0x10"),
     (0x8000_FC20, 0x8001_0000, "modulation-skip", "state, input tables, destination bitmap"),
 ]
 SRAM_FREE = [(0x8000_7330, 0x8000_8000), (0x8000_F860, 0x8001_0000)]

@@ -30,7 +30,7 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x0001b040` | `0x0001fff0` | sfcore | Synfact core subset: event bus, adapters, native transactions, host API (GPL-2.0-or-later) |
 | `0x0001fff0` | `0x00020000` | **free** |  |
 | `0x00020000` | `0x00026000` | recorder | planned: code and small data (PCM and large state in the OS heap) |
-| `0x00026000` | `0x0002a000` | lfo3 | planned: engine (source of the SRAM copy), page, actions |
+| `0x00026000` | `0x0002a000` | lfo3 | third LFO (Synfact port): engine (source of the SRAM copy), page, actions |
 | `0x0002a000` | `0x00032000` | xstore | planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks) |
 | `0x00032000` | `0x00038000` | arp | planned: arpeggiator (cells in the OS heap) |
 | `0x00038000` | `0x0003e000` | poly | planned: POLY with its native kernels |
@@ -40,7 +40,7 @@ Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 
 
 sfcore module table (`+0x1b000`, 8 pointers, initialized in this order): slot 0 modulation-skip, slot 1 xstore, slot 2 recorder, slot 3 lfo3, slot 4 arp, slot 5 poly.
 
-Planned (space claimed, code not written yet): arp, lfo3, poly, recorder, xstore.
+Planned (space claimed, code not written yet): arp, poly, recorder, xstore.
 
 ## SRAM (CPU #1, internal: never a cache miss)
 
@@ -48,9 +48,9 @@ Free tails that the stock boot zeroes: `0x80007330–0x80008000`, `0x8000f860–
 
 | From | To | Mod | Use |
 |---|---|---|---|
-| `0x80007330` | `0x80007780` | lfo3 | planned: copy of the LFO3 kernel (render.s, 1 088 B) |
+| `0x80007330` | `0x80007780` | lfo3 | copy of the LFO3 kernel (render.s) from +0x10 |
 | `0x80007780` | `0x80008000` | modulation-skip | destinations: address, value before and after (6 B each) |
-| `0x8000f860` | `0x8000fc20` | lfo3 | planned: LFO3 state, RNG and parameter bank (944 B) |
+| `0x8000f860` | `0x8000fc20` | lfo3 | LFO3 state, RNG and parameter bank (944 B) from +0x10 |
 | `0x8000fc20` | `0x80010000` | modulation-skip | state, input tables, destination bitmap |
 
 

@@ -37,6 +37,9 @@ CFLAGS = ("-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-c
           "-fno-tree-loop-distribute-patterns -Iinclude -Wall -Wextra -Wno-unused-parameter")
 NOP = b"\x4e\x71"
 UI, RENDER, MIX, FS, NATIVE = None, "sfcore:render_in", "sfcore:main_mix", "sfcore:fs", "sfcore:native"
+# un servizio per operazione dove una mod ne usa una sola: lfo3 vuole l'operazione LFO (interrupt) e il setter del
+# Sound (interfaccia), non gli altri 11 adattatori (~900 cicli a blocco anche senza iscritti)
+LFO, SOUND_SET = "sfcore:lfo", "sfcore:sound_set"
 # (indirizzo 1.42, byte stock, istruzione, simbolo, servizio, descrizione); Synfact: mods/core-st/mod.json (1.41)
 SITES = [
     (0x4000_A220, "4eb94010095c", "jsr", "core_tick", UI, "ev_tick: controllo del ridisegno a 30 Hz"),
@@ -55,10 +58,10 @@ SITES = [
     (0x4011_A8F8, "2479444df4344a8a", "jmp", "core_native_immediate", NATIVE, "IMMEDIATE"),
     (0x400A_4C46, "7119e1883140003e", "jmp", "core_native_type", NATIVE, "TYPE"),
     (0x400A_4D0E, "712b0da07225b280", "jmp", "core_native_src_type", NATIVE, "TYPE (sorgente)"),
-    (0x4001_3304, "4e56ffd848d704fc", "jmp", "core_native_sound_set", NATIVE, "SOUND_ALLOWED e parametri del provider"),
+    (0x4001_3304, "4e56ffd848d704fc", "jmp", "core_native_sound_set", SOUND_SET, "SOUND_ALLOWED e parametri del provider"),
     (0x4002_559C, "246f002c242f0030", "jmp", "core_native_machine_select", NATIVE, "MACHINE_ALLOWED (dopo sampler)"),
     (0x4009_7B74, "4fefffc448d77cfc", "jmp", "core_native_modulation", NATIVE, "MODULATION"),
-    (0x4011_942A, "4fefffc048d77cfc", "jmp", "core_native_lfo", NATIVE, "LFO"),
+    (0x4011_942A, "4fefffc048d77cfc", "jmp", "core_native_lfo", LFO, "LFO"),
     (0x400A_42B6, "202a00247201", "jmp", "core_native_note_accept", NATIVE, "NOTE_ACCEPT"),
 ]
 # simboli di long-samples (stesso codice di Synfact): storage, HZFS, CRC. Usati solo se la sua intestazione c'e'.

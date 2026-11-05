@@ -77,7 +77,8 @@ def test_sites_are_stock_and_audio_adapters_are_services():
         assert build.sha256(sec3[a - 0x4000_0400:a - 0x4000_0400 + n]) == p["expect_sha256"]
     ui = {int(p["addr"], 16) for p in fixed if "service" not in p}
     assert ui == {0x4000_A220, 0x4000_A286, 0x4000_839E, 0x4000_B468}          # interfaccia: sempre
-    assert SERVICES == ["sfcore:fs", "sfcore:main_mix", "sfcore:native", "sfcore:render_in"]
+    assert SERVICES == ["sfcore:fs", "sfcore:lfo", "sfcore:main_mix", "sfcore:native", "sfcore:render_in",
+                        "sfcore:sound_set"]
 
 
 def test_chained_sites_follow_the_existing_hooks():
@@ -202,7 +203,7 @@ def test_chained_with_every_audio_mod():
     """Tutte le mod insieme, con e senza sfcore (tutti i servizi, modulo di prova che rifiuta): stessa uscita.
     cpu-meter misura ancora l'interrupt intero, fx3 mescola ancora (il suo gancio gira prima di core_main_mix)."""
     every = sorted(p.parent.name for p in (ROOT / "mods").glob("*/mod.json")
-                   if p.parent.name not in ("mod-zero", "sfcore", "modulation-skip"))
+                   if p.parent.name not in ("mod-zero", "sfcore", "modulation-skip", "lfo3"))
     s, _ = run(every)
     m, _ = run(every + ["sfcore"], SERVICES, extra=probe)
     assert sram(s) == sram(m)
