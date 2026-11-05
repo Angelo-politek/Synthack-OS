@@ -15,4 +15,5 @@ def word(block: int, k: int) -> int:
     return BLOCKS + STRIDE * block + FIRST + 2 * k
 
 
-PARTS = {"dual-mono": [(0, 0), (0, 1), (0, 2)]}   # nome della mod -> (blocco, parola): DEL R, REV R, FX3 R
+PARTS = {"dual-mono": [(0, 0), (0, 1), (0, 2)],   # nome della mod -> (blocco, parola): DEL R, REV R, FX3 R
+         "fx3": [(1, 0)]}                           # SND3 della FX track

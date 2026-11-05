@@ -8,6 +8,7 @@ Third send effect next to delay and reverb: **chorus**, **flanger**, **phaser** 
 |---|---|---|
 | SND3 (shown `FX3`) | every audio track, **AMP page 1**, knob G, next to DEL and REV. PAN moves to page 2, knob E | per track, with the kit; p-lockable; LFO destination |
 | External input FX3 send | External Mixer page, knob C. With dual-mono in mono: next to REV | kit: low byte of FX-track word 0x37 |
+| FX track FX3 send | FX track **AMP page 1**, knob G, next to DEL and REV. PAN moves to page 2, knob E | kit (kitstore word) |
 | FX3 page | FX track → **REVERB** tab, press again for page 2 | kit (pattern) |
 | Return routing | ROUTING screen (FUNC+FX), **trig 13**, next to delay (14) and reverb (15) | kit: bit 8 of FX-track word 0x37 |
 
@@ -29,6 +30,7 @@ FX3 page: A `TYPE`; B–F change name and range with TYPE; G `DEL`; H `REV`.
 - PHSR: four allpass stages. WID turns the right side into the complementary response.
 - CRSH is mono. It hides knobs E and F.
 - Each knob uses the icon of a similar OS parameter (machine SPD, MOD, sweep time/depth, TONE, BAL, OVER…).
+- FX track send: the FX track bus (ADC 6/7, after the analog FX block) into FX3, as the OS feeds it to the delay and reverb. Off while the FX3 return goes to the FX track (ROUTING trig 13), as the OS does for DEL and REV, to avoid a loop.
 - SND3 is shown in dB, with the machines' MOD icon. External input send: same gain law as the input DEL/REV (level and balance, then (v/32768)²), from ADC 4/5.
 
 `[!]` Kits saved with v0.8.1 start with REV at 0 (that byte held VOL).

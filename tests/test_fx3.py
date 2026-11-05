@@ -1036,6 +1036,75 @@ def test_bus_includes_the_input(m, on):
         assert abs(bus[n] - want / 2 ** 32) < 64, n
 
 
+# ----------------------------------------------------------------------------- SND3 della FX track
+FX_ID = 144
+
+
+def fx_kit(m, v, route=0):
+    """Kit attivo (kitstore, 0x800030B8) con SND3 della FX track = v; kit del pattern col routing di FX3."""
+    import kitstore_layout as KS
+    ui_kit, kit = 0x5000_A000, 0x5000_6000
+    m.uc.mem_write(0x8000_30B8, struct.pack(">I", ui_kit))
+    m.uc.mem_write(0x8000_30BC, struct.pack(">I", kit))
+    m.uc.mem_write(ui_kit, bytes(0x1000))
+    m.uc.mem_write(kit, bytes(142))
+    m.uc.mem_write(kit + 110, struct.pack(">H", route << 8))
+    m.uc.mem_write(ui_kit + KS.word(*KS.PARTS["fx3"][0]), struct.pack(">H", v))
+    return ui_kit + KS.word(*KS.PARTS["fx3"][0])
+
+
+def test_fx_track_snd3_through_vparams_in_kitstore(m):
+    w = fx_kit(m, 0)
+    assert m.call(KIT, [0x5000_0000, FX_ID]) == 1
+    assert m.call(GET, [0x5000_0000, FX_ID]) == 0
+    m.call(SET, [0x5000_0000, FX_ID, 70 << 8, 1])
+    assert m.call(GET, [0x5000_0000, FX_ID]) == 70 << 8
+    assert struct.unpack(">H", m.uc.mem_read(w, 2))[0] == 70
+    m.call(SET, [0x5000_0000, FX_ID, 0x9000, 1])
+    assert m.call(GET, [0x5000_0000, FX_ID]) == 127 << 8
+
+
+@pytest.mark.parametrize("v, route", [(0, 0), (40, 0), (127, 0), (127, 1), (200, 0)])
+def test_fx_track_targets_like_the_os_fx_sends(m, v, route):
+    """Canali 14/15 = ADC 6/7, guadagno pieno dell'ingresso (-1) per (v/32768)^2; 0 se il ritorno di FX3 va
+    nella FX track (anello: l'OS fa lo stesso con DEL e REV della FX track)."""
+    fx_kit(m, v, route)
+    m.put(m.sym["fx3_moving"], [0])
+    tgt = in_hook(m, s32(-0x5000_0000), s32(-0x2000_0000))
+    s = (2 * (min(v, 127) << 8) ** 2) >> 16
+    want = 0 if route or not v else -0x4000 * s
+    assert tgt[14] == tgt[15] == want
+    assert (m.longs(m.sym["fx3_moving"], 1)[0] != 0) == (want != 0)
+
+
+@pytest.mark.parametrize("on", [[14, 15], [3, 14, 15], [12, 14, 15], [12, 13, 14, 15], [0, 5, 9, 12, 13, 14, 15]])
+def test_bus_includes_the_fx_track(m, on):
+    dig = [((k * 7919 + n * 104729) % 65536 - 32768) << 12 for k in range(8) for n in range(32)]
+    ana = [((k * 31337 + n * 7) % 65536 - 32768) << 12 for k in range(8) for n in range(32)]
+    m.put(SRC_DIG, dig)
+    m.put(SRC_ANA, ana)
+    m.put(m.sym["fx3_bus"], [12345] * 16)
+    g = [-0x0800_0000 * (k + 1) if k in on else 0 for k in range(16)]
+    gains(m, g)
+    run_block(m)
+    bus = m.longs(m.sym["fx3_bus"], 16)
+    pair = lambda x, k, n: x[32 * k + 2 * n] + x[32 * k + 2 * n + 1]
+    for n in range(16):
+        want = (-sum(g[k] * pair(dig, k, n) for k in range(8)) * 2
+                - sum(g[8 + k] * pair(ana, k, n) for k in range(8)) * 2)
+        assert abs(bus[n] - want / 2 ** 32) < 64, n
+
+
+def test_fx_track_amp_pages():
+    """G delle pagine AMP 1 della FX track (AHD 17, ADSR 18) = 144 accanto a DEL/REV; PAN (153) in E della pagina 2."""
+    m = Machine()
+    m.uc.reg_write(UC_M68K_REG_D0, 0x1234)
+    m.call(m.sym["fx3_fxamp_stub"])
+    assert [struct.unpack(">I", m.uc.mem_read(a, 4))[0] for a in (0x41BA_06D4, 0x41BA_0700, 0x41BA_0724)] == \
+        [FX_ID, FX_ID, 153]
+    assert m.uc.reg_read(UC_M68K_REG_D0) == 0x1234
+
+
 def test_input_snd3_on_the_external_mixer_page(m):
     m.uc.mem_write(0x41BA_07F8, struct.pack(">I", 0))
     m.uc.reg_write(UC_M68K_REG_D0, 0x1234)

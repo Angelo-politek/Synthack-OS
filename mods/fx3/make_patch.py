@@ -28,6 +28,7 @@ sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
 import dualmono_layout as DL  # noqa: E402
 import modarea_layout  # noqa: E402
+import kitstore_layout as KS  # noqa: E402
 
 _vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
 vparams = importlib.util.module_from_spec(_vp)
@@ -37,7 +38,7 @@ LOAD = 0x4000_0400
 MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
 CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # linea a +0xE000 (4 KB)
 TOOLS = "~/tools/m68k/root"
-CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x} -DDM_HDR={DL.HDR:#x} -DKS_FX3_R={DL.FX3_R:#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
+CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x} -DDM_HDR={DL.HDR:#x} -DKS_FX3_R={DL.FX3_R:#x} -DKS_FX3_FX={KS.word(*KS.PARTS["fx3"][0]):#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
 FS = 24000                              # il chorus lavora a 24 kHz
 DESC = 0x4022_D83C
 P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_EFD0, 0x41B9_ECD0, 0x41B9_EBD0, 0x41B9_E5D0
@@ -52,6 +53,8 @@ HOOKS = [  # (indirizzo, byte originali, simbolo, jsr/jmp, riempimento con nop)
     (0x4019_4C14, "42b941ba06a0", "fx3_amp_stub", "pagine AMP: SND3 (72) in G della pagina 1, PAN (80) in E della pagina 2"),
     (0x4008_F53C, "588f342a0714", "fx3_in_hook", "mandate dell'ingresso: jsr fx3_in_hook (SND3 dell'ingresso)"),
     (0x4019_4F88, "42b941ba07f8", "fx3_in_page", "pagina External Mixer: SND3 dell'ingresso (269) nella casella C"),
+    (0x4019_4D72, "42b941ba0724", "fx3_fxamp_stub",
+     "pagine AMP della FX track: SND3 (144) in G della pagina 1, PAN (153) in E della pagina 2"),
 ]
 # cicli dell'OS che completano i bus d'ingresso di delay e riverbero (bus += analogiche, saturato):
 # jsr al nostro (stesso lavoro, meno istruzioni, piu' la mandata DEL / REV di FX3) ; jmp oltre il ciclo
@@ -71,6 +74,8 @@ KIT_HOOKS = [(0x400A_6E0E, "2f0b2f0a246f000c", "fx3_kser_hook", "kit -> file (FX
 # classe del tab AMP: gli id sotto 73 (diversi da 73-74) erano trattati come parti dell'inviluppo, senza
 # grafica propria; con bra -> "casella normale" SND3 (72) disegna la sua icona
 AMP_FIX = (0x4004_1E84, "605c", "6058")
+# stesso tab per la FX track: gli id 0x56..0x90 (144 = SND3 della FX track) come caselle normali
+AMP_FIX_FX = (0x4004_1EB0, "6030", "602c")
 # schermata ROUTING (FUNC+FX): la voce 13, vuota nell'OS, instrada il ritorno di FX3 nella FX track
 ROUTE_JMP = [(0x4004_C5E2, "7224b28067000222", "fx3_rt_key", "ROUTING: tasto 13 -> jmp fx3_rt_key ; nop"),
              (0x4004_BF86, "4feffff048d7041c", "fx3_rt_get", "ROUTING: stato della voce -> jmp fx3_rt_get ; nop")]
@@ -106,6 +111,9 @@ G_MOD = 0x41B9_E730                     # icona MOD delle macchine (id 176)
 SND_IN = {"id": 269, "slot": 7, "objs": {20: (0x4018_FB6E, 0x41B9_EFD0, "fx3_proto_vol"),
                                          36: (0x4018_FB80, 0x41B9_E8B0, G_SEND), 68: (0x4018_FB9C, 0x41B9_E670, S_BAR)},
           "fix": [(0x4018_FB5A, "2f05", "2f03"), (0x4018_FB62, "7201", "7200")]}
+# SND3 della FX track: id 144 (vparams; prima "Delay Time" nascosto della FX track, la cui parola tiene fx3)
+SND_FX = {"id": 144, "slot": 8, "objs": {20: (0x4018_CC0E, 0x41B9_EFD0, "fx3_proto_vol"),
+                                         36: (0x4018_CC20, 0x41B9_ECD0, G_SEND), 68: (0x4018_CC3C, 0x41B9_E670, S_BAR)}}
 SND3 = {"id": 72, "g36": (0x4018_B53E, G_KNOB, G_MOD), "s68": (0x4018_B55A, 0x41B9_E670, S_BAR)}
 
 
@@ -258,6 +266,17 @@ def main() -> None:
     patches += [fixed(r + 8, struct.pack(">III", 0, 0x7F00, 0), "id 269 -> SND3 dell'ingresso: min, max, default"),
                 fixed(r + 40, long(syms["fx3_in_l"]), "id 269: nome lungo 'Input FX3 Send'"),
                 fixed(r + 48, long(syms["fx3_snd_s"]), "id 269: nome breve 'FX3'")]
+    # SND3 della FX track
+    patches.append(fixed(AMP_FIX_FX[0], bytes.fromhex(AMP_FIX_FX[2]), "tab AMP: SND3 della FX track (144) come "
+                         "casella normale", AMP_FIX_FX[1]))
+    r = DESC + 52 * SND_FX["id"]
+    patches.append(vparams.entry(SND_FX["slot"], SND_FX["id"], syms["fx3_fx_get"], syms["fx3_fx_set"], "fx3 SND3 FX"))
+    for off, (addr, orig, new) in SND_FX["objs"].items():
+        patches.append(fixed(addr, long(resolve(new)), f"id 144 +{off}: {resolve(new):#010x}", f"{orig:08x}"))
+    patches += [fixed(r + 8, struct.pack(">III", 0, 0x7F00, 0), "id 144 -> SND3 della FX track: min, max, default"),
+                fixed(r + 40, long(syms["fx3_fx_l"]), "id 144: nome lungo 'FX Track FX3 Send'"),
+                fixed(r + 48, long(syms["fx3_snd_s"]), "id 144: nome breve 'FX3'"),
+                fixed(r + 28, long(0xFFFF_FFFF), "id 144: niente NRPN", "00000097")]
     # pagina FX3
     for n, (pid, short, ln, mx, df, protos, extra) in enumerate(PARAMS):
         r = DESC + 52 * pid
@@ -270,7 +289,7 @@ def main() -> None:
         for addr, orig, new in extra:
             patches.append(fixed(addr, bytes.fromhex(new), f"id {pid}: campo dell'oggetto come DEL (250)", orig))
     spec = {
-        "name": "fx3", "os": "1.42", "requires": ["modarea", "vparams", "fastmix"],
+        "name": "fx3", "os": "1.42", "requires": ["modarea", "vparams", "fastmix", "kitstore"],
         "description": "Terza mandata effetti: SND3 per traccia (pagina AMP 2) verso un chorus stereo; "
                        "regolazioni e livello di ritorno sulla pagina 2 del tab REVERB.",
         "generated_by": "mods/fx3/make_patch.py",
@@ -280,7 +299,7 @@ def main() -> None:
             "fx3_bus", "fx3_wet", "fx3_idle", "fx3_clr", "fx3_reverb_pages", "fx3_fmt_spd", "fx3_fmt_del", "fx3_fmt_dep",
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
-            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rev_hook", "fx3_addsat", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set",
+            "fx3_kser_hook", "fx3_kdes_hook", "fx3_rev_hook", "fx3_addsat", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set", "fx3_fx_get", "fx3_fx_set", "fx3_fxamp_stub",
             "fx3_route", "fx3_rt_key", "fx3_rt_get", "fx3_rt_draw")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,

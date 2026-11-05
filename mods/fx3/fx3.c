@@ -67,12 +67,12 @@ u16 fx3_fallback[0x47] DATA = {0};                        /* nessun kit (ancora)
  * (indirizzabili con l'indice di traccia: (a5,dN*4) vuole uno spostamento sotto 128), poi i valori di ogni
  * blocco, poi quelli del phaser e del crusher (righe toccate solo con quel tipo), infine bus e uscita. Il
  * chorus tocca 23 righe. Gli offset servono all'assembly: O_* e i controlli sotto. */
-#define O_CUR    0      /* s32[16]: guadagni del blocco (levigati verso i bersagli): 0..7 digitali, 8..11 analogiche, 12..13 ingresso */
+#define O_CUR    0      /* s32[16]: guadagni del blocco (levigati verso i bersagli): 0..7 digitali, 8..11 analogiche, 12..13 ingresso, 14..15 FX track */
 #define O_TGT    64     /* s32[16]: bersagli mono (meta') */
 #define O_SEEN   128    /* u32[2]: ultime parole del kit lette, a coppie (1: rilettura) */
 #define O_MOVING 136    /* != 0: un bersaglio e' cambiato */
 #define O_RAMP   140    /* != 0: un guadagno non ha ancora raggiunto il bersaglio */
-#define O_LIVE   144    /* canali con guadagno (bit 0..13) */
+#define O_LIVE   144    /* canali con guadagno (bit 0..15; 14..15 FX track) */
 #define O_QUIET  148    /* blocchi consecutivi senza ingresso ne' coda */
 #define O_IDLE   152    /* 1 = niente da fare (e wet non valido) */
 #define O_TYPE   156    /* tipo per cui e' preparato lo stato dell'effetto */
@@ -444,6 +444,32 @@ s32 fx3_in_set(void *obj, s32 id, s32 value)
     return 0;
 }
 
+/* ---- SND3 della FX track: id 144 (vparams), parola KS_FX3_FX del kit attivo (kitstore), 0..127. Pagina AMP
+ * della FX track, G, accanto a DEL e REV: manda il bus della FX track (ADC 6/7) a FX3 come l'OS lo manda a
+ * delay e riverbero (canali 14/15, fx3_in_hook). */
+s32 fx3_fx_get(void *obj, s32 id)
+{
+    const char *k = UI_KIT;
+    u32 v = k ? *(const volatile u16 *)(k + KS_FX3_FX) : 0;
+    (void)obj;
+    (void)id;
+    return (s32)(v > 127 ? 127 : v) << 8;
+}
+
+s32 fx3_fx_set(void *obj, s32 id, s32 value)
+{
+    char *ui = UI_ROOT, *k = UI_KIT;
+    (void)obj;
+    (void)id;
+    value = (value + 0x80) >> 8;
+    value = value < 0 ? 0 : value > 127 ? 127 : value;
+    if (k)
+        *(volatile u16 *)(k + KS_FX3_FX) = (u16)value;
+    if (ui)
+        ui[96] = 1;
+    return 0;
+}
+
 /* ---- ROUTING (FUNC+FX), tasto 13: il ritorno di FX3 nella FX track (bit 8 della parola 0x37 del kit), come
  * il routing di delay e riverbero sui tasti 14 e 15 */
 #define DRAW_BOX  ((void (*)(void *, s32, s32, s32, s32, s32))0x400F7D9Au)
@@ -648,6 +674,7 @@ const u32 fx3_reverb_pages[2] = {21, 25};                  /* tab REVERB: pagina
 const char fx3_page_s[] = "FX3";
 const char fx3_snd_s[] = "FX3";
 const char fx3_in_l[] = "Input FX3 Send";
+const char fx3_fx_l[] = "FX Track FX3 Send";
 const char fx3_snd_l[] = "FX3 Send";
 
 /* ===== percorso caldo: tutto il codice che gira a ogni blocco, di seguito (righe di cache contigue).
@@ -756,7 +783,7 @@ __asm__(
     "        moveq   #1,%d5\n"
     "        tst.l   %d4\n"
     "        bne.s   1b\n"
-    "        bra.s   .Lloud\n"
+    "        bra.w   .Lloud\n"
     ".Lmany: moveq   #0,%d5\n"                           /* tracce insieme, poi l'ingresso (ADC 4/5) */
     "        move.l  %d6,%d0\n"
     "        andi.l  #0xFFF,%d0\n"
@@ -773,6 +800,8 @@ __asm__(
     "2:      move.l  " ST(O_LIVE) ",%d6\n"
     "        moveq   #12,%d0\n"
     "        lsr.l   %d0,%d6\n"                          /* ingresso: bit 0 L, bit 1 R */
+    "        moveq   #3,%d0\n"
+    "        and.l   %d0,%d6\n"
     "        lea     " ST(O_BUS) ",%a0\n"
     "        lea     0x80003B50,%a1\n"
     "        move.l  " ST(O_CUR + 48) ",%d0\n"
@@ -782,18 +811,29 @@ __asm__(
     "        lea     0x80003BD0,%a2\n"                   /* L e R: un passaggio solo */
     "        move.l  " ST(O_CUR + 52) ",%d4\n"
     "        bsr.w   f3_sum2\n"
-    "        bra.s   .Lloud\n"
+    "        moveq   #1,%d5\n"
+    "        bra.s   .Lfxtrk\n"
     "3:      btst    #0,%d6\n"
     "        beq.s   4f\n"
     "        bsr.w   f3_sum1\n"
     "        moveq   #1,%d5\n"
     "4:      btst    #1,%d6\n"
-    "        beq.s   .Lloud\n"
+    "        beq.s   .Lfxtrk\n"
     "        lea     " ST(O_BUS) ",%a0\n"
     "        lea     0x80003BD0,%a1\n"
     "        move.l  " ST(O_CUR + 52) ",%d0\n"
     "        bsr.w   f3_sum1\n"
-    ".Lloud: lea     " ST(O_BUS) ",%a0\n"                /* ingresso udibile? (tracce ferme: no) */
+    "        moveq   #1,%d5\n"
+    ".Lfxtrk: move.l  " ST(O_LIVE) ",%d6\n"               /* FX track (ADC 6/7, canali 14/15): stesso guadagno */
+    "        andi.l  #0xC000,%d6\n"
+    "        beq.s   .Lloud\n"
+    "        lea     " ST(O_BUS) ",%a0\n"
+    "        lea     0x80003C50,%a1\n"
+    "        move.l  " ST(O_CUR + 56) ",%d0\n"
+    "        lea     0x80003CD0,%a2\n"
+    "        move.l  " ST(O_CUR + 60) ",%d4\n"
+    "        bsr.w   f3_sum2\n"
+    ".Lloud: lea     " ST(O_BUS) ",%a0\n"               /* ingresso udibile? (tracce ferme: no) */
     "        moveq   #16,%d1\n"
     "        move.l  #LOUD,%d2\n"
     "1:      move.l  (%a0)+,%d0\n"
@@ -1085,7 +1125,7 @@ __asm__(
     "        bset    %d1,%d5\n"
     "5:      addq.l  #4,%a0\n"
     "        addq.l  #1,%d1\n"
-    "        moveq   #14,%d2\n"
+    "        moveq   #16,%d2\n"                          /* 14..15: FX track (ADC 6/7) */
     "        cmp.l   %d2,%d1\n"
     "        bne.s   1b\n"
     "        move.l  %d4," ST(O_RAMP) "\n"
@@ -1217,7 +1257,38 @@ __asm__(
     "8:      move.l  %d4,(%a1)\n"
     "        move.l  %d5,4(%a1)\n"
     "        move.l  %a1,fx3_s + " XS(O_MOVING) "\n"
-    "9:      movem.l (%sp),%d0-%d1/%d3-%d5/%a1\n"
+    "9:      moveq   #0,%d0\n"                           /* SND3 della FX track (parola KS_FX3_FX): canali 14/15 */
+    "        move.l  0x800030B8,%d4\n"                   /* = ADC 6/7, ognuno meta' come l'ingresso a guadagno */
+    "        beq.s   1f\n"                               /* pieno; 0 se il ritorno di FX3 va nella FX track */
+    "        movea.l %d4,%a1\n"                          /* (anello, come l'OS per DEL e REV) */
+    "        mvz.w   " XS(KS_FX3_FX) "(%a1),%d0\n"
+    "        bsr.w   f3_kit2\n"
+    "        btst    #0," XS(W_IN) "(%a1)\n"
+    "        beq.s   1f\n"
+    "        moveq   #0,%d0\n"
+    "1:      moveq   #0,%d4\n"
+    "        tst.l   %d0\n"
+    "        beq.s   2f\n"
+    "        moveq   #127,%d4\n"
+    "        cmp.l   %d4,%d0\n"
+    "        bls.s   3f\n"
+    "        move.l  %d4,%d0\n"
+    "3:      lsl.l   #8,%d0\n"
+    "        mulu.w  %d0,%d0\n"
+    "        add.l   %d0,%d0\n"
+    "        swap    %d0\n"                              /* (v/32768)^2 Q15 */
+    "        andi.l  #0xFFFF,%d0\n"
+    "        moveq   #14,%d4\n"                          /* -0x4000 x: segno degli ADC come l'ingresso */
+    "        lsl.l   %d4,%d0\n"                          /* (guadagno pieno dall'OS = -1) */
+    "        move.l  %d0,%d4\n"
+    "        neg.l   %d4\n"
+    "2:      lea     fx3_s + " XS(O_TGT) " + 56,%a1\n"
+    "        cmp.l   (%a1),%d4\n"
+    "        beq.s   4f\n"
+    "        move.l  %d4,(%a1)\n"
+    "        move.l  %d4,4(%a1)\n"
+    "        move.l  %a1,fx3_s + " XS(O_MOVING) "\n"
+    "4:      movem.l (%sp),%d0-%d1/%d3-%d5/%a1\n"
     "        lea     24(%sp),%sp\n"
     "        rts\n"
     "f3_kit2:                                        \n" /* -> a1 = kit (usa d4) */
@@ -1710,5 +1781,15 @@ __asm__(
     "        moveq   #80,%d0\n"
     "        move.l  %d0,0x41BA0674\n"
     "        move.l  %d0,0x41BA06A0\n"
+    "        move.l  (%sp)+,%d0\n"
+    "        rts\n"
+    "        .globl  fx3_fxamp_stub\n"
+    "fx3_fxamp_stub:\n"                                  /* al posto di clr.l 0x41BA0724 (pagina AMP 2 della FX */
+    "        move.l  %d0,-(%sp)\n"                       /* track, E): SND3 della FX track (144) in G della */
+    "        move.l  #144,%d0\n"                         /* pagina 1 (AHD / ADSR), accanto a DEL e REV; */
+    "        move.l  %d0,0x41BA06D4\n"                   /* PAN (153) in E della pagina 2 */
+    "        move.l  %d0,0x41BA0700\n"
+    "        move.l  #153,%d0\n"
+    "        move.l  %d0,0x41BA0724\n"
     "        move.l  (%sp)+,%d0\n"
     "        rts\n");

@@ -3,7 +3,7 @@
 "Nascosto" non vuol dire libero: un id con lo stesso gruppo + id interno di un parametro visibile e' un
 alias che l'OS puo' mettere su una pagina (59 GAIN al posto di RESO, 122 sul MIXER, 113 mix del delay...).
 Con vparams al suo posto quella manopola mostrerebbe la mod (issue #3). Un id con CC o NRPN riceverebbe
-i messaggi MIDI dell'utente. Il test legge i descrittori dall'OS stock e gli id da tutti i patch.json.
+i messaggi MIDI dell'utente. Il test legge i descrittori dall'OS stock, con le patch delle mod, e gli id da tutti i patch.json.
 """
 
 import json
@@ -31,7 +31,13 @@ KNOWN_VISIBLE = {59, 91, 101, 113, 122, 125, 127}
 
 @pytest.fixture(scope="module")
 def desc():
-    sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
+    sec3 = bytearray(eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes())
+    for f in sorted((ROOT / "mods").glob("*/patch.json")):         # descrittori come li lasciano le mod
+        for p in json.loads(f.read_text(encoding="utf-8"))["patches"]:   # (CC / NRPN azzerati)
+            a = int(p["addr"], 16)
+            if p["section"] == 3 and not p.get("append") and DESC <= a < DESC + 52 * N:
+                raw = bytes.fromhex(p["hex"])
+                sec3[a - LOAD:a - LOAD + len(raw)] = raw
     out = []
     for i in range(N):
         o = DESC - LOAD + 52 * i

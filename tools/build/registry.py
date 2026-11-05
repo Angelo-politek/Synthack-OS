@@ -109,6 +109,7 @@ SHARED_RAM = [
 VPARAMS_SLOTS = {
     **{s: ("master-comp", 262 + s) for s in range(7)},
     7: ("fx3", 269),
+    8: ("fx3", 144),
     **{9 + n: ("fx3", pid) for n, pid in enumerate((246, 247, 248, 250, 251, 252, 249, 253))},
     17: ("dual-mono", 129),
     18: ("dual-mono", 130),
@@ -120,6 +121,7 @@ IDS = {
     **{i: ("perf-fx", f"Perf FX {i - 47} (Mod A M{i - 47})") for i in range(48, 52)},
     72: ("fx3", "SND3 (amp \"Delay Time\", saved per track)"),
     125: ("dual-mono", "IN R: alias of BAL"),
+    144: ("fx3", "FX track SND3, FX track AMP page (was hidden FX amp \"Delay Time\", NRPN cleared)"),
     129: ("dual-mono", "DEL: R side while the IN R page is open"),
     130: ("dual-mono", "REV: R side while the IN R page is open"),
     **{i: ("fx3", "FX3 page") for i in range(246, 254)},

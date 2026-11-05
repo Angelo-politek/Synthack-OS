@@ -102,6 +102,7 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 5 | master-comp | 267 |
 | 6 | master-comp | 268 |
 | 7 | fx3 | 269 |
+| 8 | fx3 | 144 |
 | 9 | fx3 | 246 |
 | 10 | fx3 | 247 |
 | 11 | fx3 | 248 |
@@ -112,7 +113,7 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 16 | fx3 | 253 |
 | 17 | dual-mono | 129 |
 | 18 | dual-mono | 130 |
-| 8, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31 | **free** | |
+| 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31 | **free** | |
 
 ## Parameter ids
 
@@ -127,6 +128,7 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 125 | dual-mono | IN R: alias of BAL |
 | 129 | dual-mono | DEL: R side while the IN R page is open |
 | 130 | dual-mono | REV: R side while the IN R page is open |
+| 144 | fx3 | FX track SND3, FX track AMP page (was hidden FX amp "Delay Time", NRPN cleared) |
 | 190 | sy-fm4 | SYN page 1/3 TUNE (SY TONE's TUNE, renamed) |
 | 191 | sy-fm4 | SYN page 1/3 RAT2 (SY TONE's RATIO, renamed) |
 | 192 | sy-fm4 | SYN page 1/3 LEV2 (SY TONE's MOD, renamed) |
@@ -182,4 +184,5 @@ Ids without a page often carry a MIDI CC or are aliases: clear the CC, check ali
 | Store | Mod | Slots |
 |---|---|---|
 | kitstore | dual-mono | block 0 word 0, block 0 word 1, block 0 word 2 |
+| kitstore | fx3 | block 1 word 0 |
 | projstore | long-samples | 0–132 |
