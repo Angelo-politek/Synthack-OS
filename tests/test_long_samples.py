@@ -242,3 +242,63 @@ def test_plan_follows_the_slot_map(m):
         struct.pack_into(">I", raw, 32, zlib.crc32(bytes(raw[:size]), 0xFFFFFFFF) & 0xFFFFFFFF)
         m.disk.write(lba, bytes(raw))
     assert frames() == [3]                                # solo il secondo, alla posizione 1
+
+
+def test_transfer_window(m):
+    """A high window opens the OS's transfer window as the stock /samples/N does (write_started = 0x40007712, the
+    samples service's function); the written catalogue closes it (the UI task sends it NO)."""
+    from unicorn import UC_HOOK_CODE
+    from unicorn.m68k_const import UC_M68K_REG_A7
+    s = m.sym
+    path, out = SCRATCH + 0x300, SCRATCH + 0x400
+    m.put(MMC_READY, ">I", 1)
+
+    stub = SCRATCH + 0x600                                   # a0 = the result, as at 0x400B8100
+    m.uc.mem_write(stub, b"\x20\x7c" + struct.pack(">I", out) + b"\x4e\xf9" + struct.pack(">I", s["core_fs_route"]))
+
+    def route(k):
+        m.uc.mem_write(path + 8, f"/samples/{8185 + k}".encode() + b"\0")
+        m.put(path, ">I", path + 8)
+        m.uc.mem_write(out, bytes(0x90))
+        assert m.call(stub, [0, path]) == out                # glue.S: Synfact's route, then ls_route_done
+        return out + 8
+    info = route(0x602)
+    assert struct.unpack(">4I", m.uc.mem_read(info + 60, 16)) == (0x4000_7712, 0, 0x4016_DA7E, 0x4016_DA76)
+    assert struct.unpack(">I", m.uc.mem_read(info + 76, 4))[0] == 0x602
+    posted = []
+
+    def post(uc, addr, size, _):
+        fn = struct.unpack(">I", uc.mem_read(uc.reg_read(UC_M68K_REG_A7) + 8, 4))[0]
+        posted.append(struct.unpack(">4I", uc.mem_read(fn, 16)))
+    h = m.uc.hook_add(UC_HOOK_CODE, post, begin=0x4000_9DD8, end=0x4000_9DD8)
+    try:
+        m.call(0x4019_C3F4, [info + 60])                     # the raw writer opens (0x400B60B6)
+        assert posted and posted[0][3] == 0x4000_796E        # the stock window, in the UI task
+        views = m.call(0x4016_E044) + 64 + 20                # 0x40008392: the views shown
+
+        def messages():
+            found, n = [], m.long(views)
+            while n != views:
+                v = m.long(n + 8)
+                if v and m.call(0x401B_A614, [v, 0x4024_1EBC, 0x401C_197C, 0]):
+                    found.append(v)
+                n = m.long(n)
+            return found
+        m.call(0x4000_796E, count=200_000_000)
+        msg, = messages()
+        assert sum(bin(b).count("1") for b in m.draw(msg)) > 300     # the window and its two lines
+        posted.clear()
+        m.call(m.long(info + 76 + 12), [info + 76, 0])       # a data window written: stays open
+        assert not posted
+        info = route(0x600)
+        m.call(m.long(info + 76 + 12), [info + 76, 0])       # the catalogue written: closed in the UI task
+        p, = posted
+        m.uc.mem_write(SCRATCH, struct.pack(">4I", *p))
+        closes = m.long(s["ls_transfer_closes"])
+        m.call(p[3], [SCRATCH], count=200_000_000)
+        assert m.uc.mem_read(msg + 48, 1)[0] == 1 and m.long(msg + 76) == 2   # closed, as by NO
+        assert m.long(s["ls_transfer_closes"]) == closes + 1
+        m.call(p[3], [SCRATCH], count=200_000_000)           # closing already: nothing
+        assert m.long(s["ls_transfer_closes"]) == closes + 1
+    finally:
+        m.uc.hook_del(h)

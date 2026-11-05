@@ -42,6 +42,7 @@ Device (2026-11-04): `ls`, `put` of an 11 s file, playback checked on a Syntakt 
 |---|---|---|
 | HZFS: catalogues A/B at eMMC `0x30000000`, files in 512 KB windows from `0x30100000`; never formats a zone that isn't blank | `synfact/hzfs.c`, `crc.c`, `high-storage.c` | Synfact, unchanged |
 | Data RPC: raw windows `/samples/(8185 + k)` (route `0x400B8100`), stock-slot write guard (`0x400B6204`) | `glue.S`, `synfact/high-storage.c` | Synfact's veneers, 1.42 addresses |
+| Transfer window: a high window opens the OS's "SAMPLES ARE BEING TRANSFERRED" window, as the stock `/samples/N` route does (`write_started` = `0x40007712`); writing a catalogue window (the last write of a put, remove or order change) closes it. The window has no progress bar | `transfer.c` | ours |
 | Catalogues checked at startup (`0x4008271E`) | `glue.S` → `core_hzfs_startup` | Synfact |
 | Plan after the stock image is built (`0x4008287A`): first 64 files that fit | `pool.c` | ours |
 | Upload (`0x40082FB6` page count, `0x40082FCE` page source): after the stock pages, a table page (`SHLS`, count, {pointer, frames}) then each file read from the eMMC, 2 KB a page | `pool.c` | ours (same sites as Synfact's core_pool_count/map) |

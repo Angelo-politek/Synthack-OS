@@ -29,7 +29,7 @@ CODE_BASE = modarea_layout.RAM + OFFSET
 TOOLS = "~/tools/m68k/root"
 CFLAGS = ("-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -fno-tree-loop-distribute-patterns "
           "-Isynfact -Wall -Wextra -Wno-unused-parameter -Wno-sign-compare -Wno-misleading-indentation")
-SOURCES = ["synfact/hzfs.c", "synfact/crc.c", "synfact/high-storage.c", "pool.c"]
+SOURCES = ["synfact/hzfs.c", "synfact/crc.c", "synfact/high-storage.c", "pool.c", "transfer.c"]
 NOP = b"\x4e\x71"
 # (indirizzo 1.42, byte stock, istruzione, simbolo, descrizione); Synfact: mods/core-st/mod.json, siti 1.41
 HOOKS = [
@@ -57,7 +57,8 @@ def build_blob():
     with tempfile.TemporaryDirectory(prefix="longsamples-") as tmp:
         tmp = Path(tmp)
         shutil.copytree(HERE / "synfact", tmp / "synfact")
-        shutil.copy(HERE / "pool.c", tmp / "pool.c")
+        for f in ("pool.c", "transfer.c"):
+            shutil.copy(HERE / f, tmp / f)
         shutil.copy(HERE / "glue.S", tmp / "glue.S")
         w = eft.to_wsl_path(tmp)
         env = f"R={TOOLS}; export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu; cd {w}; "

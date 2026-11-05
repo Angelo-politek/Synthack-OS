@@ -88,6 +88,9 @@ core_fs_route:
         lea 12(%sp),%sp
         tst.l %d0
         beq.s 3f
+        move.l %a2,-(%sp)                   | ours (transfer.c): the OS's transfer window for the write
+        jsr ls_route_done
+        addq.l #4,%sp
         move.l %a2,%d0
         movem.l (%sp),%a2-%a5
         lea 16(%sp),%sp
