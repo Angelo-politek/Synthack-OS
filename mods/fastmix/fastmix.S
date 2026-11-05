@@ -23,42 +23,71 @@
         .equ    R8_BACK,        0x4008F0BE
         .equ    KMAX,           5               | canali per il percorso a canali scelti
 
-| ---- ingresso per n canali: prima gli inc (in rampa: subito la routine dell'OS, senza salvare nulla),
-| poi d4 = guadagni non nulli e la scelta del percorso
-        .macro  ENTRY c
-        .globl  fm_sum\c
-fm_sum\c:
+| ---- ingressi per n canali (10, 9, 8), un solo codice: prima gli inc (in rampa: subito la routine dell'OS,
+| senza salvare nulla), poi d4 = guadagni non nulli e la scelta del percorso. L'interrupt non sta nella cache
+| istruzioni: ogni riga di codice eseguita costa una lettura dalla DDR a ogni blocco (tools/emu/cycles.py),
+| quindi una catena sola con tre punti d'ingresso invece di tre copie.
+        .text
+        .globl  fm_sum10, fm_sum9, fm_sum8
+fm_sum10:                                       | al posto di 0x4008EF8C: jmp fm_sum10 ; nop
         movea.l 16(%sp),%a0                     | inc
-        move.l  (%a0)+,%d0
-        .rept   \c - 1
+        moveq   #0,%d0
+        bra.s   1f
+fm_sum9:                                        | al posto di 0x4008F024
+        movea.l 16(%sp),%a0
+        moveq   #0,%d0
+        bra.s   2f
+fm_sum8:                                        | al posto di 0x4008F0B6
+        movea.l 16(%sp),%a0
+        moveq   #0,%d0
+        bra.s   3f
+1:      or.l    (%a0)+,%d0
+2:      or.l    (%a0)+,%d0
+3:      .rept   8
         or.l    (%a0)+,%d0
         .endr
-        bne.w   os\c
+        bne.w   fm_os
+        move.l  %a0,%d1                         | a0 = inc + 4n
+        sub.l   16(%sp),%d1
+        lsr.l   #2,%d1                          | n
         lea     -44(%sp),%sp
         movem.l %d2-%d7/%a2-%a6,(%sp)
         movem.l 48(%sp),%a0-%a2                 | dst, src, g
         moveq   #0,%d4
-        .rept   \c
+        moveq   #9,%d2
+        cmp.l   %d2,%d1
+        blt.s   .Lc8
+        beq.s   .Lc9
+        tst.l   (%a2)+
+        beq.s   .Lc9
+        addq.l  #1,%d4
+.Lc9:   tst.l   (%a2)+
+        beq.s   .Lc8
+        addq.l  #1,%d4
+.Lc8:   .rept   8
         tst.l   (%a2)+
         beq.s   1f
         addq.l  #1,%d4
 1:
         .endr
         tst.l   %d4
-        beq.w   fm_zero
+        beq.s   fm_zero
         moveq   #KMAX,%d0
         cmp.l   %d0,%d4
-        bgt.w   dense\c
-        moveq   #\c,%d0
+        bgt.w   fm_dense
+        move.l  %d1,%d0
         bra.w   fm_some
-        .endm
 
-        .text
-        ENTRY   10                              | al posto di 0x4008EF8C: jmp fm_sum10 ; nop
-        ENTRY   9                               | al posto di 0x4008F024
-        ENTRY   8                               | al posto di 0x4008F0B6
-
-| ---- in rampa: le istruzioni sostituite, poi la routine dell'OS
+| ---- in rampa: le istruzioni sostituite, poi la routine dell'OS (n dalla fine degli inc)
+fm_os:  move.l  %a0,%d0
+        sub.l   16(%sp),%d0
+        cmpi.l  #40,%d0
+        beq.s   os10
+        cmpi.l  #36,%d0
+        beq.s   os9
+os8:    lea     -40(%sp),%sp
+        movem.l %d2-%d7/%a2-%a5,(%sp)
+        jmp     R8_BACK
 os10:   lea     -48(%sp),%sp
         moveq   #32,%d0
         movem.l %d2-%d7/%a2-%fp,(%sp)
@@ -66,9 +95,6 @@ os10:   lea     -48(%sp),%sp
 os9:    lea     -44(%sp),%sp
         movem.l %d2-%d7/%a2-%fp,(%sp)
         jmp     R9_BACK
-os8:    lea     -40(%sp),%sp
-        movem.l %d2-%d7/%a2-%a5,(%sp)
-        jmp     R8_BACK
 
 | ---- fine comune
 fm_out:
@@ -76,14 +102,21 @@ fm_out:
         lea     44(%sp),%sp
         rts
 
-| ---- nessun guadagno: dst = acc0 nel primo campione, poi zeri. a0 = dst
+| ---- nessun guadagno: dst = acc0 nel primo campione, poi zeri (a passi di 8 B). a0 = dst. Gli stessi valori
+| agli stessi indirizzi dell'OS; il primo si scrive due volte (0, poi acc0)
 fm_zero:
-        movclr.l %acc0,%d0
-        move.l  %d0,(%a0)
+        movclr.l %acc0,%d2
         moveq   #0,%d0
-        .irp    o,8,16,24,32,40,48,56,64,72,80,88,96,104,112,120,128,136,144,152,160,168,176,184,192,200,208,216,224,232,240,248
-        move.l  %d0,\o(%a0)
-        .endr
+        movea.l %a0,%a1
+        moveq   #8,%d1
+1:      move.l  %d0,(%a1)
+        move.l  %d0,8(%a1)
+        move.l  %d0,16(%a1)
+        move.l  %d0,24(%a1)
+        lea     32(%a1),%a1
+        subq.l  #1,%d1
+        bne.s   1b
+        move.l  %d2,(%a0)
         bra.w   fm_out
 
 | ---- da 1 a KMAX canali: a0 = dst, a1 = src, a2 = g + 4n, d0 = n, d4 = guadagni non nulli.
@@ -165,62 +198,28 @@ k\k:    moveq   #16,%d7
         KERN    5
 
 | ---- tutti i canali, guadagni fermi: il ciclo dell'OS senza g += inc e senza riscrivere g, due campioni
-| a giro. a0 = dst, a1 = src, a2 = g + 4n. Stessi registri dell'OS per i guadagni e la catena.
-dense8:
+| a giro. a0 = dst, a1 = src, a2 = g + 4n, d1 = n. Un ciclo solo, a 10 canali: con 9 o 8 i guadagni che
+| mancano valgono 0 (prodotti nulli, accumulatore invariato) e la catena legge uno o due canali in piu'
+| dopo src, sempre nella SRAM (le chiamate dell'OS hanno src = 0x80003950 o 0x80003D50, fino a 0x80004250).
+fm_dense:
         movea.l %a0,%a3                         | dst
         movea.l %a1,%a4                         | src
-        lea     -32(%a2),%a0
-        movem.l (%a0),%d0-%d4/%a0-%a2
-        moveq   #16,%d5
-        move.l  (%a4)+,%d6
-1:      .rept   2
-        msac.l  %d0,%d6,124(%a4),%d6,%acc0
-        msac.l  %d1,%d6,252(%a4),%d6,%acc0
-        msac.l  %d2,%d6,380(%a4),%d6,%acc0
-        msac.l  %d3,%d6,508(%a4),%d6,%acc0
-        msac.l  %d4,%d6,636(%a4),%d6,%acc0
-        msac.l  %a0,%d6,764(%a4),%d6,%acc0
-        msac.l  %a1,%d6,892(%a4),%d6,%acc0
-        msac.l  %a2,%d6,(%a4)+,%d6,%acc0
-        movclr.l %acc0,%d7
-        move.l  %d7,(%a3)
-        addq.l  #8,%a3
-        .endr
-        subq.l  #1,%d5
-        bne.w   1b
-        bra.w   fm_out
-
-dense9:
-        movea.l %a0,%a4                         | dst
-        movea.l %a1,%a5                         | src
-        lea     -36(%a2),%a0
-        movem.l (%a0),%d0-%d4/%a0-%a3
-        moveq   #16,%d5
-        move.l  (%a5)+,%d6
-1:      .rept   2
-        msac.l  %d0,%d6,124(%a5),%d6,%acc0
-        msac.l  %d1,%d6,252(%a5),%d6,%acc0
-        msac.l  %d2,%d6,380(%a5),%d6,%acc0
-        msac.l  %d3,%d6,508(%a5),%d6,%acc0
-        msac.l  %d4,%d6,636(%a5),%d6,%acc0
-        msac.l  %a0,%d6,764(%a5),%d6,%acc0
-        msac.l  %a1,%d6,892(%a5),%d6,%acc0
-        msac.l  %a2,%d6,1020(%a5),%d6,%acc0
-        msac.l  %a3,%d6,(%a5)+,%d6,%acc0
-        movclr.l %acc0,%d7
-        move.l  %d7,(%a4)
-        addq.l  #8,%a4
-        .endr
-        subq.l  #1,%d5
-        bne.w   1b
-        bra.w   fm_out
-
-dense10:
-        movea.l %a0,%a3                         | dst
-        movea.l %a1,%a4                         | src
+        moveq   #9,%d0
+        cmp.l   %d0,%d1
+        blt.s   2f
+        beq.s   1f
         lea     -40(%a2),%a5
         movem.l (%a5),%d0-%d5/%a0-%a2/%a5
-        moveq   #16,%d7
+        bra.s   3f
+1:      lea     -36(%a2),%a5
+        movem.l (%a5),%d0-%d5/%a0-%a2
+        suba.l  %a5,%a5
+        bra.s   3f
+2:      lea     -32(%a2),%a5
+        movem.l (%a5),%d0-%d5/%a0-%a1
+        suba.l  %a2,%a2
+        suba.l  %a5,%a5
+3:      moveq   #16,%d7
         move.l  (%a4)+,%d6
 1:      .rept   2
         msac.l  %d0,%d6,124(%a4),%d6,%acc0

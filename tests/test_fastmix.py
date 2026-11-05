@@ -162,8 +162,9 @@ def test_any_emac_mode(pair, macsr):
         assert a == b, (macsr, k)
 
 
-# istruzioni per chiamata, guadagni fermi (stock -> mod): tetti
-CEIL = {(10, 0): 80, (10, 2): 300, (10, 5): 410, (10, 10): 515, (9, 9): 480, (8, 8): 440, (8, 1): 250}
+# istruzioni per chiamata, guadagni fermi (stock -> mod): tetti. 2026-11-05: ingressi in una catena sola, zeri in un
+# ciclo, 9 e 8 canali nel ciclo a 10 (guadagni nulli): qualche istruzione in piu', 31 righe di codice in meno
+CEIL = {(10, 0): 115, (10, 2): 310, (10, 5): 420, (10, 10): 530, (9, 9): 525, (8, 8): 520, (8, 1): 255}
 
 
 def test_cost(pair):
