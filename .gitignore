@@ -50,3 +50,6 @@ local/
 
 # registrazioni delle misure (tools/measure)
 rec/
+
+# copia locale di synfact-dev (strumento dei sample lunghi, mods/long-samples/README.md)
+synfact-dev/
