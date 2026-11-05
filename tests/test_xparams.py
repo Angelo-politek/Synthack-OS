@@ -87,11 +87,17 @@ def test_cpu1_cost_per_block(built):
     uc.mem_map(0xFC00_0000, 0x10_0000)
     n = [0]
     uc.hook_add(UC_HOOK_CODE, lambda *a: n.__setitem__(0, n[0] + 1))
-    uc.reg_write(UC_M68K_REG_SR, 0x2700)
-    uc.reg_write(UC_M68K_REG_A7, MA.STACK - 4)
-    uc.mem_write(MA.STACK - 4, struct.pack(">I", MA.RET))
     uc.mem_write(0x8000_21B0, bytes(range(256)) * 8)
-    uc.emu_start(SYM["xp_dma_wait"], MA.RET, count=100_000)
+
+    def wait(ret):                                      # chiamata dell'interrupt che ritorna a ret
+        uc.reg_write(UC_M68K_REG_SR, 0x2700)
+        uc.reg_write(UC_M68K_REG_A7, MA.STACK - 4)
+        uc.mem_write(MA.STACK - 4, struct.pack(">I", ret))
+        uc.emu_start(SYM["xp_dma_wait"], ret, count=100_000)
+    wait(0x400A_54FC)                                   # fine dell'interrupt: solo l'attesa, nessuna copia
+    assert not any(uc.mem_read(0x1000_0640, 0x140)) and n[0] < 30, n[0]
+    n[0] = 0
+    wait(0x400A_4E34)                                   # prima del trasferimento dei parametri: la copia
     print("xp_dma_wait:", n[0])
     assert n[0] <= budget.AUDIO_CPU["xparams"], n[0]
     got = struct.unpack(">64H", uc.mem_read(0x1000_0700, 128))

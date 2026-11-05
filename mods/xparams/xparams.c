@@ -104,13 +104,12 @@ __asm__(
 #define SHARED_RAW ((volatile uint16_t *)(0x10000000 + XP_RAW))
 #define DMA_PENDING (*(volatile uint8_t *)0x43bde73c)
 #define TCD47_CSR (*(volatile uint16_t *)0xfc0455fe)
+/* The audio interrupt calls the wait twice: before the frame transfer (return to 0x400a4e34) and at its end
+ * (0x400a54fc). The values are copied with the frame, at the first call: nothing in the interrupt writes them in
+ * between, so the second copy only repeated the first (144 shared-RAM writes a block, outside the cache). */
+#define FRAME_CALL ((void *)0x400a4e34)
 
-__attribute__((optimize("O2"))) void xp_dma_wait(void) {
-    if (DMA_PENDING) {
-        while (!(TCD47_CSR & 0x80))     /* DONE */
-            ;
-        DMA_PENDING = 0;
-    }
+__attribute__((optimize("O2"), noinline)) static void xp_copy(void) {
     /* One move.l (a0)+,(a1)+ per two words, the words of a track unrolled, the tracks in a loop: ~120 instructions in
      * ~60 bytes of code. The audio interrupt does not fit the 8 KB instruction cache, so every 16 bytes of code
      * it runs cost a line fill each block: the fully unrolled copy (144 move.w d16(An),d16(An), 870 bytes) ran
@@ -128,4 +127,14 @@ __attribute__((optimize("O2"))) void xp_dma_wait(void) {
         for (int k = 0; k < XP_RAW_N / 2; k++)
             *raw++ = *src++;
     }
+}
+
+__attribute__((optimize("O2"))) void xp_dma_wait(void) {
+    if (DMA_PENDING) {
+        while (!(TCD47_CSR & 0x80))     /* DONE */
+            ;
+        DMA_PENDING = 0;
+    }
+    if (__builtin_return_address(0) == FRAME_CALL)
+        xp_copy();
 }
