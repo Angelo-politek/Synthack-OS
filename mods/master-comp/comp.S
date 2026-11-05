@@ -201,6 +201,111 @@ apply:
         lea     52(%sp),%sp
         rts
 
+| ---- di seguito il codice di ogni blocco (comp_hook, apply, meter, meter_val, stor, changed, scale):
+|      l'interrupt non sta nella cache istruzioni, righe contigue = meno letture dalla DDR
+| ---- misuratore GR con balistica: sale subito, scende a ~20 dB/s; chiede un ridisegno dello
+|      schermo quando il valore mostrato cambia (usa d0, d1, a0)
+meter:  move.l  k_state+4,%d0                   | at <= 0
+        neg.l   %d0
+        bpl.s   1f
+        moveq   #0,%d0
+1:      move.l  k_meter,%d1
+        subi.l  #METER_DECAY,%d1
+        bpl.s   2f
+        moveq   #0,%d1
+2:      cmp.l   %d1,%d0
+        bge.s   3f
+        move.l  %d1,%d0
+3:      move.l  %d0,k_meter
+        bsr.w   meter_val
+        addq.l  #1,k_tick
+        cmp.w   k_shown,%d0
+        beq.s   4f
+        moveq   #REDRAW_BLOCKS,%d1
+        cmp.l   k_tick,%d1
+        bgt.s   4f
+        clr.l   k_tick
+        move.w  %d0,k_shown
+        move.l  UI_ROOT,%d1
+        beq.s   4f
+        movea.l %d1,%a0
+        moveq   #1,%d1
+        move.b  %d1,UI_DIRTY(%a0)
+4:      rts
+
+| d0 = valore mostrato dal misuratore (0..0x7F00, barra piena = METER_FS dB) (usa d1)
+meter_val:
+        move.l  k_meter,%d0                     | 2^23 unita' per dB
+        moveq   #12,%d1
+        asr.l   %d1,%d0                         | 2048 per dB
+        move.l  #0x7F00,%d1
+        mulu.l  %d1,%d0
+        move.l  #(METER_FS*2048),%d1
+        divu.l  %d1,%d0
+        cmpi.l  #0x7F00,%d0
+        bls.s   1f
+        move.l  #0x7F00,%d0
+1:      rts
+
+| ---- dove stanno i valori: a0 = inizio del blocco esterno (globale con SYN global, se no kit)
+stor:   moveq   #4,%d1
+        and.l   GLOBAL_FLAGS,%d1
+        bne.s   1f
+        move.l  KIT_PTR,%d1
+        beq.s   2f
+        movea.l %d1,%a0
+        lea     KIT_BLK(%a0),%a0
+        rts
+1:      lea     GLOB_BLK,%a0
+        rts
+2:      lea     k_fallback,%a0                  | nessun kit ancora: valori in RAM
+        rts
+
+| ---- Z = 0 se i valori salvati (4 parole), il contenitore (kit, globale o ripiego) o l'interruttore
+|      sono cambiati dall'ultimo blocco; aggiorna la copia (usa d0, d1, a0, a1)
+changed:
+        bsr.w   stor
+        lea     k_seen,%a1
+        moveq   #0,%d1
+        move.l  %a0,%d0
+        cmp.l   (%a1),%d0
+        beq.s   1f
+        moveq   #1,%d1
+        move.l  %d0,(%a1)
+1:      move.l  12(%a0),%d0                     | parole +12 +14 (THR, ATK)
+        cmp.l   4(%a1),%d0
+        beq.s   2f
+        moveq   #1,%d1
+        move.l  %d0,4(%a1)
+2:      move.w  2(%a0),%d0                      | +2 (REL) e +8 (MUP)
+        swap    %d0
+        move.w  8(%a0),%d0
+        cmp.l   8(%a1),%d0
+        beq.s   3f
+        moveq   #1,%d1
+        move.l  %d0,8(%a1)
+3:      mvz.b   k_on,%d0
+        cmp.l   12(%a1),%d0
+        beq.s   4f
+        moveq   #1,%d1
+        move.l  %d0,12(%a1)
+4:      tst.l   %d1
+        rts
+
+| d0 = CV, d1 = G -> d0 = min(65535, CV*G >> 12) (CV negativo: lasciato com'e', come l'originale)
+scale:  cmpi.l  #CV_MAX,%d0
+        ble.s   6f
+        move.l  #CV_MAX,%d0
+6:      tst.l   %d0
+        blt.s   7f
+        mulu.l  %d1,%d0
+        moveq   #12,%d2
+        lsr.l   %d2,%d0
+        cmpi.l  #CV_MAX,%d0
+        bls.s   7f
+        move.l  #CV_MAX,%d0
+7:      rts
+
 | ---- costanti del compressore dai parametri (stesse formule della Digitakt, vedi model.Preset)
 convert:
         moveq   #0,%d0                          | THR: valore<<16
@@ -289,64 +394,6 @@ convert:
         move.l  %d5,40(%a5)
         rts
 
-| ---- misuratore GR con balistica: sale subito, scende a ~20 dB/s; chiede un ridisegno dello
-|      schermo quando il valore mostrato cambia (usa d0, d1, a0)
-meter:  move.l  k_state+4,%d0                   | at <= 0
-        neg.l   %d0
-        bpl.s   1f
-        moveq   #0,%d0
-1:      move.l  k_meter,%d1
-        subi.l  #METER_DECAY,%d1
-        bpl.s   2f
-        moveq   #0,%d1
-2:      cmp.l   %d1,%d0
-        bge.s   3f
-        move.l  %d1,%d0
-3:      move.l  %d0,k_meter
-        bsr.w   meter_val
-        addq.l  #1,k_tick
-        cmp.w   k_shown,%d0
-        beq.s   4f
-        moveq   #REDRAW_BLOCKS,%d1
-        cmp.l   k_tick,%d1
-        bgt.s   4f
-        clr.l   k_tick
-        move.w  %d0,k_shown
-        move.l  UI_ROOT,%d1
-        beq.s   4f
-        movea.l %d1,%a0
-        moveq   #1,%d1
-        move.b  %d1,UI_DIRTY(%a0)
-4:      rts
-
-| d0 = valore mostrato dal misuratore (0..0x7F00, barra piena = METER_FS dB) (usa d1)
-meter_val:
-        move.l  k_meter,%d0                     | 2^23 unita' per dB
-        moveq   #12,%d1
-        asr.l   %d1,%d0                         | 2048 per dB
-        move.l  #0x7F00,%d1
-        mulu.l  %d1,%d0
-        move.l  #(METER_FS*2048),%d1
-        divu.l  %d1,%d0
-        cmpi.l  #0x7F00,%d0
-        bls.s   1f
-        move.l  #0x7F00,%d0
-1:      rts
-
-| ---- dove stanno i valori: a0 = inizio del blocco esterno (globale con SYN global, se no kit)
-stor:   moveq   #4,%d1
-        and.l   GLOBAL_FLAGS,%d1
-        bne.s   1f
-        move.l  KIT_PTR,%d1
-        beq.s   2f
-        movea.l %d1,%a0
-        lea     KIT_BLK(%a0),%a0
-        rts
-1:      lea     GLOB_BLK,%a0
-        rts
-2:      lea     k_fallback,%a0                  | nessun kit ancora: valori in RAM
-        rts
-
 | d0 = indice 0..3 -> d0 = valore 0..0x7F00 (usa d1, a0, a1)
 getv:   move.l  %d0,-(%sp)
         bsr.w   stor
@@ -412,37 +459,6 @@ setr:   move.l  %d0,%d2
         moveq   #4,%d0
         cmp.l   %d0,%d1
         blt.s   1b
-        rts
-
-| ---- Z = 0 se i valori salvati (4 parole), il contenitore (kit, globale o ripiego) o l'interruttore
-|      sono cambiati dall'ultimo blocco; aggiorna la copia (usa d0, d1, a0, a1)
-changed:
-        bsr.w   stor
-        lea     k_seen,%a1
-        moveq   #0,%d1
-        move.l  %a0,%d0
-        cmp.l   (%a1),%d0
-        beq.s   1f
-        moveq   #1,%d1
-        move.l  %d0,(%a1)
-1:      move.l  12(%a0),%d0                     | parole +12 +14 (THR, ATK)
-        cmp.l   4(%a1),%d0
-        beq.s   2f
-        moveq   #1,%d1
-        move.l  %d0,4(%a1)
-2:      move.w  2(%a0),%d0                      | +2 (REL) e +8 (MUP)
-        swap    %d0
-        move.w  8(%a0),%d0
-        cmp.l   8(%a1),%d0
-        beq.s   3f
-        moveq   #1,%d1
-        move.l  %d0,8(%a1)
-3:      mvz.b   k_on,%d0
-        cmp.l   12(%a1),%d0
-        beq.s   4f
-        moveq   #1,%d1
-        move.l  %d0,12(%a1)
-4:      tst.l   %d1
         rts
 
 | ---- all'avvio, al posto di clr.l 0x41BA0968 (ultima casella vuota della pagina "SYN / FX Drive"):
@@ -711,43 +727,11 @@ null_mgr:
         moveq   #0,%d0
         rts
 
-| d0 = CV, d1 = G -> d0 = min(65535, CV*G >> 12) (CV negativo: lasciato com'e', come l'originale)
-scale:  cmpi.l  #CV_MAX,%d0
-        ble.s   6f
-        move.l  #CV_MAX,%d0
-6:      tst.l   %d0
-        blt.s   7f
-        mulu.l  %d1,%d0
-        moveq   #12,%d2
-        lsr.l   %d2,%d0
-        cmpi.l  #CV_MAX,%d0
-        bls.s   7f
-        move.l  #CV_MAX,%d0
-7:      rts
-
         .data
         .balign 4
 k_const:
         .long   C_OCT, 0, 0, 0, 0, 0, 0, 0      | C_OCT, THR, SLOPE, REL1, REL, ATT1, ATT, MK
         .long   0, 0, 0                         | ATT^32, REL^32, K (rilevatore per blocco)
-k_fallback:
-        .space  16                              | blocco esterno di ripiego se non c'e' ancora un kit
-k_ids:
-        .word   ID_THR, ID_ATK, ID_REL, ID_MUP, ID_RAT, ID_GR, ID_COMP
-k_woff:
-        .byte   12, 14, 2, 8                    | THR ATK REL MUP: L1 +40 +42 +30 +36 (L2 +82 +84 +72 +78)
-k_defw:
-        .word   D_THR, D_ATK, D_REL, D_MUP
-k_off:
-        .byte   0
-k_on:
-        .byte   -1                              | interruttore ON/OFF (non salvato: riparte acceso)
-k_s_on:
-        .asciz  "ON"
-k_s_off:
-        .asciz  "OFF"
-k_gfx_on:
-        .byte   GFX_ON                          | esperimento attivo (make_patch --no-drive-knob)
         .balign 4
 k_meter:
         .long   0
@@ -760,6 +744,26 @@ k_state:
         .long   0, 0
 k_seen:
         .long   -1, 0, 0, 0                     | contenitore, parole, interruttore visti (-1: mai)
+k_off:
+        .byte   0
+k_on:
+        .byte   -1                              | interruttore ON/OFF (non salvato: riparte acceso)
+| dati letti solo dall'interfaccia o al cambio dei valori, dopo quelli di ogni blocco (righe di cache)
+k_fallback:
+        .space  16                              | blocco esterno di ripiego se non c'e' ancora un kit
+k_ids:
+        .word   ID_THR, ID_ATK, ID_REL, ID_MUP, ID_RAT, ID_GR, ID_COMP
+k_woff:
+        .byte   12, 14, 2, 8                    | THR ATK REL MUP: L1 +40 +42 +30 +36 (L2 +82 +84 +72 +78)
+k_defw:
+        .word   D_THR, D_ATK, D_REL, D_MUP
+k_s_on:
+        .asciz  "ON"
+k_s_off:
+        .asciz  "OFF"
+k_gfx_on:
+        .byte   GFX_ON                          | esperimento attivo (make_patch --no-drive-knob)
+        .balign 4
 k_logt:
         .long   LOG_T0, LOG_T1, LOG_T2, LOG_T3, LOG_T4, LOG_T5, LOG_T6, LOG_T7, LOG_T8
         .long   LOG_T9, LOG_T10, LOG_T11, LOG_T12, LOG_T13, LOG_T14, LOG_T15, LOG_T16
