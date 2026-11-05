@@ -21,7 +21,7 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x8000` | `0x8180` | vparams | table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS) |
 | `0x8180` | `0xa000` | **free** |  |
 | `0xa000` | `0xdff0` | fx3 | code and data |
-| `0xdff0` | `0xf000` | fx3 | feedback (+0xDFFC) and delay line (+0xE000, 4 KB) |
+| `0xdff0` | `0xf000` | fx3 | delay line (+0xE000, 4 KB); +0xDFF0..+0xE000 unused since 2026-11-05 |
 | `0xf000` | `0xfff0` | fastmix | code and data: faster OS audio routines |
 | `0xfff0` | `0x00018000` | long-samples | Synfact HZFS storage, plan and upload of long samples (GPL-2.0-or-later) |
 | `0x00018000` | `0x0001b000` | sampler | main CPU side: pages, sample menu, one list of samples, knob graphics, waveform, value texts, tempo |

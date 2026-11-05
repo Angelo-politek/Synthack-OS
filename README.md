@@ -41,7 +41,7 @@ One idea changed the sound of the Syntakt. SyntHack is the structure that lets e
 
 | Issue | Status |
 |---|---|
-| UI lag with FX3 | `[wip]` cause: cache misses. fx3 alone ~95 %, every mod together ~101 %: don't combine fx3 with master-comp, dual-mono and the machines yet ([fx3 CPU](docs/status.md#fx3-cpu)) |
+| UI lag with FX3 | `[wip]` cause: cache misses. Cache model: fx3 alone ~93 %, fx3 with master-comp and dual-mono ~96 %, every mod ~97 %; device measurement open ([fx3 CPU](docs/status.md#fx3-cpu)) |
 | Samples cut at 5 s by the stock upload | `[wip]` [long-samples](mods/long-samples) (Synfact's HZFS): emulator-tested, device test open |
 | Bus compressor: toggling *global* for the external input mixer also copies the compressor settings | known |
 | v0.8.0 and earlier: projects with SP TWINSHOT samples can crash at boot ([#4](https://github.com/Angelo-politek/Synthack-OS/issues/4)) | fixed in v0.8.1. Flash the stock OS; projects and samples are not affected |

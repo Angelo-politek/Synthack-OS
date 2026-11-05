@@ -56,17 +56,27 @@ FX3 page: A `TYPE`; B–F change name and range with TYPE; G `DEL`; H `REV`.
 
 ## Cost
 
-Instructions per 32-sample block, emulator. The stock OS uses ~89 % of the CPU at rest ([docs/audio-path.md](../../docs/audio-path.md#cpu-load)).
+Instructions per 32-sample block over stock, emulator, without the per-track hook. The stock OS uses ~89 % of the CPU at rest ([docs/audio-path.md](../../docs/audio-path.md#cpu-load)).
 
 | Case | Instructions |
 |---|---|
-| Idle | ~60 |
-| One track: CHOR / FLNG / PHSR / CRSH | ~1,300 / ~1,500 / ~1,700 / ~850 |
-| Worst case: 12 tracks and the input sending, maximum feedback and sends | ~2,750 (ceiling 2,770 in `tests/test_cpu_budget.py`) |
+| Idle | ~−100 (the replaced OS loops cost more) |
+| One track: CHOR / FLNG / PHSR / CRSH | ~1,030 / ~1,210 / ~1,320 / ~780 |
+| Worst case: 12 tracks and the input sending, maximum feedback and sends | ~2,660 (ceiling 2,700 in `tests/test_cpu_budget.py`) |
 
-With the caches (`tools/emu/cycles.py`, calibrated with cpu-meter): ~14,400 cycles per block over fastmix, ~8.6 % of the block. Interrupt at ~95.3 % with fx3 alone, 89 % stock. Measured on the device with every mod: 110 % and more before the 2026-11-04 fixes (fastmix smoothing off, xparams long words, fx3 knob values precomputed), ~101 % estimated after.
+Instructions are not the time: the audio interrupt doesn't fit the 8 KB instruction cache, so every 16-byte code line run and every DDR data line touched is a DDR read each block (`tools/emu/cycles.py`, calibrated with cpu-meter). So the per-block path is compact assembly kept together, its state is one 432-byte block (23 lines with the chorus), the effect output is 16-bit, and knob-derived values are computed when a knob moves. Only rare work is C: parameters changed, TYPE change, line clear, crusher.
 
-`[!]` `[wip]` With fx3, master-comp and dual-mono together the interrupt is at ~99 %, with every mod ~101 %: the UI lags. fx3 alone, or the other mods without fx3, stay at or below ~95 %. Next: `fx3_run`'s steady path in assembly ([docs/status.md](../../docs/status.md#fx3-cpu)).
+| Cache model, scene max | Before (C `fx3_run`) | Now |
+|---|---|---|
+| fx3 cycles per block over fastmix | ~14,400 | ~10,700 |
+| Code / data lines per block | 153 / 41 | 105 / 32 |
+| Interrupt, fx3 alone | 95.6 % | 92.7 % |
+| fx3 + master-comp + dual-mono | 99.3 % | 96.2 % |
+| Every audio mod | 101.2 % | 97.3 % |
+
+Same output as the C version, bit for bit: `test_same_output_as_the_c_version` runs both (`tests/data/fx3_c.json`) on random blocks.
+
+`[!]` With fx3, master-comp and dual-mono together the interrupt is still above ~95 %: the UI may lag. To measure on the device ([docs/status.md](../../docs/status.md#fx3-cpu)).
 
 ## Build and test
 
@@ -75,4 +85,4 @@ python mods/fx3/make_patch.py
 python -m pytest tests/test_fx3.py
 ```
 
-`tests/test_fx3.py` covers: send gains like the OS, mute, bus sums, chorus as a pure delay, reads inside the line with sudden TIME changes, phaser and crusher against bit-exact models, return interpolation, sign and saturation, send to delay, idle after heavy use and with silent inputs, cost per block and per type, kit storage and pattern change, kit file round trip through the OS writer/reader, names and texts per type, page and drawing hooks, ROUTING key 13 and the return on the FX-track bus.
+`tests/test_fx3.py` covers: send gains like the OS, mute, bus sums, chorus as a pure delay, reads inside the line with sudden TIME changes, phaser and crusher against bit-exact models, return interpolation, sign and saturation, send to delay, idle after heavy use and with silent inputs, cost per block and per type, same output as the previous C version on random blocks, kit storage and pattern change, kit file round trip through the OS writer/reader, names and texts per type, page and drawing hooks, ROUTING key 13 and the return on the FX-track bus.

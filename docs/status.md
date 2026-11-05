@@ -1,6 +1,6 @@
 # Status
 
-Snapshot of `dev`, 2026-11-04. Target: SyntHack 1.0 on Syntakt OS 1.42, with the web builder and the docs.
+Snapshot of `dev`, 2026-11-05. Target: SyntHack 1.0 on Syntakt OS 1.42, with the web builder and the docs.
 
 ## Summary
 
@@ -13,7 +13,7 @@ Snapshot of `dev`, 2026-11-04. Target: SyntHack 1.0 on Syntakt OS 1.42, with the
 | Feature mods | 6: splash, master-comp, dual-mono, readable-values, perf-fx, fx3 |
 | Machines | 2: sy-fm4, sampler. Not tested on 1.42 hardware |
 | Infra mods | 9: modarea, modarea7, vparams, kitstore, projstore, fastmix, syn-pages, xparams, mod-zero (example) |
-| Audio CPU | `[wip]` fx3 alone ~95 %, every mod ~101 % (cache misses, see [fx3 CPU](#fx3-cpu)) |
+| Audio CPU | `[wip]` fx3 alone ~93 %, every mod ~97 % (cache model, see [fx3 CPU](#fx3-cpu)); device measurement open |
 | Sample length | `[wip]` long samples ported from Synfact ([long-samples](../mods/long-samples)): emulator-tested, device test open |
 
 ## Release 1.0
@@ -34,10 +34,10 @@ Cycles: extra CPU #1 cycles per block, worst case, cache model at CPI 1.0 (`AUDI
 
 | Mod | Kind | Tests | Device | Cycles | Findings | Action |
 |---|---|---|---|---|---|---|
-| [fx3](../mods/fx3) | feature | 130 | not stated | ~15 000 | 164 code lines and 41 DDR data lines per block. The C control code of `fx3_run` is the biggest part: 76 lines, ~700 instructions, 4 divisions. TYPE change cleared 4 KB in one block: fixed (8 blocks). | Precompute knob-derived values when a knob moves; move `fx3_run`'s steady path to compact assembly; measure on the device |
-| [fastmix](../mods/fastmix) | infra | 47 | to check | ~−600 | −10 000 instructions, but the smoothing keeps a 1.9 KB copy of the inputs in DDR: 117 data lines per block. The gain depends on the real CPI (−600 to −10 000 cycles). | Measure on the device. Option: test the fixed point from the state in SRAM (`0 ≤ x·2¹⁶ − s ≤ 33`), no copy |
-| [xparams](../mods/xparams) | infra | 3 | — | ~5 200 | Copy unrolled to 870 B: fixed (one loop per track, −4 500 cycles). Still 288 shared-RAM accesses per block. | Measure the shared-RAM access cost. Option: write changed words only |
-| [master-comp](../mods/master-comp) | feature | 34 | `[ok]` v0.9 | ~3 700 | Toggling *global* for the external input also copies the compressor settings (known). | — |
+| [fx3](../mods/fx3) | feature | 134 | not stated | ~10 900 | Per-block path in assembly, state in one block: 105 code and 32 data lines per block (were 153 and 41). Same output as the C version (test on random blocks). | Measure on the device |
+| [fastmix](../mods/fastmix) | infra | 47 | to check | ~−4 300 | −10 000 instructions, but the smoothing keeps a 1.9 KB copy of the inputs in DDR: 117 data lines per block. The gain depends on the real CPI (−600 to −10 000 cycles). | Measure on the device. Option: test the fixed point from the state in SRAM (`0 ≤ x·2¹⁶ − s ≤ 33`), no copy |
+| [xparams](../mods/xparams) | infra | 3 | — | ~1 700 | Copy unrolled to 870 B: fixed (one loop per track, −4 500 cycles). Copied twice a block (both calls of the eDMA wait): now once, 72 shared-RAM writes. | Measure the shared-RAM access cost |
+| [master-comp](../mods/master-comp) | feature | 34 | `[ok]` v0.9 | ~3 500 | Toggling *global* for the external input also copies the compressor settings (known). | — |
 | [dual-mono](../mods/dual-mono) | feature | 47 | `[ok]` v0.9 | ~2 400 | MIDI CC for input DEL/REV goes to IN R while that page is open (known). | — |
 | [sampler](../mods/sampler) | machine | 21 | not stated | ~400 | CPU #2: 8 voices ~84 000 instructions per block (SP TWINSHOT 64 000, SY SWARM 116 000). Samples limited to ~5 s by the OS. | Device test; sample management |
 | [sy-fm4](../mods/sy-fm4) | machine | 7 | 1.40A (Rxuting), 1.42 open | ~0 | Locks of pages 2/3–3/3 lost on a stock OS (documented). | Device test on 1.42 |
@@ -54,23 +54,25 @@ Why the UI lags: the MCF54418 has 8 KB instruction and 8 KB data caches; the sto
 
 Measured on the device with [cpu-meter](../mods/cpu-meter) (2026-11-04): every mod at 110 % and more. The cache model at CPI 1.0 had predicted 107 %: that calibration is the right one.
 
-Fixes (2026-11-04), cache model, worst case (scene `max`, after the gain ramps):
+Fixes, cache model at CPI 1.0, worst case (scene `max`):
 
-| Build | Before | After |
-|---|---|---|
-| stock | 89 % | 89 % |
-| fx3 | 97.6 % | 95.3 % (device: under 100 %, almost no lag) |
-| fx3 + master-comp + dual-mono | — | 99.2 % |
-| machines (sy-fm4, sampler) | 94 % | 89 % |
-| every mod | 107 % (110+ measured) | 101.2 % |
+| Build | Before | 2026-11-04 | 2026-11-05 |
+|---|---|---|---|
+| stock | 89 % | 89 % | 89 % |
+| fx3 | 97.6 % | 95.6 % (device: under 100 %, almost no lag) | 92.7 % |
+| fx3 + master-comp + dual-mono | — | 99.3 % | 96.2 % |
+| machines (sy-fm4, sampler) | 94 % | 89 % | — |
+| every audio mod | 107 % (110+ measured) | 101.2 % | 97.3 % |
 
 1. `[ok]` fastmix: smoothing unhooked (−2 700 cycles): its DDR copy cost more than it saved.
 2. `[ok]` xparams: copy in a loop (−4 500), then in long words (half the shared-RAM accesses).
 3. `[ok]` fx3: knob-derived values computed when a knob moves, not every block; TYPE change no longer overruns.
-4. `[ ]` fx3: `fx3_run`'s steady path in assembly (~50 code lines → ~20, ~−1 600 cycles); input sends skipped when off.
-5. `[ ]` Measure again with cpu-meter: `2-fx3-meter`, `3-all-meter`.
+4. `[ok]` fx3: per-block path in assembly (run, chorus/phaser control, ramp, input send, return, DEL/REV sends) kept together; state in one 432-byte block; 16-bit effect output; DEL/REV gains computed when they change; input send skipped when off. 153 → 105 code lines, 41 → 32 data lines, −3 700 cycles. Bit for bit as before (`test_same_output_as_the_c_version`).
+5. `[ok]` fastmix: one entry chain for the 8/9/10-channel sums, zeros in a loop, one dense loop (−1 300). xparams: one copy a block, not two (−1 250). master-comp: per-block code and data together (−150).
+6. `[ ]` Measure with cpu-meter: `out/2-fx3-meter.syx` (fx3), `out/3-all-meter.syx` (every mod but mod-zero). Read the box left of the tempo on a parameter page: average and peak, % of the block. Expected ~93 and ~97 average with sends at maximum.
+7. `[ ]` Still above ~95 % with fx3 + master-comp + dual-mono. Left on the CPU #1 without changing the sound: master-comp (42 code lines a block) and dual-mono (31) rewritten compact (~−1 500); OS copies for USB/Overbridge (~1 900 instructions) skipped without streaming (needs the USB state). Otherwise FX3 on the CPU #2 (after 1.0).
 
-Until 4–5: don't build fx3 together with master-comp, dual-mono and the machines. The site's load indicator marks it.
+Until 6: fx3 with master-comp and dual-mono may still lag the UI. The site's load indicator marks it.
 
 ## Sample management
 
@@ -142,7 +144,7 @@ SyntHack is GPL-2.0-or-later since 2026-11-04: Synfact's mods can be ported. The
 | `modulation-skip-st` | ~270 | modulation destinations | new |
 | `sample-manager-st` + core pool | — | sample library in folders, pool saved per project | after the SAMPLER menu |
 
-Order: arpeggiator (smallest of the roadmap), then the third LFO. Every port: CPU cost with `tools/emu/cycles.py` before the device (the interrupt has ~5 % left with fx3).
+Order: arpeggiator (smallest of the roadmap), then the third LFO. Every port: CPU cost with `tools/emu/cycles.py` before the device (the interrupt has ~7 % left with fx3 alone, ~3 % with every audio mod).
 
 ## Next session
 

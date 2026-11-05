@@ -22,9 +22,10 @@ sys.path.insert(0, str(ROOT))
 SY = ROOT.parent / "firmware" / "Syntakt_OS1.42.syx"
 pytestmark = pytest.mark.skipif(not SY.exists(), reason="OS stock assente")
 
-# tetti (istruzioni per blocco): misurati il 2026-11-03 su OS 1.42 (fx3: 3555 -> 3197 -> 2743 con le mandate DEL/REV nei cicli dell'OS)
-CEILING = {"fx3": 2770, "master-comp": 650, "dual-mono v2": 340, "dual-mono v1": 140}
-TOTAL = 3800
+# tetti (istruzioni per blocco): misurati il 2026-11-03 su OS 1.42 (fx3: 3555 -> 3197 -> 2743 con le mandate DEL/REV nei cicli
+# dell'OS; 2026-11-05: 2664, percorso di ogni blocco in assembly; totale 3688)
+CEILING = {"fx3": 2700, "master-comp": 650, "dual-mono v2": 340, "dual-mono v1": 140}
+TOTAL = 3720
 
 
 def counted(uc, fn):

@@ -57,9 +57,9 @@ def m():
 
 
 class Machine:
-    def __init__(self):
+    def __init__(self, spec=None):
         sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
-        self.spec = json.loads(MODS[1].read_text(encoding="utf-8"))
+        self.spec = spec or json.loads(MODS[1].read_text(encoding="utf-8"))
         self.sym = {k: int(v, 16) for k, v in self.spec["symbols"].items()}
         uc = self.uc = Uc(UC_ARCH_M68K, UC_MODE_BIG_ENDIAN, cpu=UC_CPU_M68K_ANY)
         uc.mem_map(0x4000_0000, 0x0040_0000)
@@ -68,8 +68,8 @@ class Machine:
         uc.mem_map(MA_PAGE, MA_MAP)
         uc.mem_map(0x5000_0000, 0x1_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
-        for f in MODS:
-            for p in json.loads(f.read_text(encoding="utf-8"))["patches"]:
+        for patches in (json.loads(MODS[0].read_text(encoding="utf-8"))["patches"], self.spec["patches"]):
+            for p in patches:
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
         uc.mem_write(RET, b"\x4e\x75")
         uc.mem_write(0x444E_2334, struct.pack(">I", UI))
@@ -1219,3 +1219,121 @@ def test_return_goes_to_the_fx_track_when_routed(m, routed):
         for bus in seen:
             seen[bus] |= m.longs(bus, 64) != [-1000] * 64
     assert seen == {OUT_A: not routed, OUT_B: bool(routed)}
+
+
+# ----------------------------------------------------------------------------- come la versione in C (2026-11-05)
+C_VERSION = ROOT / "tests" / "data" / "fx3_c.json"       # mods/fx3 a fa839e3: fx3_run in C, uscita a 32 bit
+
+
+def c_version():
+    import base64
+    import zlib
+    doc = json.loads(C_VERSION.read_text(encoding="utf-8"))
+    return Machine(json.loads(zlib.decompress(base64.b64decode(doc["zlib_b64"]))))
+
+
+def wet_any(m):
+    return wet16(m) if "fx3_s" in m.spec["symbols"] else m.longs(m.sym["fx3_wet"], 32)
+
+
+def one_block(m, st):
+    """Un blocco come nell'OS: mandate per traccia e dell'ingresso, DEL/REV nei cicli dei bus, somme del master.
+    -> tutto quello che fx3 scrive (bus dell'OS, uscita, stato visibile, linea)."""
+    uc = m.uc
+    for name, v in st["ui"]:
+        m.param(name, v)
+    for a, data in st["mem"]:
+        uc.mem_write(a, data)
+    m.put(FRAME - 508, [st["mute"]])
+    for t, (gl, gr, v) in enumerate(st["trk"]):
+        uc.mem_write(TRK + 106, struct.pack(">h", v))
+        m.emac.state.acc[0] = m.emac.state.acc[1] = 0
+        m.call(m.sym["fx3_trk_hook"], regs={UC_M68K_REG_D0: gl, UC_M68K_REG_D1: gr, UC_M68K_REG_D3: t,
+                                            UC_M68K_REG_A3: TRK, UC_M68K_REG_A6: FRAME})
+    for gl, gr in st["inp"]:
+        in_hook(m, gl, gr)
+    out = []
+    for hook, bus in (("fx3_del_hook", st["dly"]), ("fx3_rev_hook", st["rev"])):
+        m.put(DLY_IN, bus)
+        m.put(DLY_IN + 0x300, st["ana"])
+        m.call(m.sym[hook], [1, 2, 3])
+        out.append(m.longs(DLY_IN, 64))
+    m.put(SRC_DIG, st["dig"])
+    m.put(SRC_ANA, st["src"])
+    m.put(OUT_A, st["outa"])
+    m.put(OUT_B, st["outb"])
+    m.emac.state.acc[0] = 0
+    uc.reg_write(UC_M68K_REG_A6, FRAME)
+    m.call(m.sym["fx3_mix_hook"])
+    return out + [m.longs(OUT_A, 64), m.longs(OUT_B, 64), wet_any(m), m.longs(m.sym["fx3_bus"], 16),
+                  m.longs(m.sym["fx3_cur"], 14), m.longs(m.sym["fx3_tgt"], 14), m.longs(m.sym["fx3_idle"], 1),
+                  bytes(uc.mem_read(m.sym["fx3_p"], 8)), bytes(uc.mem_read(MA + 0xE000, 4096))]
+
+
+def scenario(seed, n, steady):
+    """Manopole, cambi di pattern e di kit, dual mono, mandate in moto o ferme, silenzi lunghi (riposo)."""
+    import dualmono_layout as DML
+    rnd = random.Random(seed)
+    kits = (0x5000_6000, 0x5000_6200)
+    on = rnd.sample(range(13), rnd.choice((1, 2, 5, 13)))
+    trk = [[rnd.randrange(-2 ** 31, 2 ** 31), rnd.randrange(-2 ** 31, 2 ** 31),
+            rnd.randrange(1, 0x7F01) if t in on else 0] for t in range(13)]
+    inp = (rnd.randrange(-2 ** 31, 2 ** 31), rnd.randrange(-2 ** 31, 2 ** 31))
+    silent = 0
+    for b in range(n):
+        st = {"ui": [], "mem": []}
+        if b == 0:
+            st["mem"].append((0x8000_30BC, bytes(4)))                         # nessun kit: valori in RAM
+        if b == 3:
+            st["mem"] += [(kits[0], bytes(142)), (kits[1], bytes(142)), (0x8000_30BC, struct.pack(">I", kits[0])),
+                          (0x8000_30B8, struct.pack(">I", 0x5000_6400)), (0x5000_6400, bytes(0x400))]
+        r = rnd.random()
+        if r < 0.05:
+            name = rnd.choice(list(IDS))
+            st["ui"].append((name, rnd.randrange(0, 5) if name == "TYPE" else rnd.randrange(0, 128)))
+        elif b > 3 and r < 0.06:
+            st["mem"].append((0x8000_30BC, struct.pack(">I", rnd.choice(kits))))          # altro pattern
+        elif b > 3 and r < 0.07:
+            st["mem"].append((rnd.choice(kits) + rnd.choice(WOFF), struct.pack(">H", rnd.randrange(65536))))
+        elif b > 3 and r < 0.09:
+            st["mem"].append((rnd.choice(kits) + 110, struct.pack(">H", rnd.randrange(0x200))))  # ingresso, routing
+        elif r < 0.10:
+            side = rnd.choice((0, 0, 1, 2, 3))
+            st["mem"].append((DML.HDR, struct.pack(">IB", 0x444D_5632 if side else 0, side)))
+        elif b > 3 and r < 0.11:
+            st["mem"].append((0x5000_6400 + DML.FX3_R, struct.pack(">H", rnd.randrange(300))))
+        for g in trk:
+            if steady and rnd.random() > 0.01:
+                continue
+            if rnd.random() < 0.03:
+                g[2] = 0 if rnd.random() < 0.5 else rnd.randrange(-100, 0x7F01)
+            elif rnd.random() < 0.05:
+                g[2] = max(-50, min(0x7F00, g[2] + rnd.randrange(-2000, 2000)))
+        st["trk"] = [tuple(g) for g in trk]
+        st["mute"] = rnd.randrange(1 << 13) if rnd.random() < 0.05 else 0
+        if not steady and rnd.random() < 0.3:
+            inp = (rnd.randrange(-2 ** 31, 2 ** 31), rnd.randrange(-2 ** 31, 2 ** 31))
+        st["inp"] = [inp] * rnd.choice((1, 1, 2))
+        if silent:
+            silent -= 1
+            amp = 0 if rnd.random() < 0.7 else 1 << 16                      # sotto la soglia
+        else:
+            silent = rnd.randrange(50, 200) if rnd.random() < 0.01 else 0
+            amp = rnd.choice((1 << 20, 1 << 28, 1 << 30, 1 << 31))
+        st["dig"] = [rnd.randrange(-amp, amp) if amp > 1 else 0 for _ in range(256)]
+        st["src"] = [rnd.randrange(-amp, amp) if amp > 1 else 0 for _ in range(192)]
+        big = lambda: rnd.choice((2 ** 31 - 1, -2 ** 31)) if rnd.random() < 0.1 else rnd.randrange(-2 ** 31, 2 ** 31)
+        for k in ("dly", "ana", "rev", "outa", "outb"):
+            st[k] = [big() for _ in range(64)]
+        yield st
+
+
+@pytest.mark.parametrize("seed, steady", [(1, False), (2, True), (3, True), (4, False)])
+def test_same_output_as_the_c_version(seed, steady):
+    """Il percorso di ogni blocco in assembly (2026-11-05) contro la versione in C che sostituisce: stessi ingressi,
+    stesse uscite bit per bit, blocco per blocco (bus dell'OS, ritorno, mandate DEL/REV, effetto, linea, stato)."""
+    old, new = c_version(), Machine()
+    names = ("del", "rev", "out", "fx", "wet", "bus", "cur", "tgt", "idle", "p", "line")
+    for b, st in enumerate(scenario(seed, 600, steady)):
+        for name, x, y in zip(names, one_block(old, st), one_block(new, st)):
+            assert x == y, (seed, b, name)

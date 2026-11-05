@@ -35,7 +35,7 @@ MODAREA = [
     (0x8000, 0x8180, "vparams", "table: 32 entries of 12 B, one per virtual parameter (VPARAMS_SLOTS)"),
     # 0x8180..0xA000: free (sampler moved to +0x18000 on 2026-11-04)
     (0xA000, 0xDFF0, "fx3", "code and data"),
-    (0xDFF0, 0xF000, "fx3", "feedback (+0xDFFC) and delay line (+0xE000, 4 KB)"),
+    (0xDFF0, 0xF000, "fx3", "delay line (+0xE000, 4 KB); +0xDFF0..+0xE000 unused since 2026-11-05"),
     (0xF000, 0xFFF0, "fastmix", "code and data: faster OS audio routines"),
     (0xFFF0, 0x18000, "long-samples", "Synfact HZFS storage, plan and upload of long samples (GPL-2.0-or-later)"),
     (0x18000, 0x1B000, "sampler", "main CPU side: pages, sample menu, one list of samples, knob graphics, waveform, value texts, tempo"),

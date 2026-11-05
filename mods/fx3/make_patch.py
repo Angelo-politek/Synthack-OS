@@ -35,7 +35,7 @@ _vp.loader.exec_module(vparams)
 
 LOAD = 0x4000_0400
 MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
-CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # retroazione a +0xDFFC, linea a +0xE000 (4 KB)
+CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # linea a +0xE000 (4 KB)
 TOOLS = "~/tools/m68k/root"
 CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x} -DDM_HDR={DL.HDR:#x} -DKS_FX3_R={DL.FX3_R:#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
 FS = 24000                              # il chorus lavora a 24 kHz
