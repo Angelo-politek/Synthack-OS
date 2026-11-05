@@ -338,10 +338,10 @@ def test_project_list(m):
         assert bytes(m.uc.mem_read(rec, 2)) == b"LP"
         n = m.uc.mem_read(rec + 2, 1)[0]
         return list(struct.unpack(f">{n}H", m.uc.mem_read(rec + 4, 2 * n)))
+    m.call(s["ls_plan"], count=400_000_000)            # boot plan first (the saved list may be another test's)
     applied = m.long(s["ls_applied"])
     m.call(0x4001_D16A, [m.project, 0xFFFF_FFFF], count=400_000_000)   # NEW PROJECT (hook): no list
     assert m.long(s["ls_applied"]) == applied + 1
-    m.call(s["ls_plan"], count=400_000_000)
     load = [m.long(s["ls_cpu2"] + 12 + 8 * i) // 48000 for i in range(3)]   # seconds of the files, load order
     assert sorted(load) == [2, 3, 4]
     sec = dict(zip((2, 3, 4), ids))
