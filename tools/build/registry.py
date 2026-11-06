@@ -47,7 +47,10 @@ MODAREA = [
     (0x2A000, 0x32000, "xstore", "planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks)"),
     (0x32000, 0x38000, "arp", "planned: arpeggiator (cells in the OS heap)"),
     (0x38000, 0x3E000, "poly", "planned: POLY with its native kernels"),
-    # 0x3E000..0x3FFF0: free
+    (0x3E000, 0x3FFF0, "idspace", "code; descriptors, object definitions and pages the mods write (idspace_layout)"),
+    # 512 KB area from 2026-11-06: the second half is runtime RAM only (zeroed by the loader)
+    (0x40000, 0x48000, "idspace", "parameter ids above 504: descriptor table copy (537 x 52 B), extra parameter objects, extra pages"),
+    # 0x48000..0x7FFF0: free (runtime RAM only)
 ]
 
 # ---- mod con spazio prenotato ma non ancora scritte (port di Synfact, piano 2026-11-05): ammesse come proprietarie
@@ -89,7 +92,7 @@ ENGINE = [
 ]
 
 # ---- lista di avvio dell'area mod: posto -> mod (modarea_layout.boot_slot)
-BOOT_SLOTS = {0: "sy-fm4", 1: "sampler", 2: "xparams", 3: "sfcore"}
+BOOT_SLOTS = {0: "sy-fm4", 1: "sampler", 2: "xparams", 3: "sfcore", 4: "idspace"}
 
 # ---- RAM condivisa tra le CPU: offset (CPU #1 a 0x10000000 + offset, CPU #2 a offset). Fine esclusa.
 SHARED_RAM = [

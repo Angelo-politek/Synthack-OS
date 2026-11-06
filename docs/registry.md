@@ -34,9 +34,12 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x0002a000` | `0x00032000` | xstore | planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks) |
 | `0x00032000` | `0x00038000` | arp | planned: arpeggiator (cells in the OS heap) |
 | `0x00038000` | `0x0003e000` | poly | planned: POLY with its native kernels |
-| `0x0003e000` | `0x0003fff0` | **free** |  |
+| `0x0003e000` | `0x0003fff0` | idspace | code; descriptors, object definitions and pages the mods write (idspace_layout) |
+| `0x0003fff0` | `0x00040000` | **free** |  |
+| `0x00040000` | `0x00048000` | idspace | parameter ids above 504: descriptor table copy (537 x 52 B), extra parameter objects, extra pages |
+| `0x00048000` | `0x0007fff0` | **free** |  |
 
-Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams, slot 3 sfcore.
+Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams, slot 3 sfcore, slot 4 idspace.
 
 sfcore module table (`+0x1b000`, 8 pointers, initialized in this order): slot 0 modulation-skip, slot 1 xstore, slot 2 recorder, slot 3 lfo3, slot 4 arp, slot 5 poly.
 

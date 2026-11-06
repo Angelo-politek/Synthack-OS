@@ -58,7 +58,7 @@ def area_image():
 
 def test_layout_is_the_first_heap_block():
     assert (RAM, SIZE, BLOCK) == (L.RAM, L.SIZE, L.HEAP_BLOCK)
-    assert BLOCK == HEAP_LO and RAM == BLOCK + 0x10 and RAM + SIZE == BLOCK + L.HEAP_BLOCK_SIZE == BLOCK + 0x4_0000
+    assert BLOCK == HEAP_LO and RAM == BLOCK + 0x10 and RAM + SIZE == BLOCK + L.HEAP_BLOCK_SIZE == BLOCK + 0x8_0000
     assert BSS_LO < RAM < RAM + SIZE < BSS_HI
 
 

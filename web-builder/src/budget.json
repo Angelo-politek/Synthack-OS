@@ -1,7 +1,7 @@
 {
   "limits": {
     "cpu": 10000,
-    "modarea": 262128,
+    "modarea": 524272,
     "kit": 36,
     "project": 256,
     "sec7": 127695
@@ -36,6 +36,13 @@
       "cpu": 11300,
       "modarea": 20480,
       "kit": 1,
+      "project": 0,
+      "sec7": 0
+    },
+    "idspace": {
+      "cpu": 0,
+      "modarea": 40944,
+      "kit": 0,
       "project": 0,
       "sec7": 0
     },
