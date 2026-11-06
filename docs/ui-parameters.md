@@ -47,17 +47,16 @@ Slots are read at draw time: changing them at runtime changes the page (0 = empt
 
 | Id | Stock meaning | Mod use |
 |---|---|---|
-| 262–268 | Digitakt MIDI-track "CC1–CC7 Select" (page never shown, no MIDI CC) | master-comp (virtual, via [vparams](../mods/vparams)) |
 | 144 | amp delay time | the kit word of 144 stores fx3 |
 | 72 | amp "Delay Time", saved per track, unused | fx3 SND3 (native, per track) |
-| 269 | Digitakt MIDI-track "CC8 Select" | fx3: SND3 of the external input (virtual), External Mixer slot C |
 | 48–51 | Trig modifier Mod A, M1–M4 | perf-fx: effect of keys 13–16 (native storage in the kit, text formatter) |
-| 246–253 | Digitakt MIDI-track parameters (no MIDI tracks on Syntakt) | fx3 page (virtual) |
-| 254–261 | Digitakt MIDI-track "CC1–CC8 Value" (no page, MIDI CCs) | sy-fm4: SYN pages 2/3 and 3/3, MIDI CC cleared, own storage slots |
+| 505–513 | none: ids above 504 ([idspace](../mods/idspace)) | fx3 page (505–512) and SND3 of the external input (513) |
+| 514–520 | idspace | master-comp |
+| 521–528 | idspace | sy-fm4: SYN pages 2/3 and 3/3 |
 
 Ids 1–5 and 11–18 are tied to MIDI CCs (bank select, data entry, all notes off…): not reusable.
 
-**Hidden is not free.** Ids without a page or MIDI CC are often *aliases* the OS swaps onto a page: 59 GAIN replaces 60 RESO for track filter types 2–6 (`0x40042140` in 1.42), 122 REV shows on MIXER page 2, 91/101 SLEW replace SPH, 125 IN and 127 PAN replace IN LR and BAL, 113 is the delay mix (114). Same group + internal id as the visible parameter = alias: do not reuse. `tests/test_id_audit.py` checks every id the mods register.
+**Hidden is not free.** 246–269 are the MIDI machine's pages (SRC, CC VAL, CC SEL), not Digitakt leftovers: up to v0.9 fx3, sy-fm4, master-comp and dual-mono used them and broke the MIDI machine. New mod parameters take ids from 505 on ([idspace](../mods/idspace)). Ids without a page or MIDI CC are often *aliases* the OS swaps onto a page: 59 GAIN replaces 60 RESO for track filter types 2–6 (`0x40042140` in 1.42), 122 REV shows on MIXER page 2, 91/101 SLEW replace SPH, 125 IN and 127 PAN replace IN LR and BAL, 113 is the delay mix (114). Same group + internal id as the visible parameter = alias: do not reuse. `tests/test_id_audit.py` checks every id the mods register.
 
 ## Per-parameter objects
 

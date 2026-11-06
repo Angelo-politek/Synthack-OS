@@ -4,9 +4,9 @@
  * Digitakt, mai mostrata sulla Syntakt): IN R, FX3, DEL, REV. La pagina External Mixer resta quella
  * di IN L. Le mandate del lato R stanno in tre parole del kit (kitstore, blocco 0): 0..127.
  *
- * Interfaccia: la pagina IN R usa gli stessi id della pagina IN L (129 DEL, 130 REV, 269 FX3), con le
+ * Interfaccia: la pagina IN R usa gli stessi id della pagina IN L (129 DEL, 130 REV, 513 FX3), con le
  * loro icone; 129 e 130 passano da vparams e, solo quando la pagina IN R e' quella aperta nel tab
- * MIXER, leggono e scrivono il lato R (269 lo fa fx3 leggendo dm_page_r dall'intestazione).
+ * MIXER, leggono e scrivono il lato R (513 lo fa fx3 leggendo dm_page_r dall'intestazione).
  * Il tab MIXER ha il vettore delle pagine {22, 23, 24, 37}: la sua lunghezza (+0x80 della vista) e' 4 in
  * mono e 3 in stereo, aggiornata alla costruzione della vista e quando cambia l'impostazione.
  *

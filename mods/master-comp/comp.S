@@ -14,8 +14,8 @@
 | Scrive hw+70/hw+72; preserva tutti i registri (d1/d3 non servono dopo), MACSR e ACC puliti.
 |
 | Interfaccia (v0.3): 5 parametri "virtuali" THR ATK REL MUP RAT sulla pagina SYN della FX
-| track (FX Drive), con gli id logici liberi 262..266 (descrittori riscritti da make_patch.py)
-| + misuratore GR (267, sola lettura) e interruttore COMP (268). Tre agganci intercettano per questi id le
+| track (FX Drive), con gli id delle mod 514..518 (mods/idspace, descrittori da make_patch.py)
+| + misuratore GR (519, sola lettura) e interruttore COMP (520). Tre agganci intercettano per questi id le
 | funzioni centrali dei parametri di kit: "e' di kit?" 0x4000D870, lettura 0x4000D94A,
 | scrittura 0x4000DA32. RAT 0 = compressore spento, 1..8 = 1.5,2,3,4,6,8,16,20:1.
 | Valori (v0.4.2) in 4 parole libere del blocco "mixer esterno" del kit del pattern (o del

@@ -53,7 +53,7 @@ FX3 page: A `TYPE`; B–F change name and range with TYPE; G `DEL`; H `REV`.
 | Chorus / flanger | One modulated delay line, two interpolated taps (L/R). TIME changes glide: at most 8 samples per block. |
 | DEL / REV sends | Previous block's output goes into the delay and reverb input buses (0.67 ms later), inside our replacement of the OS loops that finish those buses (`0x4008F852`, `0x4008F98A`): same result as the OS loop, fewer instructions. |
 | Routing | Hooks on the ROUTING key handler (`0x4004C5E2`), entry state (`0x4004BF86`), drawing of entry 13 (`0x4004C242`), its LED (`0x4004C480`). Return goes to the direct bus, or to the FX track (analog FX block, bus compressor). |
-| UI | Page 25 (unused "OB8") becomes REVERB page 2, drawn as 8 plain slots. Controls: hidden ids 246–253 via [vparams](../vparams). Names are RAM strings rewritten with the icons and slots when TYPE changes, from UI code only ([modding guide](../../docs/modding-guide.md#5-text-icons-and-styles)). The AMP tab is patched to give SND3 its own graphic. |
+| UI | Page 25 (unused "OB8") becomes REVERB page 2, drawn as 8 plain slots. Controls: ids 505–512 ([idspace](../idspace)) via [vparams](../vparams). Names are RAM strings rewritten with the icons and slots when TYPE changes, from UI code only ([modding guide](../../docs/modding-guide.md#5-text-icons-and-styles)). The AMP tab is patched to give SND3 its own graphic. |
 | Idle | Nothing runs without sends, or once the inputs are silent (sequencer stopped) and the tail has died out. |
 
 ## Cost
