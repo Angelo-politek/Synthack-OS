@@ -110,7 +110,7 @@ SHARED_RAM = [
 
 # ---- vparams: posto nella tabella -> (mod, id)
 VPARAMS_SLOTS = {
-    **{s: ("master-comp", 262 + s) for s in range(7)},
+    **{s: ("master-comp", 514 + s) for s in range(7)},
     7: ("fx3", 513),
     8: ("fx3", 144),
     **{9 + n: ("fx3", pid) for n, pid in enumerate((505, 506, 507, 509, 510, 511, 508, 512))},
@@ -128,7 +128,7 @@ IDS = {
     129: ("dual-mono", "DEL: R side while the IN R page is open"),
     130: ("dual-mono", "REV: R side while the IN R page is open"),
     **{i: ("fx3", "FX3 page (idspace)") for i in range(505, 513)},
-    **{i: ("master-comp", "compressor") for i in range(262, 269)},
+    **{i: ("master-comp", "compressor (idspace)") for i in range(514, 521)},
     513: ("fx3", "external input SND3 (idspace)"),
     **{190 + k: ("sy-fm4", f"SYN page 1/3 {n} (SY TONE's {w}, renamed)") for k, (n, w) in enumerate(
         (("TUNE", "TUNE"), ("RAT2", "RATIO"), ("LEV2", "MOD"), ("FDBK", "FDBK"), ("DEC2", "MENV"), ("PNCH", "PNCH"),

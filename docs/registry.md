@@ -97,13 +97,13 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 
 | Slot | Mod | Id |
 |---|---|---|
-| 0 | master-comp | 262 |
-| 1 | master-comp | 263 |
-| 2 | master-comp | 264 |
-| 3 | master-comp | 265 |
-| 4 | master-comp | 266 |
-| 5 | master-comp | 267 |
-| 6 | master-comp | 268 |
+| 0 | master-comp | 514 |
+| 1 | master-comp | 515 |
+| 2 | master-comp | 516 |
+| 3 | master-comp | 517 |
+| 4 | master-comp | 518 |
+| 5 | master-comp | 519 |
+| 6 | master-comp | 520 |
 | 7 | fx3 | 513 |
 | 8 | fx3 | 144 |
 | 9 | fx3 | 505 |
@@ -148,13 +148,6 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 259 | sy-fm4 | SYN page 2/3 LEV4 (was Digitakt MIDI CC6 Value, MIDI CC cleared) |
 | 260 | sy-fm4 | SYN page 2/3 DEC4 (was Digitakt MIDI CC7 Value, MIDI CC cleared) |
 | 261 | sy-fm4 | SYN page 2/3 DET (was Digitakt MIDI CC8 Value, MIDI CC cleared) |
-| 262 | master-comp | compressor |
-| 263 | master-comp | compressor |
-| 264 | master-comp | compressor |
-| 265 | master-comp | compressor |
-| 266 | master-comp | compressor |
-| 267 | master-comp | compressor |
-| 268 | master-comp | compressor |
 | 497 | sampler | SAMPLER knob A TUNE (was SP TWINSHOT TUN1) |
 | 498 | sampler | SAMPLER knob B PLAY (was SP TWINSHOT SMP1) |
 | 499 | sampler | SAMPLER knob C BR (was SP TWINSHOT FLT1) |
@@ -172,6 +165,13 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 511 | fx3 | FX3 page (idspace) |
 | 512 | fx3 | FX3 page (idspace) |
 | 513 | fx3 | external input SND3 (idspace) |
+| 514 | master-comp | compressor (idspace) |
+| 515 | master-comp | compressor (idspace) |
+| 516 | master-comp | compressor (idspace) |
+| 517 | master-comp | compressor (idspace) |
+| 518 | master-comp | compressor (idspace) |
+| 519 | master-comp | compressor (idspace) |
+| 520 | master-comp | compressor (idspace) |
 
 Ids without a page often carry a MIDI CC or are aliases: clear the CC, check aliases. Ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).
 

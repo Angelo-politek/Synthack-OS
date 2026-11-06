@@ -27,7 +27,7 @@ import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
 MA = modarea_layout.RAM                                    # area mod (mods/modarea)
-MA_PAGE, MA_MAP = 0x444E_1000, 0x5_0000                     # area mod e radice dell'interfaccia (0x444E2334)
+MA_PAGE, MA_MAP = 0x444E_1000, 0x9_0000                     # area mod e radice dell'interfaccia (0x444E2334)
 assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
 SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
@@ -43,10 +43,16 @@ KIT_PTR, KIT, KIT_BLK = 0x8000_30BC, 0x5000_4000, 70
 GLOB_BLK, GLOBAL_FLAGS = 0x41B9_E3B0, 0x43BD_F444
 WOFF = {"THR": 12, "ATK": 14, "REL": 2, "MUP": 8}      # parole nel blocco esterno
 UI_ROOT, UI = 0x444E_2334, 0x5000_A000
-IDS = {"THR": 262, "ATK": 263, "REL": 264, "MUP": 265, "RAT": 266, "GR": 267, "COMP": 268}
+IDS = {"THR": 514, "ATK": 515, "REL": 516, "MUP": 517, "RAT": 518, "GR": 519, "COMP": 520}   # idspace
 OLD_IDS = (144, 122, 91, 101, 127, 59, 115)               # alias dell'OS usati fino alla v0.8
 RAT_STEP = 0xFE0
 OBJS = 0x41BA_0A24
+
+
+def obj(i):
+    """Oggetto per parametro: dell'OS o delle mod (mods/idspace)."""
+    import idspace_layout as I
+    return OBJS + 84 * i if i < I.FIRST else I.OBJ + 84 * (i - I.FIRST)
 GET, SET, KIT_FN = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
 REGS = [getattr(__import__("unicorn.m68k_const", fromlist=["x"]), f"UC_M68K_REG_{r}")
         for r in ("D0", "D2", "D4", "D5", "D6", "D7", "A0", "A1", "A2", "A4", "A5")]
@@ -66,7 +72,8 @@ class Machine:
         uc.mem_write(LOAD, sec3)
         uc.mem_map(MA_PAGE, MA_MAP)                      # area mod (dopo la rilocazione)
         vp = json.loads((ROOT / "mods" / "vparams" / "patch.json").read_text(encoding="utf-8"))
-        for p in spec["patches"] + vp["patches"]:          # i parametri virtuali passano da vparams
+        ids = json.loads((ROOT / "mods" / "idspace" / "patch.json").read_text(encoding="utf-8"))
+        for p in spec["patches"] + vp["patches"] + ids["patches"]:   # parametri virtuali: vparams, id: idspace
             dst = int(p["ram"], 16) if p.get("append") else int(p["addr"], 16)
             uc.mem_write(dst, bytes.fromhex(p["hex"]))
         uc.mem_map(0x8000_0000, 0x1_0000)
@@ -77,6 +84,7 @@ class Machine:
         uc.mem_write(KIT_PTR, struct.pack(">I", KIT if kit else 0))
         uc.mem_write(RET, b"\x4e\x75")
         self.emac = UnicornEmac(uc, [int(a, 16) for a in spec.get("emac_sites", [])])
+        self.call(int(ids["symbols"]["ids_boot"], 16), [], count=2_000_000)   # descrittori (avvio)
 
     def block(self, left, right, cv_l, cv_r, macsr=0x20):
         uc = self.uc
@@ -100,13 +108,13 @@ class Machine:
         assert self.emac.state.acc[0] == 0                                 # accumulatore pulito
         return struct.unpack_from(">2H", uc.mem_read(HW + 70, 4))
 
-    def call(self, fn, args, stop=RET):
+    def call(self, fn, args, stop=RET, count=10_000):
         uc = self.uc
         sp = STACK - 4 * (len(args) + 1)
         uc.mem_write(sp, struct.pack(f">{len(args) + 1}I", RET, *[a & 0xFFFFFFFF for a in args]))
         uc.reg_write(UC_M68K_REG_SR, 0x2700)
         uc.reg_write(UC_M68K_REG_A7, sp)
-        uc.emu_start(fn, stop, count=10_000)
+        uc.emu_start(fn, stop, count=count)
         assert self.emac.error is None, self.emac.error
         return uc.reg_read(UC_M68K_REG_D0) & 0xFFFFFFFF
 
@@ -376,9 +384,9 @@ def test_init_copies_drive_knob_graphics(setup):
     m.uc.mem_write(drive, bytes(range(0xA0, 0xB0)))
     comp_init(m, spec)
     for k in ("THR", "ATK", "REL", "MUP"):
-        assert bytes(m.uc.mem_read(OBJS + 84 * IDS[k] + 36, 16)) == bytes(range(0xA0, 0xB0))
+        assert bytes(m.uc.mem_read(obj(IDS[k]) + 36, 16)) == bytes(range(0xA0, 0xB0))
     for i in (IDS["RAT"], IDS["GR"]):                # RAT e GR restano barre
-        assert bytes(m.uc.mem_read(OBJS + 84 * i + 36, 16)) == bytes(16)
+        assert bytes(m.uc.mem_read(obj(i) + 36, 16)) == bytes(16)
 
 
 def test_formatters_ignore_the_function_data(setup):
@@ -386,21 +394,21 @@ def test_formatters_ignore_the_function_data(setup):
     m = Machine(spec, sec3)
     comp_init(m, spec)
     for name in ("THR", "RAT"):                      # anche se l'OS copia la std::function senza dati
-        obj = OBJS + 84 * IDS[name] + 20
+        fn = obj(IDS[name]) + 20
         before = call_fmt(m, 0x4000, name)
-        m.uc.mem_write(obj, bytes.fromhex("deadbeef") * 2)
+        m.uc.mem_write(fn, bytes.fromhex("deadbeef") * 2)
         assert call_fmt(m, 0x4000, name) == before
 
 
 # ----------------------------------------------------------------------------- v0.4.2
 def call_fmt(m, value, name="RAT"):
     """Chiama il formattatore di un parametro come farebbe l'OS: invoker(funzione, valore, buffer)."""
-    obj = OBJS + 84 * IDS[name] + 20
-    mgr, inv = struct.unpack(">II", m.uc.mem_read(obj + 8, 8))
+    fn = obj(IDS[name]) + 20
+    mgr, inv = struct.unpack(">II", m.uc.mem_read(fn + 8, 8))
     assert mgr != 0                                  # l'OS controlla che ci sia un gestore
     buf = 0x5000_C000
     m.uc.mem_write(buf, bytes([0xEE]) * 16)
-    m.call(inv, [obj, value, buf])
+    m.call(inv, [fn, value, buf])
     raw = bytes(m.uc.mem_read(buf, 16))
     return raw[:raw.index(0)].decode()
 
@@ -529,11 +537,11 @@ def test_init_sets_the_encoder_type_of_the_new_ids(setup):
     spec, sec3, _ = setup
     m = Machine(spec, sec3)
     for i in IDS.values():
-        m.uc.mem_write(OBJS + 84 * i, struct.pack(">I", 1))         # MIDI-track type
+        m.uc.mem_write(obj(i), struct.pack(">I", 1))               # tipo diverso prima dell'init
     comp_init(m, spec)
     want = {"THR": 0, "ATK": 8, "REL": 0, "MUP": 0, "RAT": 8, "GR": 0, "COMP": 12}
     for k, v in want.items():
-        assert struct.unpack(">I", m.uc.mem_read(OBJS + 84 * IDS[k], 4))[0] == v
+        assert struct.unpack(">I", m.uc.mem_read(obj(IDS[k]), 4))[0] == v
 
 
 # ----------------------------------------------------------------------------- costo per blocco (v0.8.1)

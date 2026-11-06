@@ -680,15 +680,17 @@ fmt_copy:
 |      con le unita' reali
         .globl  comp_init
 comp_init:
-        lea     -12(%sp),%sp
-        movem.l %d2/%a1-%a2,(%sp)
+        lea     -16(%sp),%sp
+        movem.l %d1-%d2/%a1-%a2,(%sp)
         tst.b   k_gfx_on
         beq.s   3f
         lea     k_ids,%a2
         moveq   #3,%d2
 1:      mvz.w   (%a2)+,%d0
-        mulu.w  #84,%d0
-        addi.l  #(OBJS+36),%d0
+        move.l  %d0,-(%sp)                      | oggetto dell'id (mods/idspace: costruito se manca)
+        jsr     IDS_OBJ
+        addq.l  #4,%sp
+        addi.l  #36,%d0
         movea.l %d0,%a0
         move.l  DRIVE_GFX,(%a0)+
         move.l  DRIVE_GFX+4,(%a0)+
@@ -699,8 +701,9 @@ comp_init:
 3:      lea     k_types,%a2                     | {id, tipo} x 7: passo dell'encoder (+0 dell'oggetto)
         moveq   #6,%d2
 5:      move.l  (%a2)+,%d0
-        mulu.w  #84,%d0
-        addi.l  #OBJS,%d0
+        move.l  %d0,-(%sp)                      | oggetto dell'id (mods/idspace: costruito se manca)
+        jsr     IDS_OBJ
+        addq.l  #4,%sp
         movea.l %d0,%a0
         move.l  (%a2)+,(%a0)
         subq.l  #1,%d2
@@ -708,8 +711,10 @@ comp_init:
         lea     k_fmts,%a2                      | {id, formattatore} x 7
         moveq   #6,%d2
 4:      move.l  (%a2)+,%d0
-        mulu.w  #84,%d0
-        addi.l  #(OBJS+20),%d0
+        move.l  %d0,-(%sp)                      | oggetto dell'id (mods/idspace: costruito se manca)
+        jsr     IDS_OBJ
+        addq.l  #4,%sp
+        addi.l  #20,%d0
         movea.l %d0,%a0
         clr.l   (%a0)+                          | nessun dato
         clr.l   (%a0)+
@@ -718,8 +723,8 @@ comp_init:
         move.l  (%a2)+,(%a0)                    | esecutore
         subq.l  #1,%d2
         bge.s   4b
-        movem.l (%sp),%d2/%a1-%a2
-        lea     12(%sp),%sp
+        movem.l (%sp),%d1-%d2/%a1-%a2
+        lea     16(%sp),%sp
         rts
 
 | gestore della std::function del formattatore: nessuno stato da copiare o distruggere

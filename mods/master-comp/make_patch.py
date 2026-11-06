@@ -25,6 +25,7 @@ REPO = HERE.parents[1]
 sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build"), str(HERE)]
 import eft  # noqa: E402
 import modarea_layout  # noqa: E402
+import idspace_layout as IDS  # noqa: E402
 from dsp import ATTACK, C_OCT, EXP_T, LOG_T, RATIO, RELEASE  # noqa: E402
 _vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
 vparams = importlib.util.module_from_spec(_vp)
@@ -80,17 +81,17 @@ HOOK_ORIG = "0c810000ffff6f06223c0000ffff374100460c830000ffff6f06263c0000ffff374
 # l'OS mette sulle pagine in certi modi: 59 = GAIN al posto di RESO nei filtri EQ dei track, 122 = REV
 # sulla pagina 2 del MIXER, 91/101 = SLEW al posto di SPH degli LFO, 127 = PAN al posto di BAL. Con le
 # nostre funzioni al loro posto quelle manopole mostravano il compressore e non funzionavano.
-# Ora: 262..268 = "CC1..CC7 Select" dei track MIDI della Digitakt (nessun track MIDI sulla Syntakt,
-# pagina "CC Select" mai mostrata, nessun CC MIDI, nessun alias): gli id vecchi tornano come nell'OS.
+# 2026-11-06: 262..268 sono gli id della pagina "CC Select" della machine MIDI della Syntakt (non residui
+# della Digitakt): ora id delle mod 514..520 (mods/idspace), 262..268 di nuovo come nell'OS.
 DESC = 0x4022_D83C                      # descrittori: 52 B, indice = id logico
 PARAMS = [  # (nome breve, nome lungo, id, massimo)
-    ("THR", "Comp Threshold", 262, 0x7F00),
-    ("ATK", "Comp Attack", 263, 0x7F00),
-    ("REL", "Comp Release", 264, 0x7F00),
-    ("MUP", "Comp Makeup", 265, 0x7F00),
-    ("RAT", "Comp Ratio", 266, 0x7F00),        # 9 posizioni: 0 = OFF, 1..8 = 1.5..20:1
-    ("GR", "Gain Reduction", 267, 0x7F00),     # misuratore, sola lettura
-    ("COMP", "Compressor On/Off", 268, 0x100),  # interruttore
+    ("THR", "Comp Threshold", 514, 0x7F00),
+    ("ATK", "Comp Attack", 515, 0x7F00),
+    ("REL", "Comp Release", 516, 0x7F00),
+    ("MUP", "Comp Makeup", 517, 0x7F00),
+    ("RAT", "Comp Ratio", 518, 0x7F00),        # 9 posizioni: 0 = OFF, 1..8 = 1.5..20:1
+    ("GR", "Gain Reduction", 519, 0x7F00),     # misuratore, sola lettura
+    ("COMP", "Compressor On/Off", 520, 0x100),  # interruttore
 ]
 # agganci alle funzioni centrali dei parametri di kit: (indirizzo, byte originali, simbolo)
 VP_SLOT0 = 0                            # posti nella tabella di vparams: 0..6
@@ -115,6 +116,8 @@ INIT_FIX = [(0x4018_F914, "2f05", "2f03", "id 262 (THR) +4: prototipo come 144")
             (0x4018_FAF8, "41b9e670", "41b9e5d0", "id 267 (GR) +68: barra come IN LR"),
             (0x4018_FB2A, "41b9e8b0", "41b9e9f0", "id 268 (COMP) +36: come 115"),
             (0x4018_FB4A, "41b9e670", "41b9e680", "id 268 (COMP) +68: come 115")]
+# modello stock dell'oggetto per id MIDI di prima (dati +0..+19 uguali agli oggetti della v0.9), 2026-11-06
+TEMPLATE = {262: 34, 263: 112, 264: 34, 265: 34, 266: 113, 267: 78, 268: 115}
 TYPES = {"THR": 0, "ATK": 8, "REL": 0, "MUP": 0, "RAT": 8, "GR": 0, "COMP": 12}   # +0 degli oggetti
 RAT_STEP = 0xFE0
 PAGE_HOOK, PAGE_ORIG = 0x4019_531A, "42b941ba0968"      # clr.l 0x41BA0968 (ultima casella vuota, all'avvio)
@@ -172,6 +175,8 @@ def main() -> None:
     defs = {"C_OCT": C_OCT, "D_THR": a.thr, "D_ATK": a.atk, "D_REL": a.rel, "D_MUP": a.mup,
             "GFX_ON": 0 if a.no_drive_knob else 1}
     defs.update({f"ID_{n}": i for n, _, i, _ in PARAMS})
+    defs["IDS_OBJ"] = int(json.loads((REPO / "mods" / "idspace" / "patch.json").read_text(encoding="utf-8"))
+                          ["symbols"]["ids_obj32"], 16)
     defs.update({f"TY_{n}": TYPES[n] for n, _, _, _ in PARAMS})
     nl = "\n"
     tables = "".join(f"        .long   {', '.join(str(v) for v in tab[k:k + 8])}{nl}"
@@ -204,18 +209,29 @@ def main() -> None:
     for slot, (n, _, i, _) in enumerate(PARAMS):      # parametri virtuali (mods/vparams), posti 0..6
         ui.append(vparams.entry(VP_SLOT0 + slot, i, syms["get_hook"], syms["set_hook"], f"master-comp {n}"))
     defaults = {"THR": a.thr, "ATK": a.atk, "REL": a.rel, "MUP": a.mup, "RAT": a.rat * RAT_STEP, "GR": 0, "COMP": 0x100}
+    def ext(at: int, data: bytes, what: str) -> dict:
+        return {"section": 3, "addr": f"{MODAREA_IMG + at - MODAREA_RAM:#010X}", "len": len(data), "append": True,
+                "hex": data.hex(), "ram": f"{at:#010x}", "what": what}
+
+    # descrittori e oggetti (idspace): descrittore stock dell'id MIDI di prima con intervallo e nomi nostri,
+    # oggetto da un modello stock (dati +0..+19 come le correzioni della v0.8) con grafico e stile di INIT_FIX
     for n, ln, i, mx in PARAMS:
-        r = DESC + 52 * i
-        ui.append(fixed(r + 8, struct.pack(">III", 0, mx, defaults[n]), f"id {i} -> {n}: min, max, default"))
-        ui.append(fixed(r + 40, struct.pack(">I", syms[f"n_{n.lower()}_l"]), f"id {i}: nome lungo '{ln}'"))
-        ui.append(fixed(r + 48, struct.pack(">I", syms[f"n_{n.lower()}_s"]), f"id {i}: nome breve '{n}'"))
-    for addr, orig, new, what in INIT_FIX:
-        ui.append(fixed(addr, bytes.fromhex(new), what, orig))
+        old = i - 252
+        d = bytearray(sec3[DESC - LOAD + 52 * old:DESC - LOAD + 52 * old + 52])
+        d[8:20] = struct.pack(">III", 0, mx, defaults[n])
+        d[24:32] = struct.pack(">II", 0xFFFF_FFFF, 0xFFFF_FFFF)
+        d[40:44] = struct.pack(">I", syms[f"n_{n.lower()}_l"])
+        d[48:52] = struct.pack(">I", syms[f"n_{n.lower()}_s"])
+        g = {off: int(new, 16) for a_, orig, new, what in INIT_FIX if what.startswith(f"id {old} ")
+             for off in (36, 68) if f"+{off}" in what}
+        o = struct.pack(">4I", TEMPLATE[old], 0, g.get(36, 0), g.get(68, 0))
+        ui += [ext(IDS.desc(i), bytes(d), f"idspace: descrittore dell'id {i} ({n})"),
+               ext(IDS.objdef(i), o, f"idspace: oggetto dell'id {i} ({n}), modello {TEMPLATE[old]}")]
     ui.append(fixed(PAGE_HOOK, struct.pack(">HI", 0x4EB9, syms["comp_page_stub"]),
                     "pagina SYN della FX track all'avvio: caselle A..G e init (jsr comp_page_stub)", PAGE_ORIG))
 
     spec = {
-        "name": "master-comp", "os": "1.42", "requires": ["modarea", "vparams", "fastmix"],
+        "name": "master-comp", "os": "1.42", "requires": ["modarea", "vparams", "fastmix", "idspace"],
         "description": "Compressore sul master analogico (VCA del master) con l'algoritmo del "
                        "compressore in stile Digitakt; manopole THR ATK REL MUP RAT (0 = OFF) e misuratore GR "
                        "sulla pagina SYN della FX track; valori salvati nel kit del pattern (o globali con "
