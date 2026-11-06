@@ -549,7 +549,8 @@ def ui():
     return screens.UI(["sampler"], setup=setup)
 
 
-OBJS, DESC = 0x41BA_0A24, 0x4022_D83C
+OBJS = 0x41BA_0A24
+DESC = __import__("idspace_layout").TABLE                   # i descrittori che l'OS legge (mods/idspace)
 
 
 def text(u, i, v):

@@ -29,7 +29,10 @@ typedef int32_t s32;
 
 #define OBJS 0x41BA0A24u                    /* per-parameter objects, 84 B, index = id */
 #define OBJ_SIZE 84u
+#ifndef DESC
 #define DESC 0x4022D83Cu                    /* descriptors, 52 B per id */
+#endif
+/* DESC from make_patch.py: the copy the OS reads (mods/idspace) */
 #define TRACKS ((const volatile short *)0x800021B0u)    /* per-track values: 0x47 words from +0xE */
 #define TRACK_WORDS 0x47
 #define PROJECT (*(void *const volatile *)0x444E23F4u)

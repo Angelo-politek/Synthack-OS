@@ -26,6 +26,7 @@ sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
 import engine_layout as E  # noqa: E402
 import modarea_layout as M  # noqa: E402
+import idspace_layout as IDS  # noqa: E402
 import registry  # noqa: E402
 import synpages_layout as SP  # noqa: E402
 
@@ -36,7 +37,7 @@ BOOT_SLOT = next(n for n, who in registry.BOOT_SLOTS.items() if who == "sampler"
 TOOLS = "~/tools/m68k/root"
 LS_HDR = __import__("modarea_layout").RAM + next(a for a, b, who, _ in __import__("registry").MODAREA
                                                   if who == "long-samples")    # mods/long-samples: 'LSHD'
-CFLAGS = (f"-DSP_TABLE={SP.TABLE:#x} -DLS_HDR={LS_HDR:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
+CFLAGS = (f"-DDESC={IDS.TABLE:#x}u -DSP_TABLE={SP.TABLE:#x} -DLS_HDR={LS_HDR:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
           "--param=min-pagesize=0")             # la RAM condivisa della CPU #2 parte da 0
 
 # sezione 3 (OS 1.42)
@@ -212,7 +213,7 @@ def main() -> None:
          "ram": f"{E.RAM + OFF_ENGINE:#010x}", "what": "(area motori) SAMPLER sulla CPU #2"},
     ]
     spec = {
-        "name": "sampler", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "xparams"],
+        "name": "sampler", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "xparams", "idspace"],
         "description": "SAMPLER al posto di SP TWINSHOT: le machine a campioni della Digitakt (ONESHOT, WERP, "
                        "REPITCH, SLICE), riscritte, come quattro machine nel menu. SYN 1/2 come la Digitakt (TUNE PLAY BR "
                        "SAMP / tre parametri del tipo / LEV), SYN 2/2 la forma d'onda con i tre parametri e uno proprio della "
