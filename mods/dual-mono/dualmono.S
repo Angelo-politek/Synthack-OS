@@ -30,14 +30,14 @@
         .equ    ID_DEL,         129
         .equ    ID_REV,         130
         .equ    ID_FXROUT,      132
-        | nomi brevi nella tabella dei parametri (0x4022E404 + 52*indice + 48)
-        .equ    NAME_INLR,      0x4022E404 + 52*68 + 48
+        | nomi nella tabella dei descrittori: DESC (--defsym) = la copia di idspace, letta dall'OS
+        .equ    NAME_INLR,      DESC + 52*126 + 48
         .equ    ORIG_INLR,      0x40253E8E      | "IN LR"
-        .equ    NAME_INR,       0x4022E404 + 52*67 + 48 | alias 125
+        .equ    NAME_INR,       DESC + 52*125 + 48 | alias 125
         .equ    ORIG_IN,        0x4024FBC7      | "IN"
-        | nomi lunghi (titolo in alto mentre si gira la manopola): 0x4022D83C + 52*id + 40
-        .equ    LONG_INLR,      0x4022D83C + 52*126 + 40
-        .equ    LONG_INR,       0x4022D83C + 52*125 + 40
+        | nomi lunghi (titolo in alto mentre si gira la manopola): DESC + 52*id + 40
+        .equ    LONG_INLR,      DESC + 52*126 + 40
+        .equ    LONG_INR,       DESC + 52*125 + 40
         .equ    ORIG_LONG_INLR, 0x40253E80      | "In Left/Right"
         .equ    ORIG_LONG_INR,  0x40253E6D      | "Input Level"
 

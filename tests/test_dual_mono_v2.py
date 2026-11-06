@@ -23,6 +23,7 @@ from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A0, UC_M68K_REG_A1,
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack"), str(ROOT / "tools" / "build")]
 import dualmono_layout as DL  # noqa: E402
+import idspace_layout as IDS  # noqa: E402
 import eft  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
@@ -55,7 +56,7 @@ class Machine:
         uc.mem_map(0x4000_0000, 0x0040_0000)
         uc.mem_write(LOAD, sec3)
         uc.mem_map(0x41B9_1000, 0x2_0000)
-        uc.mem_map(0x444E_1000, 0x5_0000)
+        uc.mem_map(0x444E_1000, 0x9_0000)
         uc.mem_map(0x5000_0000, 0x2_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
         self.sym = {}
@@ -172,7 +173,7 @@ def test_input_fx3_per_side(stock, mod):
 
 # ----------------------------------------------------------------------------- interfaccia
 def view(m, idx, mono):
-    m.uc.mem_write(PAGES, struct.pack(">4i", 22, 23, 24, 27))
+    m.uc.mem_write(PAGES, struct.pack(">4i", 22, 23, 24, 37))
     m.uc.mem_write(VIEW + 0x7C, struct.pack(">3I", PAGES, PAGES + 16, PAGES + 16))
     m.uc.mem_write(VIEW + 0x90, struct.pack(">i", idx))
     m.uc.mem_write(FLAG, bytes([0 if mono else 1]))
@@ -216,10 +217,10 @@ def test_r_page_reads_and_writes_the_r_sends(mod):
     get, put = 0x4000_D94A, 0x4000_DA32                                # vparams
     assert mod.call(get, [0x5000_0000, 129]) == 11 << 8
     assert mod.call(get, [0x5000_0000, 130]) == 22 << 8
-    assert mod.call(get, [0x5000_0000, 269]) == 33 << 8                 # fx3
+    assert mod.call(get, [0x5000_0000, 513]) == 33 << 8                 # fx3
     mod.call(put, [0x5000_0000, 129, 100 << 8, 1])
     mod.call(put, [0x5000_0000, 130, 0x9000, 1])
-    mod.call(put, [0x5000_0000, 269, 5 << 8, 1])
+    mod.call(put, [0x5000_0000, 513, 5 << 8, 1])
     assert [mod.r16(UI_KIT + o) for o in (DL.DEL_R, DL.REV_R, DL.FX3_R)] == [100, 127, 5]
     assert mod.uc.mem_read(UI + 96, 1)[0] == 1
 
@@ -248,22 +249,22 @@ def test_fx3_l_page_unchanged(mod):
     view(mod, 2, True)
     mod.uc.mem_write(mod.sym["dm_view"], struct.pack(">I", VIEW))
     mod.w16(FX_KIT + 2 * 0x37, 0x0150)
-    assert mod.call(0x4000_D94A, [0x5000_0000, 269]) == 0x50 << 8
-    mod.call(0x4000_DA32, [0x5000_0000, 269, 7 << 8, 1])
+    assert mod.call(0x4000_D94A, [0x5000_0000, 513]) == 0x50 << 8
+    mod.call(0x4000_DA32, [0x5000_0000, 513, 7 << 8, 1])
     assert mod.r16(FX_KIT + 2 * 0x37) == 0x0107
 
 
 def test_r_page_slots_at_boot(mod):
-    mod.uc.mem_write(0x41BA_07F8, struct.pack(">I", 269))
+    mod.uc.mem_write(0x41BA_07F8, struct.pack(">I", 513))
     mod.uc.mem_write(0x41BA_0874, struct.pack(">9I", *range(246, 255)))
     mod.call(mod.sym["dm_page_stub"])
-    assert list(struct.unpack(">9I", mod.uc.mem_read(0x41BA_0874, 36))) == [125, 0, 0, 0, 129, 130, 269, 0, 0]
+    assert list(struct.unpack(">8I", mod.uc.mem_read(IDS.page(37) + 8, 32))) == [125, 0, 0, 0, 129, 130, 513, 0]
 
 
 MIX = 0x41BA_07F0                                       # External Mixer (pagina 24), caselle A..H
 
 
-@pytest.mark.parametrize("fx3", [269, 0])
+@pytest.mark.parametrize("fx3", [513, 0])
 def test_fx3_next_to_reverb_in_mono(mod, fx3):
     """Mono: FX3 in G accanto a DEL e REV (anche nella pagina IN L); stereo: in C, BAL in G come prima."""
     mod.uc.mem_write(MIX, struct.pack(">8I", 126, 0, fx3, 0, 129, 130, 128, 132))
@@ -278,10 +279,10 @@ def test_fx3_next_to_reverb_in_mono(mod, fx3):
 
 
 def test_slots_untouched_before_the_page_init(mod):
-    mod.uc.mem_write(MIX, struct.pack(">8I", 126, 0, 269, 0, 129, 130, 128, 132))
+    mod.uc.mem_write(MIX, struct.pack(">8I", 126, 0, 513, 0, 129, 130, 128, 132))
     mod.uc.mem_write(FLAG, b"\x00")
     mod.call(mod.sym["dm_update"])
-    assert list(struct.unpack(">8I", mod.uc.mem_read(MIX, 32))) == [126, 0, 269, 0, 129, 130, 128, 132]
+    assert list(struct.unpack(">8I", mod.uc.mem_read(MIX, 32))) == [126, 0, 513, 0, 129, 130, 128, 132]
 
 
 def test_header_and_patched_bytes():
@@ -297,4 +298,4 @@ def test_header_and_patched_bytes():
     sec3 = eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     for a, orig in want.items():
         assert sec3[a - LOAD:a - LOAD + len(orig) // 2].hex() == orig
-    assert set(sp["requires"]) == {"modarea", "vparams", "kitstore", "fastmix"}
+    assert set(sp["requires"]) == {"modarea", "vparams", "kitstore", "fastmix", "idspace"}

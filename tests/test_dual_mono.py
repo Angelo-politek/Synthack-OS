@@ -17,7 +17,7 @@ from unicorn.m68k_const import (UC_CPU_M68K_ANY, UC_M68K_REG_A2, UC_M68K_REG_A3,
                                 UC_M68K_REG_A7, UC_M68K_REG_D4, UC_M68K_REG_SR)
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack")]
+sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "unpack"), str(ROOT / "tools" / "build")]
 import eft  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
@@ -35,9 +35,11 @@ MIX3 = 0x41BA_07F0
 STEREO_LAYOUT = [126, 0, 0, 0, 129, 130, 128, 132]
 MONO_LAYOUT = [126, 0, 0, 0, 129, 130, 128, 132]     # B: IN R nella sua pagina; C e G (FX3) li sposta dualmono2.c
 DESC = 0x4022D83C                                       # descrittori: record da 52 B, indice = id logico
-NAMES = {i: DESC + 52 * i + 48 for i in (125, 126, 127, 128)}
+import idspace_layout as IDS  # noqa: E402
+TABLE = IDS.TABLE                                       # la copia che l'OS legge (mods/idspace)
+NAMES = {i: TABLE + 52 * i + 48 for i in (125, 126, 127, 128)}
 ORIG_NAMES = {125: 0x4024FBC7, 126: 0x40253E8E, 127: 0x40266369, 128: 0x4026601D}
-LONG = {i: DESC + 52 * i + 40 for i in (125, 126)}
+LONG = {i: TABLE + 52 * i + 40 for i in (125, 126)}
 ORIG_LONG = {125: 0x40253E6D, 126: 0x40253E80}          # "Input Level", "In Left/Right"
 SWITCHES = (0x4000C8B0, 0x4000C9A4)                     # get/set del valore per id logico 125..132
 # istruzioni EMAC del codice originale eseguito (blocco, legge di bilanciamento, seno): da GNU objdump
@@ -60,6 +62,8 @@ class Machine:
         uc.mem_write(MIX3, struct.pack(">8i", *STEREO_LAYOUT))
         uc.mem_map(0x8000_0000, 0x1_0000)                     # SRAM (flag dual mono)
         uc.mem_map(0x5000_0000, 0x2_0000)                     # parametri, hw, stack
+        uc.mem_map(0x444E_1000, 0x9_0000)                     # area mod: copia dei descrittori (idspace)
+        uc.mem_write(TABLE, sec3[DESC - LOAD:DESC - LOAD + 52 * 505])
         sites = list(ORIG_EMAC)
         if patched:
             for p in SPEC["patches"]:
@@ -112,7 +116,7 @@ def test_original_descriptor_fields_are_as_assumed(sec3):
     # alias 125: stesso gruppo/id interno di IN LR, nessun CC/NRPN, nessuna posizione di salvataggio
     assert [u(DESC + 52 * 125 + 4 * k) for k in (0, 1, 6, 7, 8)] == [0x34, 0x23, 0xFFFFFFFF, 0xFFFFFFFF, 0]
     assert [u(DESC + 52 * 128 + 4 * k) for k in (0, 1)] == [0x34, 0x25]               # BAL
-    assert {i: u(LONG[i]) for i in LONG} == ORIG_LONG
+    assert {i: u(DESC + 52 * i + 40) for i in LONG} == ORIG_LONG
     for tab in SWITCHES:                    # voci 125,126 -> campo di IN LR; 127,128 -> campo di BAL
         assert struct.unpack_from(">4h", sec3, tab - LOAD) == (0x10, 0x10, 0x22, 0x22)
 

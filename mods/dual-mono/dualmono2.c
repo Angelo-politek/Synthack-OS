@@ -1,13 +1,13 @@
 /* dual mono v2: IN L e IN R con mandate proprie (DEL, REV, FX3), nell'area mod (Syntakt OS 1.41).
  *
- * Con EXTERNAL IN = mono il tab MIXER ha una quarta pagina, IN R (pagina 27, "MIDI Source" della
+ * Con EXTERNAL IN = mono il tab MIXER ha una quarta pagina, IN R (pagina 37 di idspace; prima la 27, "MIDI Source" della
  * Digitakt, mai mostrata sulla Syntakt): IN R, FX3, DEL, REV. La pagina External Mixer resta quella
  * di IN L. Le mandate del lato R stanno in tre parole del kit (kitstore, blocco 0): 0..127.
  *
  * Interfaccia: la pagina IN R usa gli stessi id della pagina IN L (129 DEL, 130 REV, 269 FX3), con le
  * loro icone; 129 e 130 passano da vparams e, solo quando la pagina IN R e' quella aperta nel tab
  * MIXER, leggono e scrivono il lato R (269 lo fa fx3 leggendo dm_page_r dall'intestazione).
- * Il tab MIXER ha il vettore delle pagine {22, 23, 24, 27}: la sua lunghezza (+0x80 della vista) e' 4 in
+ * Il tab MIXER ha il vettore delle pagine {22, 23, 24, 37}: la sua lunghezza (+0x80 della vista) e' 4 in
  * mono e 3 in stereo, aggiornata alla costruzione della vista e quando cambia l'impostazione.
  *
  * Audio: il blocco originale delle mandate dell'ingresso (0x4008F4F0..0x4008F66A) gira due volte, come
@@ -24,7 +24,9 @@ typedef unsigned short u16;
 #define MONO()    (*(const volatile unsigned char *)0x80003146u == 0)   /* EXTERNAL IN: 0 = mono */
 #define KIT       (*(char *const volatile *)0x800030B8u)                /* kit attivo */
 #define UI_ROOT   (*(char *const volatile *)0x444E2334u)
-#define PAGE_R    27
+#define S_(x)     #x
+#define XS(x)     S_(x)
+#define PAGE_R    37                 /* pagina delle mod (mods/idspace): la 27 e' "MIDI Source" della machine MIDI */
 #define V_BEGIN   0x7C                                                  /* ParameterPageView: pagine */
 #define V_END     0x80
 #define V_CAP     0x84
@@ -73,7 +75,7 @@ u32 dm_page_r(void)                                                     /* pagin
 }
 
 /* External Mixer (pagina 24): in mono FX3 in G accanto a DEL e REV (BAL non serve), in stereo in C con
- * BAL in G come prima. dm_fx3 = casella C all'avvio (269 con fx3, 0 senza), letta da dm_page_stub. */
+ * BAL in G come prima. dm_fx3 = casella C all'avvio (513 con fx3, 0 senza), letta da dm_page_stub. */
 #define MIX_C     (*(volatile s32 *)0x41BA07F8u)
 #define MIX_G     (*(volatile s32 *)0x41BA0808u)
 #define ID_BAL    128
@@ -136,8 +138,11 @@ void dm_rparams(char *a2)
     *(volatile u16 *)(a2 + 1812) = (u16)(rword(KS_REV_R) << 8);
 }
 
-const char dm_page_s[] = "IN R";
-const char dm_page_l[] = "External In R";
+/* nomi della pagina: std::string COW statiche (lunghezza, capacita', contatore -1 = "leaked": l'OS ne fa copie
+ * proprie e non le libera mai), poi i caratteri. make_patch.py scrive l'elemento di pagina di idspace. */
+struct rep { u32 len, cap; s32 ref; char s[16]; };
+const struct rep dm_page_s = {4, 4, -1, "IN R"};
+const struct rep dm_page_l = {13, 13, -1, "External In R"};
 
 __asm__(
     "        .text\n"
@@ -233,21 +238,13 @@ __asm__(
     "        movem.l (%sp),%d0-%d1/%a0-%a1\n"
     "        lea     16(%sp),%sp\n"
     "        rts\n"
-    /* ---- 0x401950DE: pagina 27 all'avvio (al posto di clr.l 0x41BA0894) */
+    /* ---- 0x401950DE (inizializzazione delle pagine, dopo la 24): al posto di clr.l 0x41BA0894. La pagina IN R
+     * e' la 37 di idspace (PAGE_G = sua casella G): FX3 accanto al riverbero, come la casella C della pagina
+     * IN L (513 con fx3, altrimenti vuota) */
     "        .globl  dm_page_stub\n"
     "dm_page_stub:\n"
-    "        moveq   #125,%d0\n"                /* A: IN R (alias 125 = BAL) */
-    "        move.l  %d0,0x41BA0874\n"
-    "        clr.l   0x41BA0878\n"
-    "        clr.l   0x41BA087C\n"
-    "        clr.l   0x41BA0880\n"
-    "        move.l  #129,%d0\n"                /* E: DEL, F: REV */
-    "        move.l  %d0,0x41BA0884\n"
-    "        move.l  #130,%d0\n"
-    "        move.l  %d0,0x41BA0888\n"
-    "        move.l  0x41BA07F8,%d0\n"          /* G: FX3 accanto al riverbero, come la casella C */
-    "        move.l  %d0,0x41BA088C\n"          /* della pagina IN L (269 con fx3, altrimenti vuota) */
-    "        move.l  %d0,dm_fx3\n"
-    "        clr.l   0x41BA0890\n"
     "        clr.l   0x41BA0894\n"
+    "        move.l  0x41BA07F8,%d0\n"
+    "        move.l  %d0," XS(PAGE_G) "\n"
+    "        move.l  %d0,dm_fx3\n"
     "        rts\n");

@@ -30,6 +30,7 @@ sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import dualmono_layout as DL  # noqa: E402
 import eft  # noqa: E402
 import modarea_layout  # noqa: E402
+import idspace_layout as IDS  # noqa: E402
 
 _vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
 vparams = importlib.util.module_from_spec(_vp)
@@ -42,7 +43,8 @@ BLOCK_START, BLOCK_END = 0x4009_08EA, 0x4009_0974
 ENTRY_ORIG = "342a070a302a0740"         # move.w 1802(a2),d2 ; move.w 1856(a2),d0
 EXIT_ORIG = "223c00007f7f"              # move.l #32639,d1
 WSL_BINUTILS = "~/tools/m68k/root"
-CFLAGS = (f"-DKS_DEL_R={DL.DEL_R:#x}u -DKS_REV_R={DL.REV_R:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin "
+PAGE_R = 37                             # pagina delle mod (idspace): IN R
+CFLAGS = (f"-DPAGE_G={IDS.page(PAGE_R) + 8 + 24:#x} -DKS_DEL_R={DL.DEL_R:#x}u -DKS_REV_R={DL.REV_R:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin "
           "-nostdlib -fno-pic -fno-common -fno-toplevel-reorder -Wall -Wextra")
 # v2: (indirizzo, byte originali, simbolo o byte nuovi, salto, descrizione)
 V2_HOOKS = [
@@ -50,12 +52,10 @@ V2_HOOKS = [
     (0x4008_F66A, "7f6a0746736a0018", "dm_mid", "jsr", "mandate dell'ingresso, fine: jsr dm_mid ; nop"),
     (0x4003_5914, "4eb940044626", "dm_mixer_ctor", "jsr", "tab MIXER: costruzione della vista (dm_mixer_ctor)"),
     (0x400A_347C, "13c080003146", "dm_flag_hook", "jsr", "impostazione EXTERNAL IN: jsr dm_flag_hook"),
-    (0x4019_50DE, "42b941ba0894", "dm_page_stub", "jsr", "pagina 27 all'avvio: IN R, FX3, DEL, REV"),
+    (0x4019_50DE, "42b941ba0894", "dm_page_stub", "jsr", "pagine all'avvio: FX3 nella pagina IN R (37, idspace)"),
 ]
 V2_LONGS = [
-    (0x4003_58EE, "401c823c", "dm_pages", "tab MIXER: pagine {22, 23, 24, 27}"),
-    (0x4019_500E, "40251e2c", "dm_page_s", "pagina 27: nome breve 'IN R'"),
-    (0x4019_5074, "40251e30", "dm_page_l", "pagina 27: nome lungo 'External In R'"),
+    (0x4003_58EE, "401c823c", "dm_pages", "tab MIXER: pagine {22, 23, 24, 37}"),
 ]
 MIXER_COUNT = (0x4003_58E8, "7203", "7204")
 # bit 5 del byte di controllo degli ingressi (hw+0xA6): in mono l'OS lo spegne e l'hardware somma IN L e IN R
@@ -83,7 +83,7 @@ def build_blob() -> tuple[bytes, dict[str, int], list[int], str]:
         shutil.copy(HERE / "dualmono.S", tmp / "dualmono.S")
         w = eft.to_wsl_path(tmp)
         bu = f"R={WSL_BINUTILS}; export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu; cd {w}; "
-        wsl(bu + "$R/usr/bin/m68k-linux-gnu-as -mcpu=54418 dualmono.S -o dm.o")
+        wsl(bu + f"$R/usr/bin/m68k-linux-gnu-as -mcpu=54418 --defsym DESC={IDS.TABLE} dualmono.S -o dm.o")
         # .text a CODE_BASE, .data subito dopo (allineata a 4): un unico blocco contiguo
         wsl(bu + f"$R/usr/bin/m68k-linux-gnu-ld -N -Ttext={CODE_BASE:#x} -o dm.elf dm.o")
         wsl(bu + "$R/usr/bin/m68k-linux-gnu-objcopy -O binary dm.elf dm.bin")
@@ -180,6 +180,11 @@ def main() -> None:
         v2.append(fixed(addr, code, what, orig))
     for addr, orig, sym, what in V2_LONGS:
         v2.append(fixed(addr, struct.pack(">I", syms2[sym]), what, orig))
+    page = struct.pack(">2I", syms2["dm_page_s"] + 12, syms2["dm_page_l"] + 12) + struct.pack(
+        ">9i", 125, 0, 0, 0, 129, 130, 0, 0, 0)                        # A IN R, E DEL, F REV, G FX3 (all'avvio)
+    v2.append({"section": 3, "addr": f"{modarea_layout.IMG + IDS.page(PAGE_R) - modarea_layout.RAM:#010X}",
+               "len": len(page), "append": True, "hex": page.hex(), "ram": f"{IDS.page(PAGE_R):#010x}",
+               "what": f"idspace: pagina {PAGE_R}, IN R (External In R)"})
     v2.append(fixed(MIXER_COUNT[0], bytes.fromhex(MIXER_COUNT[2]), "tab MIXER: 4 pagine (la quarta solo in mono)",
                     MIXER_COUNT[1]))
     v2.append(fixed(HW_STEREO[0], bytes.fromhex(HW_STEREO[2]),
@@ -191,7 +196,7 @@ def main() -> None:
     t_in = struct.pack(">HIH", 0x4EB9, syms["pre_hook"], 0x4E71)        # jsr.l pre_hook ; nop
     t_out = struct.pack(">HI", 0x4EB9, syms["post_hook"])               # jsr.l post_hook
     spec = {
-        "name": "dual-mono", "os": "1.42", "requires": ["modarea", "vparams", "kitstore", "fastmix"],
+        "name": "dual-mono", "os": "1.42", "requires": ["modarea", "vparams", "kitstore", "fastmix", "idspace"],
         "description": "EXTERNAL IN in modalità mono: INPUT L e INPUT R come due ingressi separati, ognuno "
                        "con livello e mandate DEL, REV, FX3 propri. Pagina External Mixer = IN L; pagina "
                        "IN R nel tab MIXER (solo in mono); in stereo tutto come l'originale.",

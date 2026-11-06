@@ -180,7 +180,7 @@ Ids without a page often carry a MIDI CC or are aliases: clear the CC, check ali
 | Page | Mod | Use |
 |---|---|---|
 | 25 | fx3 | REVERB page 2 (was OB8) |
-| 27 | dual-mono | IN R in the MIXER tab (was MIDI Source) |
+| 37 | dual-mono | IN R in the MIXER tab (idspace page) |
 
 ## Saved with the kit / project
 

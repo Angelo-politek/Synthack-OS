@@ -143,7 +143,7 @@ IDS = {
 }
 
 # ---- pagine dell'interfaccia (indice -> mod) riusate
-PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 27: ("dual-mono", "IN R in the MIXER tab (was MIDI Source)")}
+PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 37: ("dual-mono", "IN R in the MIXER tab (idspace page)")}
 
 
 def modarea_owner(off: int) -> str | None:
