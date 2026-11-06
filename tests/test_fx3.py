@@ -31,18 +31,18 @@ import modarea_layout  # noqa: E402
 from emac import UnicornEmac  # noqa: E402
 
 MA = modarea_layout.RAM                                    # area mod (mods/modarea)
-MA_PAGE, MA_MAP = 0x444E_1000, 0x5_0000                     # area mod e radice dell'interfaccia (0x444E2334)
+MA_PAGE, MA_MAP = 0x444E_1000, 0x9_0000                     # area mod e radice dell'interfaccia (0x444E2334)
 assert MA_PAGE <= MA and MA + modarea_layout.SIZE <= MA_PAGE + MA_MAP
 
 SY = ROOT / "firmware" / "Syntakt_OS1.42.syx"
-MODS = [ROOT / "mods" / m / "patch.json" for m in ("vparams", "fx3")]
+MODS = [ROOT / "mods" / m / "patch.json" for m in ("vparams", "fx3", "idspace")]
 pytestmark = pytest.mark.skipif(not (SY.exists() and all(p.exists() for p in MODS)), reason="OS o patch assenti")
 
 LOAD, STACK, RET, UI = 0x4000_0400, 0x5000_8000, 0x5000_F000, 0x5000_0C00
 FRAME, TRK = 0x5000_4000, 0x5000_5000
 SRC_DIG, SRC_ANA, OUT_A, OUT_B = 0x8000_3D50, 0x8000_3950, 0x8000_DAD0, 0x8000_DFD0
 GET, SET, KIT = 0x4000_D94A, 0x4000_DA32, 0x4000_D870
-IDS = {"TYPE": 246, "SPD": 247, "DEP": 248, "TIME": 250, "FDBK": 251, "WID": 252, "DSND": 249, "RSND": 253}
+IDS = {"TYPE": 505, "SPD": 506, "DEP": 507, "TIME": 509, "FDBK": 510, "WID": 511, "DSND": 508, "RSND": 512}   # idspace
 DELAY, REVERB, DLY_IN = 0x4009_6908, 0x4009_6EB4, 0x8000_DBD0
 
 
@@ -68,12 +68,15 @@ class Machine:
         uc.mem_map(MA_PAGE, MA_MAP)
         uc.mem_map(0x5000_0000, 0x1_0000)
         uc.mem_map(0x8000_0000, 0x1_0000)
-        for patches in (json.loads(MODS[0].read_text(encoding="utf-8"))["patches"], self.spec["patches"]):
+        ids = json.loads(MODS[2].read_text(encoding="utf-8"))
+        for patches in (json.loads(MODS[0].read_text(encoding="utf-8"))["patches"], self.spec["patches"],
+                        ids["patches"]):
             for p in patches:
                 uc.mem_write(int(p["ram"], 16) if p.get("append") else int(p["addr"], 16), bytes.fromhex(p["hex"]))
         uc.mem_write(RET, b"\x4e\x75")
         uc.mem_write(0x444E_2334, struct.pack(">I", UI))
         self.emac = UnicornEmac(uc, [int(a, 16) for a in self.spec["emac_sites"]])
+        self.call(int(ids["symbols"]["ids_boot"], 16))           # descrittori nella copia di idspace (avvio)
 
     def call(self, fn, args=(), regs=None):
         uc = self.uc
@@ -93,8 +96,10 @@ class Machine:
     def put(self, a, vals):
         self.uc.mem_write(a, struct.pack(f">{len(vals)}I", *[v & 0xFFFFFFFF for v in vals]))
 
+    ids = None
+
     def param(self, name, v):
-        self.call(SET, [0x5000_0000, IDS[name], v << 8, 1])
+        self.call(SET, [0x5000_0000, (self.ids or IDS)[name], v << 8, 1])
 
 
 def wet16(m):
@@ -460,7 +465,7 @@ def test_mix_hook_replays_pushes(m):
 
 def test_page_slots_and_reverb_tab(m):
     m.call(m.sym["fx3_page_stub"])
-    assert m.longs(0x41BA_081C, 9) == [246, 247, 248, 250, 251, 252, 249, 253, 0]
+    assert m.longs(0x41BA_081C, 9) == [505, 506, 507, 509, 510, 511, 508, 512, 0]
     m.call(m.sym["fx3_amp_stub"])                               # AMP 1: ... DEL REV SND3 VOL; AMP 2: PAN in E
     assert m.longs(0x41BA_0624, 1) == [72] and m.longs(0x41BA_0650, 1) == [72]
     assert m.longs(0x41BA_0674, 1) == [80] and m.longs(0x41BA_06A0, 1) == [80]
@@ -516,12 +521,24 @@ def stub_calls(m, addr, nargs, fn, args):
     return got
 
 
+def objdefs():
+    """Definizioni degli oggetti (idspace): id -> (modello, +20, +36, +68)."""
+    import idspace_layout as I
+    spec = json.loads(MODS[1].read_text(encoding="utf-8"))
+    out = {}
+    for p in spec["patches"]:
+        if p.get("append") and I.OBJDEF <= int(p["ram"], 16) < I.PAGEDEF:
+            out[I.FIRST + (int(p["ram"], 16) - I.OBJDEF) // 16] = struct.unpack(">4I", bytes.fromhex(p["hex"]))
+    return out
+
+
 def test_send_graphics():
     spec = json.loads(MODS[1].read_text(encoding="utf-8"))
     fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
-    assert fixes[0x4018_F51A] == "41b9ebd0" and fixes[0x4018_F536] == "41b9e5d0"   # DEL (249): come la mandata DEL
     assert fixes[0x4018_B53E] == "41b9e730" and fixes[0x4018_B55A] == "41b9e5d0"   # SND3 (72): icona MOD + barra
-    assert fixes[0x4018_F660] == "41b9eba0"                                        # REV (253): come la mandata REV (79)
+    d = objdefs()
+    assert d[508][2:] == (0x41B9_EBD0, 0x41B9_E5D0)                                # DEL: come la mandata DEL
+    assert d[512][2] == 0x41B9_EBA0                                                # REV: come la mandata REV (79)
 
 
 def test_type_drawn_as_text(m):
@@ -567,14 +584,17 @@ def test_more_texts(m, fn, v, text):
     assert raw[:raw.index(0)].decode() == text
 
 
-def test_object_fields_like_del():
+def test_object_templates_and_no_patch_on_midi_ids():
+    """Ogni id della pagina e della mandata dell'ingresso ha un oggetto di idspace con un modello stock; nessuna
+    patch tocca piu' gli oggetti o i descrittori degli id MIDI 246-269."""
+    d = objdefs()
+    assert sorted(d) == list(range(505, 514))
+    assert all(v[0] for v in d.values())
     spec = json.loads(MODS[1].read_text(encoding="utf-8"))
-    fixes = {int(p["addr"], 16): p["hex"] for p in spec["patches"] if not p.get("append")}
-    for a in (0x4018_F3F8, 0x4018_F454, 0x4018_F4A6, 0x4018_F63A):
-        assert fixes[a] == "2f03"                              # prototipo d3, come 250 (DEL)
-    for a in (0x4018_F400, 0x4018_F456, 0x4018_F642):
-        assert fixes[a][2:] == "00"                            # tipo 0
-    assert fixes[0x4018_F4AE] == "42b941ba5b84"
+    for p in spec["patches"]:
+        a = int(p["addr"], 16)
+        assert not 0x4022_D83C + 52 * 246 <= a < 0x4022_D83C + 52 * 270, p["what"]
+        assert not 0x4018_F3F0 <= a < 0x4018_FC00, p["what"]
 
 
 def test_send_to_delay_adds_scaled_chorus(m):
@@ -859,11 +879,14 @@ LOOK = {0: [(0x41B9_E6B0, 0), (0x41B9_E730, 0), (0x41B9_E7D0, 0), (0x41B9_ECD0, 
 
 
 def obj(i):
-    return 0x41BA_0A24 + 84 * i
+    import idspace_layout as I
+    return 0x41BA_0A24 + 84 * i if i < I.FIRST else I.OBJ + 84 * (i - I.FIRST)
 
 
 @pytest.mark.parametrize("t", [0, 1, 2, 3, 0])
 def test_icons_and_slots_follow_the_type(m, t):
+    ids = json.loads(MODS[2].read_text(encoding="utf-8"))["symbols"]
+    m.call(int(ids["ids_obj32"], 16), [505])                    # oggetti di idspace costruiti (prima ricerca)
     protos = {a for row in LOOK.values() for pair in row for a in pair if a}
     for a in protos:                                            # prototipi "costruiti all'avvio": firme
         m.put(a, [a, a + 1, a + 2, a + 3])
@@ -871,12 +894,12 @@ def test_icons_and_slots_follow_the_type(m, t):
     if t == 0:
         m.param("TYPE", 3)                                      # da un altro tipo
     m.param("TYPE", t)
-    for i, pid in enumerate((247, 248, 250, 251, 252)):
+    for i, pid in enumerate((506, 507, 509, 510, 511)):
         g, st = LOOK[t][i]                                      # {0, 0, fx3_mgr, invoker del prototipo}
         mgr = m.sym["fx3_mgr"]
         assert m.longs(obj(pid) + 36, 4) == ([0, 0, mgr, g + 3] if g else [0] * 4), (pid, hex(g))
         assert m.longs(obj(pid) + 68, 4) == ([0, 0, mgr, st + 3] if st else [0] * 4), pid
-    want = [246, 247, 248, 250, 0, 0, 249, 253] if t == 3 else [246, 247, 248, 250, 251, 252, 249, 253]
+    want = [505, 506, 507, 509, 0, 0, 508, 512] if t == 3 else [505, 506, 507, 509, 510, 511, 508, 512]
     assert m.longs(0x41BA_081C, 8) == want                      # il crusher lascia vuote FDBK e WID
 
 
@@ -884,13 +907,13 @@ def test_audio_interrupt_never_rewrites_the_ui(m):
     """Cambio di pattern a un kit con altro tipo: l'interrupt aggiorna i valori, nomi e icone li cambia
     solo l'interfaccia (al primo disegno o lettura)."""
     m.call(m.sym["fx3_fmt_spd"], [0, 0, 0x5000_3000])          # interfaccia: tipo 0 sistemato
-    m.put(obj(247) + 36, [0x1111] * 4)
+    m.put(obj(506) + 36, [0x1111] * 4)
     put_kit(m, KIT_A, [3, 10, 20, 30, 40, 50, 60, 70])
     m.put(KIT_PTR, [KIT_A])
     gains(m, [0x4000_0000])
     run_block(m)
     assert m.uc.mem_read(m.sym["fx3_p"], 1)[0] == 3
-    assert m.longs(obj(247) + 36, 4) == [0x1111] * 4             # non toccata dall'interrupt
+    assert m.longs(obj(506) + 36, 4) == [0x1111] * 4             # non toccata dall'interrupt
     assert text(m, m.sym["fx3_n1_s"]) == "SPD"
     m.call(m.sym["fx3_fmt_spd"], [0, 0, 0x5000_3000])
     assert text(m, m.sym["fx3_n1_s"]) == "SRR"
@@ -964,7 +987,7 @@ def test_kit_hooks_keep_failure_paths():
 
 
 # ----------------------------------------------------------------------------- SND3 dell'ingresso (v0.9)
-IN_ID, IN_HOOK_RET = 269, 0x5000_E000
+IN_ID, IN_HOOK_RET = 513, 0x5000_E000
 A2 = 0x5000_9000                                    # array dei parametri levigati (a2 nel mix)
 
 
@@ -1298,7 +1321,9 @@ def c_version():
     import base64
     import zlib
     doc = json.loads(C_VERSION.read_text(encoding="utf-8"))
-    return Machine(json.loads(zlib.decompress(base64.b64decode(doc["zlib_b64"]))))
+    m = Machine(json.loads(zlib.decompress(base64.b64decode(doc["zlib_b64"]))))
+    m.ids = {k: v - 259 for k, v in IDS.items()}                # la versione C usa ancora gli id MIDI (246..253)
+    return m
 
 
 def wet_any(m):

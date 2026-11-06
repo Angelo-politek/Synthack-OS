@@ -104,16 +104,16 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 4 | master-comp | 266 |
 | 5 | master-comp | 267 |
 | 6 | master-comp | 268 |
-| 7 | fx3 | 269 |
+| 7 | fx3 | 513 |
 | 8 | fx3 | 144 |
-| 9 | fx3 | 246 |
-| 10 | fx3 | 247 |
-| 11 | fx3 | 248 |
-| 12 | fx3 | 250 |
-| 13 | fx3 | 251 |
-| 14 | fx3 | 252 |
-| 15 | fx3 | 249 |
-| 16 | fx3 | 253 |
+| 9 | fx3 | 505 |
+| 10 | fx3 | 506 |
+| 11 | fx3 | 507 |
+| 12 | fx3 | 509 |
+| 13 | fx3 | 510 |
+| 14 | fx3 | 511 |
+| 15 | fx3 | 508 |
+| 16 | fx3 | 512 |
 | 17 | dual-mono | 129 |
 | 18 | dual-mono | 130 |
 | 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31 | **free** | |
@@ -140,14 +140,6 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 195 | sy-fm4 | SYN page 1/3 PNCH (SY TONE's PNCH, renamed) |
 | 196 | sy-fm4 | SYN page 1/3 OVER (SY TONE's OVER, renamed) |
 | 197 | sy-fm4 | SYN page 1/3 DEC1 (SY TONE's DEC, renamed) |
-| 246 | fx3 | FX3 page |
-| 247 | fx3 | FX3 page |
-| 248 | fx3 | FX3 page |
-| 249 | fx3 | FX3 page |
-| 250 | fx3 | FX3 page |
-| 251 | fx3 | FX3 page |
-| 252 | fx3 | FX3 page |
-| 253 | fx3 | FX3 page |
 | 254 | sy-fm4 | SYN pages 2/3 and 3/3 ALGO (was Digitakt MIDI CC1 Value, MIDI CC cleared) |
 | 255 | sy-fm4 | SYN page 2/3 RAT3 (was Digitakt MIDI CC2 Value, MIDI CC cleared) |
 | 256 | sy-fm4 | SYN page 2/3 LEV3 (was Digitakt MIDI CC3 Value, MIDI CC cleared) |
@@ -163,7 +155,6 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 266 | master-comp | compressor |
 | 267 | master-comp | compressor |
 | 268 | master-comp | compressor |
-| 269 | fx3 | external input SND3 |
 | 497 | sampler | SAMPLER knob A TUNE (was SP TWINSHOT TUN1) |
 | 498 | sampler | SAMPLER knob B PLAY (was SP TWINSHOT SMP1) |
 | 499 | sampler | SAMPLER knob C BR (was SP TWINSHOT FLT1) |
@@ -172,6 +163,15 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 502 | sampler | SAMPLER knob F LEN/MODE (was SP TWINSHOT SMP2) |
 | 503 | sampler | SAMPLER knob H LEV, lix 0x19 (the machine type in lix 0x1A, set from the machine menu) (was SP TWINSHOT OVER) |
 | 504 | sampler | SAMPLER knob D SAMP, lix 0x15 (was SP TWINSHOT DEC1) |
+| 505 | fx3 | FX3 page (idspace) |
+| 506 | fx3 | FX3 page (idspace) |
+| 507 | fx3 | FX3 page (idspace) |
+| 508 | fx3 | FX3 page (idspace) |
+| 509 | fx3 | FX3 page (idspace) |
+| 510 | fx3 | FX3 page (idspace) |
+| 511 | fx3 | FX3 page (idspace) |
+| 512 | fx3 | FX3 page (idspace) |
+| 513 | fx3 | external input SND3 (idspace) |
 
 Ids without a page often carry a MIDI CC or are aliases: clear the CC, check aliases. Ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).
 

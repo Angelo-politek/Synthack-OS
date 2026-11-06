@@ -25,7 +25,7 @@
  * uscita destra complementare (WID); CRSH = tenuta del campione, bit ridotti e drive (mono).
  *
  * Interfaccia: pagina 2 del tab REVERB (pagina 25 dell'OS, "OB8", inutilizzata) con TYPE e 7 controlli:
- * id nascosti delle tracce MIDI (246..253) tramite mods/vparams. Nomi, testi e icone (prese da parametri
+ * id 505..512 (mods/idspace) tramite mods/vparams. Nomi, testi e icone (prese da parametri
  * dell'OS simili) cambiano col tipo; il crusher lascia vuote le caselle che non usa. La
  * classe dei tab DELAY/REVERB disegna le caselle 5-6 come filtro: per la pagina 25 si usa il disegno
  * generico a 8 caselle (fx3_draw_hook). SND3 e la mandata DEL usano la grafica della mandata del delay.
@@ -57,7 +57,7 @@ typedef unsigned short u16;
 
 enum { P_TYPE, P_SPD, P_DEP, P_TIME, P_FDBK, P_WID, P_DSND, P_RSND, NP };
 enum { CHOR, FLNG, PHSR, CRSH, NT };
-static const unsigned short ids[NP] = {246, 247, 248, 250, 251, 252, 249, 253};
+static const unsigned short ids[NP] = {505, 506, 507, 509, 510, 511, 508, 512};   /* idspace */
 static const unsigned char maxv[NP] = {NT - 1, 127, 127, 127, 127, 127, 127, 127};
 static const unsigned char defv[NP] = {0, 60, 64, 64, 0, 64, 0, 0};
 static const unsigned char woff[4] = {0, 2 * 0x1A, 2 * 0x38, 2 * 0x46}; /* parole nel kit */
@@ -190,7 +190,7 @@ static u32 named DATA = 0xFF;                             /* tipo di nomi, icone
  * simile. Dei prototipi (std::function costruite all'avvio) si prende solo l'invoker (+12): nessuno di
  * quelli scelti usa i dati del functor; il gestore e' fx3_mgr (nessuna copia o distruzione sullo heap
  * condiviso col prototipo). 0 = vuoto. */
-#define OBJ(id)   ((u32 *)(0x41BA0A24u + 84u * (id)))     /* oggetto del parametro */
+#define OBJ(id)   ((u32 *)((u32 (*)(u32))IDS_OBJ)(id))      /* oggetto del parametro (idspace: costruito se manca) */
 #define SLOTS     ((u32 *)0x41BA081Cu)                     /* caselle della pagina 25 */
 enum {
     G_DEF = 0x41B9ECD0, G_LFO = 0x41B9EC70, G_SPD = 0x41B9E6B0, G_MOD = 0x41B9E730, G_STIM = 0x41B9E7D0,
@@ -202,7 +202,7 @@ static const u32 look[NT][5][2] = {
     {{G_SPD, 0}, {G_SDEP, 0}, {G_STIM, 0}, {G_LFO, S_660}, {G_BAL, S_660}},     /* SDEP 283, LFO DEP 94 (bipolare) */
     {{G_SPD, 0}, {G_SDEP, 0}, {G_TONE, S_660}, {G_LFO, S_660}, {G_BAL, S_660}}, /* TONE 394 */
     {{G_NCOL, S_660}, {G_TICK, 0}, {G_OVER, S_KNOB}, {0, 0}, {0, 0}}};          /* NCOL 385, TICK 277, OVER 164 */
-static const unsigned short knob_id[5] = {247, 248, 250, 251, 252};
+static const unsigned short knob_id[5] = {506, 507, 509, 510, 511};
 
 static void put(char *buf, const char *s)
 {
@@ -236,8 +236,8 @@ static void dress(void)
         graphic(OBJ(knob_id[i]) + 9, look[t][i][0]);
         graphic(OBJ(knob_id[i]) + 17, look[t][i][1]);
     }
-    SLOTS[4] = t == CRSH ? 0 : 251;                        /* il crusher non usa FDBK e WID: */
-    SLOTS[5] = t == CRSH ? 0 : 252;                        /* caselle vuote */
+    SLOTS[4] = t == CRSH ? 0 : 510;                        /* il crusher non usa FDBK e WID: */
+    SLOTS[5] = t == CRSH ? 0 : 511;                        /* caselle vuote */
     put(fx3_page_l, t_l[t]);
     if (ui)
         ui[96] = 1;
@@ -395,14 +395,14 @@ s32 fx3_set(void *obj, s32 id, s32 value)
     return 0;
 }
 
-/* ---- SND3 dell'ingresso esterno: id 269 (vparams), byte basso della parola 0x37 del kit della FX track.
+/* ---- SND3 dell'ingresso esterno: id 513 (idspace, vparams), byte basso della parola 0x37 del kit della FX track.
  * Bersagli come le mandate DEL/REV dell'ingresso (0x4008F4F8..): guadagni L/R da livello e bilanciamento,
  * per (v/32768)^2; ogni lato pesa meta' nel bus mono, come una traccia al centro (fx3_in_hook). */
 
 /* Dual mono v2 (mods/dual-mono): intestazione a DM_HDR (tools/build/dualmono_layout.py). In mono il
  * blocco delle mandate dell'ingresso gira due volte: passata 1 = IN L (canale 12), passata 2 = IN R
  * (canale 13, mandata FX3 R nella parola KS_FX3_R del kit attivo, kitstore). La pagina IN R del tab
- * MIXER mostra 269 come la pagina IN L: con quella pagina aperta si legge e scrive FX3 R. */
+ * MIXER mostra 513 come la pagina IN L: con quella pagina aperta si legge e scrive FX3 R. */
 #define DM_MAGIC  0x444D5632
 #define UI_KIT    (*(char *const volatile *)0x800030B8u)    /* kit attivo (kitstore) */
 
@@ -1693,7 +1693,7 @@ __asm__(
     "        .globl  fx3_in_page\n"
     "fx3_in_page:\n"                                     /* al posto di clr.l 0x41BA07F8 (External Mixer, casella C) */
     "        move.l  %d0,-(%sp)\n"
-    "        move.l  #269,%d0\n"
+    "        move.l  #513,%d0\n"
     "        move.l  %d0,0x41BA07F8\n"
     "        move.l  (%sp)+,%d0\n"
     "        rts\n"
@@ -1752,21 +1752,21 @@ __asm__(
     "        move.l  %a0,-(%sp)\n"
     "        move.l  %d0,-(%sp)\n"
     "        lea     0x41BA081C,%a0\n"
-    "        move.l  #246,%d0\n"
+    "        move.l  #505,%d0\n"
     "        move.l  %d0,(%a0)+\n"
-    "        move.l  #247,%d0\n"
+    "        move.l  #506,%d0\n"
     "        move.l  %d0,(%a0)+\n"
-    "        move.l  #248,%d0\n"
+    "        move.l  #507,%d0\n"
     "        move.l  %d0,(%a0)+\n"
-    "        move.l  #250,%d0\n"
+    "        move.l  #509,%d0\n"
     "        move.l  %d0,(%a0)+\n"
-    "        move.l  #251,%d0\n"
+    "        move.l  #510,%d0\n"
     "        move.l  %d0,(%a0)+\n"
-    "        move.l  #252,%d0\n"
+    "        move.l  #511,%d0\n"
     "        move.l  %d0,(%a0)+\n"
-    "        move.l  #249,%d0\n"
+    "        move.l  #508,%d0\n"
     "        move.l  %d0,(%a0)+\n"
-    "        move.l  #253,%d0\n"
+    "        move.l  #512,%d0\n"
     "        move.l  %d0,(%a0)+\n"
     "        clr.l   (%a0)\n"                            /* +40 (istruzione sostituita) */
     "        move.l  (%sp)+,%d0\n"

@@ -15,6 +15,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "tools" / "build"), str(ROOT / "tools" / "unpack")]
 import engine_layout as EN  # noqa: E402
+import idspace_layout as IL  # noqa: E402
 import kitstore_layout as KS  # noqa: E402
 import modarea_layout as MA  # noqa: E402
 import registry as R  # noqa: E402
@@ -89,6 +90,14 @@ def test_mod_area_writes_inside_own_space():
         elif SFC <= ram < SFC + 4 * R.SFCORE_N:
             assert (ram - SFC) % 4 == 0 and n == 4
             assert R.SFCORE_SLOTS.get((ram - SFC) // 4) == name, f"{name}: posto {(ram - SFC) // 4} dei moduli sfcore"
+        elif IL.EXT <= ram < IL.PAGEDEF:                         # idspace: descrittore o oggetto di un id
+            base, size = (IL.EXT, 52) if ram < IL.OBJDEF else (IL.OBJDEF, 16)
+            pid = IL.FIRST + (ram - base) // size
+            assert (ram - base) % size == 0 and n == size
+            assert R.IDS.get(pid, ("",))[0] == name, f"{name}: id {pid} (idspace) non registrato"
+        elif IL.PAGEDEF <= ram < IL.PAGEDEF + 44 * IL.PAGE_N:     # idspace: pagine in piu'
+            assert (ram - IL.PAGEDEF) % 44 == 0 and n == 44
+            assert R.PAGES.get(IL.PAGE_FIRST + (ram - IL.PAGEDEF) // 44, ("",))[0] == name, f"{name}: pagina"
         elif VP_TABLE <= ram < VP_TABLE + 12 * VP_N:
             slot = (ram - VP_TABLE) // 12
             pid = struct.unpack(">H", bytes.fromhex(p["hex"])[:2])[0]

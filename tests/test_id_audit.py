@@ -44,6 +44,16 @@ def desc():
         group, iid = struct.unpack(">ii", sec3[o:o + 8])
         cc, nrpn = struct.unpack(">II", sec3[o + 24:o + 32])
         out.append((group, iid, cc, nrpn))
+    ext = {}                                                         # id delle mod (mods/idspace): 505..
+    sys.path.insert(0, str(ROOT / "tools" / "build"))
+    import idspace_layout as I
+    for f in sorted((ROOT / "mods").glob("*/patch.json")):
+        for p in json.loads(f.read_text(encoding="utf-8"))["patches"]:
+            if p.get("append") and I.EXT <= int(p["ram"], 16) < I.OBJDEF:
+                ext[I.FIRST + (int(p["ram"], 16) - I.EXT) // 52] = bytes.fromhex(p["hex"])
+    for i in range(I.FIRST, I.N):
+        d = ext.get(i)
+        out.append(struct.unpack(">ii", d[:8]) + struct.unpack(">II", d[24:32]) if d else out[0])
     return out
 
 
@@ -65,12 +75,13 @@ def test_some_mods_register_virtual_ids():
 @pytest.mark.parametrize("mod", ["master-comp", "fx3"])
 def test_ids_are_not_aliases_and_have_no_midi(desc, mod):
     keys = defaultdict(list)
-    for i, (g, iid, _, _) in enumerate(desc):
+    for i, (g, iid, _, _) in enumerate(desc[:N]):                 # mappe inverse: solo gli id dell OS
         keys[(g, iid)].append(i)
     for i in virtual_ids()[mod] | NATIVE.get(mod, set()):
         g, iid, cc, nrpn = desc[i]
         assert i not in KNOWN_VISIBLE, (mod, i)
-        assert keys[(g, iid)] == [i], f"{mod}: id {i} e' alias di {[j for j in keys[(g, iid)] if j != i]}"
+        if i < N:   # gli id di idspace (>= 505) non entrano nelle mappe inverse dell'OS: nessun alias possibile
+            assert keys[(g, iid)] == [i], f"{mod}: id {i} e' alias di {[j for j in keys[(g, iid)] if j != i]}"
         assert cc == NONE and nrpn == NONE, f"{mod}: id {i} ha CC/NRPN ({cc:#x}, {nrpn:#x})"
 
 

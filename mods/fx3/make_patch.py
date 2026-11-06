@@ -29,6 +29,7 @@ import eft  # noqa: E402
 import dualmono_layout as DL  # noqa: E402
 import modarea_layout  # noqa: E402
 import kitstore_layout as KS  # noqa: E402
+import idspace_layout as IDS  # noqa: E402
 
 _vp = importlib.util.spec_from_file_location("vparams_make_patch", REPO / "mods" / "vparams" / "make_patch.py")
 vparams = importlib.util.module_from_spec(_vp)
@@ -38,7 +39,12 @@ LOAD = 0x4000_0400
 MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
 CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # linea a +0xE000 (4 KB)
 TOOLS = "~/tools/m68k/root"
-CFLAGS = f"-DMODAREA_RAM={modarea_layout.RAM:#x} -DDM_HDR={DL.HDR:#x} -DKS_FX3_R={DL.FX3_R:#x} -DKS_FX3_FX={KS.word(*KS.PARTS["fx3"][0]):#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
+_ids_spec = json.loads((REPO / "mods" / "idspace" / "patch.json").read_text(encoding="utf-8"))
+IDS_OBJ = int(_ids_spec["symbols"]["ids_obj32"], 16)    # oggetto per parametro (id dell'OS o delle mod)
+NEW = {old: old + 259 for old in range(246, 254)} | {269: 513}   # id delle mod (idspace) al posto di quelli MIDI
+# id stock modello dell'oggetto (dati +0..+19 e funzioni non sostituite), trovati nell'emulatore il 2026-11-06
+TEMPLATE = {246: 288, 247: 34, 248: 34, 249: 277, 250: 34, 251: 34, 252: 34, 253: 277, 269: 277}
+CFLAGS = f"-DIDS_OBJ={IDS_OBJ:#x} -DMODAREA_RAM={modarea_layout.RAM:#x} -DDM_HDR={DL.HDR:#x} -DKS_FX3_R={DL.FX3_R:#x} -DKS_FX3_FX={KS.word(*KS.PARTS["fx3"][0]):#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
 FS = 24000                              # il chorus lavora a 24 kHz
 DESC = 0x4022_D83C
 P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_EFD0, 0x41B9_ECD0, 0x41B9_EBD0, 0x41B9_E5D0
@@ -256,16 +262,28 @@ def main() -> None:
                 fixed(r + 48, long(syms["fx3_snd_s"]), "id 72: nome breve 'FX3'"),
                 fixed(r + 36, long(0xE00), "id 72: destinazione di modulazione (LFO), come la mandata DEL (78)",
                       "00000000")]
+    def ext(at: int, data: bytes, what: str) -> dict:
+        """Patch accodata nell'area mod (descrittori, oggetti di idspace)."""
+        return {"section": 3, "addr": f"{modarea_layout.IMG + at - modarea_layout.RAM:#010X}", "len": len(data),
+                "append": True, "hex": data.hex(), "ram": f"{at:#010x}", "what": what}
+
+    def new_id(old: int, mx: int, df: int, nl: int, ns: int, protos: dict, what: str) -> list[dict]:
+        """Id delle mod al posto di `old`: descrittore (quello stock di `old` con intervallo e nomi nostri) e
+        oggetto (modello + prototipi). Il gruppo e l'id interno restano quelli di `old`: le mappe inverse
+        dell'OS contengono solo gli id stock (idspace), vparams intercetta lettura e scrittura."""
+        pid = NEW[old]
+        d = bytearray(sec3[DESC - LOAD + 52 * old:DESC - LOAD + 52 * old + 52])
+        d[8:20] = struct.pack(">III", 0, mx << 8, df << 8)
+        d[24:32] = struct.pack(">II", 0xFFFF_FFFF, 0xFFFF_FFFF)                 # niente CC ne' NRPN
+        d[40:44], d[48:52] = long(nl), long(ns)
+        o = struct.pack(">4I", TEMPLATE[old], *(resolve(protos[f]) if f in protos else 0 for f in (20, 36, 68)))
+        return [ext(IDS.desc(pid), bytes(d), f"idspace: descrittore dell'id {pid} ({what})"),
+                ext(IDS.objdef(pid), o, f"idspace: oggetto dell'id {pid} ({what}), modello {TEMPLATE[old]}")]
+
     # SND3 dell'ingresso
-    r = DESC + 52 * SND_IN["id"]
-    patches.append(vparams.entry(SND_IN["slot"], SND_IN["id"], syms["fx3_in_get"], syms["fx3_in_set"], "fx3 SND3 IN"))
-    for off, (addr, orig, new) in SND_IN["objs"].items():
-        patches.append(fixed(addr, long(resolve(new)), f"id 269 +{off}: {resolve(new):#010x}", f"{orig:08x}"))
-    for addr, orig, new in SND_IN["fix"]:
-        patches.append(fixed(addr, bytes.fromhex(new), "id 269: campo dell'oggetto come DEL (249)", orig))
-    patches += [fixed(r + 8, struct.pack(">III", 0, 0x7F00, 0), "id 269 -> SND3 dell'ingresso: min, max, default"),
-                fixed(r + 40, long(syms["fx3_in_l"]), "id 269: nome lungo 'Input FX3 Send'"),
-                fixed(r + 48, long(syms["fx3_snd_s"]), "id 269: nome breve 'FX3'")]
+    patches.append(vparams.entry(SND_IN["slot"], NEW[269], syms["fx3_in_get"], syms["fx3_in_set"], "fx3 SND3 IN"))
+    patches += new_id(269, 127, 0, syms["fx3_in_l"], syms["fx3_snd_s"],
+                      {f: v[2] for f, v in SND_IN["objs"].items()}, "SND3 dell'ingresso")
     # SND3 della FX track
     patches.append(fixed(AMP_FIX_FX[0], bytes.fromhex(AMP_FIX_FX[2]), "tab AMP: SND3 della FX track (144) come "
                          "casella normale", AMP_FIX_FX[1]))
@@ -279,17 +297,11 @@ def main() -> None:
                 fixed(r + 28, long(0xFFFF_FFFF), "id 144: niente NRPN", "00000097")]
     # pagina FX3
     for n, (pid, short, ln, mx, df, protos, extra) in enumerate(PARAMS):
-        r = DESC + 52 * pid
-        patches.append(vparams.entry(VP_SLOT + n, pid, syms["fx3_get"], syms["fx3_set"], f"fx3 {short}"))
-        patches += [fixed(r + 8, struct.pack(">III", 0, mx << 8, df << 8), f"id {pid} -> {short}: min, max, default"),
-                    fixed(r + 40, long(syms[f"fx3_n{n}_l"]), f"id {pid}: nome lungo '{ln}'"),
-                    fixed(r + 48, long(syms[f"fx3_n{n}_s"]), f"id {pid}: nome breve '{short}'")]
-        for off, (addr, orig, new) in protos.items():
-            patches.append(fixed(addr, long(resolve(new)), f"id {pid} +{off}: {resolve(new):#010x}", f"{orig:08x}"))
-        for addr, orig, new in extra:
-            patches.append(fixed(addr, bytes.fromhex(new), f"id {pid}: campo dell'oggetto come DEL (250)", orig))
+        patches.append(vparams.entry(VP_SLOT + n, NEW[pid], syms["fx3_get"], syms["fx3_set"], f"fx3 {short}"))
+        patches += new_id(pid, mx, df, syms[f"fx3_n{n}_l"], syms[f"fx3_n{n}_s"],
+                          {f: v[2] for f, v in protos.items()}, f"pagina FX3, {short}")
     spec = {
-        "name": "fx3", "os": "1.42", "requires": ["modarea", "vparams", "fastmix", "kitstore"],
+        "name": "fx3", "os": "1.42", "requires": ["modarea", "vparams", "fastmix", "kitstore", "idspace"],
         "description": "Terza mandata effetti: SND3 per traccia (pagina AMP 2) verso un chorus stereo; "
                        "regolazioni e livello di ritorno sulla pagina 2 del tab REVERB.",
         "generated_by": "mods/fx3/make_patch.py",
