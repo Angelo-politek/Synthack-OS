@@ -35,7 +35,7 @@
     "fx3": {
       "cpu": 10900,
       "modarea": 20480,
-      "kit": 0,
+      "kit": 1,
       "project": 0,
       "sec7": 0
     },
@@ -50,7 +50,7 @@
       "cpu": 0,
       "modarea": 32784,
       "kit": 0,
-      "project": 0,
+      "project": 132,
       "sec7": 0
     },
     "master-comp": {
@@ -114,7 +114,7 @@
       "modarea": 12288,
       "kit": 0,
       "project": 0,
-      "sec7": 12996
+      "sec7": 13048
     },
     "sfcore": {
       "cpu": 0,
