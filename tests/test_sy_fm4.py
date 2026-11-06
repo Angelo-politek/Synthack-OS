@@ -75,13 +75,18 @@ def test_sites_are_the_ones_of_the_original_patcher(stock):
     assert {a for a, _, _ in RXUTING} <= sites                          # i siti di salvataggio e copia: in xparams
 
 
-def test_page2_descriptors_replace_midi_track_cc_values(stock):
+def test_page2_descriptors_on_idspace_ids(stock):
+    """Pagina 2/2 sugli id delle mod 521..528 (mods/idspace): i descrittori 254..261 restano della machine MIDI."""
+    sys.path.insert(0, str(ROOT / "tools" / "build"))
+    import idspace_layout as I
     sec3, _ = stock
-    rows = [p for p in SPEC["patches"] if p["what"].startswith("descrittore ") and "2/2" in p["what"]]
-    assert [int(p["addr"], 16) for p in rows] == [0x4022_D83C + 52 * i for i in range(254, 262)]
+    rows = [p for p in SPEC["patches"] if p["what"].startswith("idspace: descrittore")]
+    assert [int(p["ram"], 16) for p in rows] == [I.desc(i) for i in range(521, 529)]
+    assert not any(0x4022_D83C + 52 * 254 <= int(p["addr"], 16) < 0x4022_D83C + 52 * 262
+                   for p in SPEC["patches"] if not p.get("append"))
     for k, p in enumerate(rows):
         owner, lix, mn, mx, de, _r5, cc, nrpn, rid = struct.unpack(">9I", bytes.fromhex(p["hex"])[:36])
-        assert (owner, lix, rid) == (0xFFFF_FFFF, 0x36 + k, 254 + k)
+        assert (owner, lix, rid) == (0xFFFF_FFFF, 0x36 + k, 521 + k)
         assert (cc, nrpn) == (0xFFFF_FFFF, 0xFFFF_FFFF)                # niente MIDI sulla pagina 2/2
         flags = struct.unpack(">I", bytes.fromhex(p["hex"])[36:40])[0]
         assert flags == 0              # come i descrittori stock senza machine: fuori dalle destinazioni di LFO e mod
@@ -101,7 +106,7 @@ def test_stock_sound_gets_page2_defaults(built):
     MA.call(uc, xp["xp_load_params"], sound, storage)
     got = struct.unpack(">8H", uc.mem_read(sound + 20 + 2 * 0x36, 16))
     recs = [struct.unpack(">I", bytes.fromhex(p["hex"])[16:20])[0] for p in SPEC["patches"]
-            if p["what"].startswith("descrittore ") and "2/2" in p["what"]]
+            if p["what"].startswith("idspace: descrittore")]
     assert list(got) == recs and got[7] == 0x4000
 
 
@@ -142,7 +147,7 @@ def test_syn_page_on_an_fm4_track():
     """Pagina SYN di una traccia SY FM4 (vista SRC nell'emulatore dell'interfaccia, machine del suono = 4), dalle
     pagine di syn-pages: la prima apertura porta l'elenco delle pagine da 1 a 3 in un blocco nuovo dell'heap; la
     1/3 ha i descrittori di SY TONE con i nomi di SY FM4 (operatore 2 sotto: rapporto, livello, decay); la 2/3 i
-    descrittori 254..261 (operatore 3 sopra, 4 sotto, ALGO nell'ultima casella); la 3/3 ALGO e LEV; il titolo e' una std::string costruita in a0; la vista si disegna; nessuna scrittura
+    descrittori 521..528 (operatore 3 sopra, 4 sotto, ALGO nell'ultima casella); la 3/3 ALGO e LEV; il titolo e' una std::string costruita in a0; la vista si disegna; nessuna scrittura
     nel codice dell'OS. Prima delle correzioni, due eccezioni sulla macchina: il puntatore del malloc dell'OS (d0)
     letto da a0, e il titolo restituito come char * invece della std::string."""
     from syn_view import SynView
@@ -162,11 +167,11 @@ def test_syn_page_on_an_fm4_track():
     assert short == [b"TUNE", b"RAT2", b"LEV2", b"FDBK", b"DEC2", b"PNCH", b"OVER", b"DEC1"]
     assert v.title() == b"SY FM4 1/3"
     v.page(1)
-    assert v.knobs() == [255, 256, 257, 261, 258, 259, 260, 254, 10]         # op3 DET / op4 ALGO
+    assert v.knobs() == [522, 523, 524, 528, 525, 526, 527, 521, 10]         # op3 DET / op4 ALGO
     assert v.title() == b"SY FM4 2/3"
     v.frame()
     v.page(2)
-    assert v.knobs() == [254, 0, 0, 0, 0, 0, 0, 0, 10]
+    assert v.knobs() == [521, 0, 0, 0, 0, 0, 0, 0, 10]
     assert v.title() == b"SY FM4 3/3"
     v.frame()
     assert bad == []

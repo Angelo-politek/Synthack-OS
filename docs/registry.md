@@ -140,14 +140,6 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 195 | sy-fm4 | SYN page 1/3 PNCH (SY TONE's PNCH, renamed) |
 | 196 | sy-fm4 | SYN page 1/3 OVER (SY TONE's OVER, renamed) |
 | 197 | sy-fm4 | SYN page 1/3 DEC1 (SY TONE's DEC, renamed) |
-| 254 | sy-fm4 | SYN pages 2/3 and 3/3 ALGO (was Digitakt MIDI CC1 Value, MIDI CC cleared) |
-| 255 | sy-fm4 | SYN page 2/3 RAT3 (was Digitakt MIDI CC2 Value, MIDI CC cleared) |
-| 256 | sy-fm4 | SYN page 2/3 LEV3 (was Digitakt MIDI CC3 Value, MIDI CC cleared) |
-| 257 | sy-fm4 | SYN page 2/3 DEC3 (was Digitakt MIDI CC4 Value, MIDI CC cleared) |
-| 258 | sy-fm4 | SYN page 2/3 RAT4 (was Digitakt MIDI CC5 Value, MIDI CC cleared) |
-| 259 | sy-fm4 | SYN page 2/3 LEV4 (was Digitakt MIDI CC6 Value, MIDI CC cleared) |
-| 260 | sy-fm4 | SYN page 2/3 DEC4 (was Digitakt MIDI CC7 Value, MIDI CC cleared) |
-| 261 | sy-fm4 | SYN page 2/3 DET (was Digitakt MIDI CC8 Value, MIDI CC cleared) |
 | 497 | sampler | SAMPLER knob A TUNE (was SP TWINSHOT TUN1) |
 | 498 | sampler | SAMPLER knob B PLAY (was SP TWINSHOT SMP1) |
 | 499 | sampler | SAMPLER knob C BR (was SP TWINSHOT FLT1) |
@@ -172,6 +164,14 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 518 | master-comp | compressor (idspace) |
 | 519 | master-comp | compressor (idspace) |
 | 520 | master-comp | compressor (idspace) |
+| 521 | sy-fm4 | SYN pages 2/3 and 3/3 ALGO (idspace) |
+| 522 | sy-fm4 | SYN page 2/3 RAT3 (idspace) |
+| 523 | sy-fm4 | SYN page 2/3 LEV3 (idspace) |
+| 524 | sy-fm4 | SYN page 2/3 DEC3 (idspace) |
+| 525 | sy-fm4 | SYN page 2/3 RAT4 (idspace) |
+| 526 | sy-fm4 | SYN page 2/3 LEV4 (idspace) |
+| 527 | sy-fm4 | SYN page 2/3 DEC4 (idspace) |
+| 528 | sy-fm4 | SYN page 2/3 DET (idspace) |
 
 Ids without a page often carry a MIDI CC or are aliases: clear the CC, check aliases. Ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).
 

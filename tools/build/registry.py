@@ -133,7 +133,7 @@ IDS = {
     **{190 + k: ("sy-fm4", f"SYN page 1/3 {n} (SY TONE's {w}, renamed)") for k, (n, w) in enumerate(
         (("TUNE", "TUNE"), ("RAT2", "RATIO"), ("LEV2", "MOD"), ("FDBK", "FDBK"), ("DEC2", "MENV"), ("PNCH", "PNCH"),
          ("OVER", "OVER"), ("DEC1", "DEC")))},
-    **{254 + k: ("sy-fm4", f"SYN {p} {n} (was Digitakt MIDI CC{k + 1} Value, MIDI CC cleared)")
+    **{521 + k: ("sy-fm4", f"SYN {p} {n} (idspace)")
        for k, (n, p) in enumerate((("ALGO", "pages 2/3 and 3/3"), *((n, "page 2/3") for n in (
            "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))))},
     **{497 + k: ("sampler", f"SAMPLER knob {n} (was SP TWINSHOT {w})") for k, (n, w) in enumerate(

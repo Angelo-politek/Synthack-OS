@@ -33,8 +33,6 @@
 typedef uint32_t u32;
 
 #define ORIG_SRC_BC    ((u32 (*)(void *, u32))0x40044c54)
-#define REC_INFO(r)    ((u32 *)(0x41ba0a24 + (r) * 0x54))
-#define INFO_LONGS     (0x54 / 4)
 
 /* SY TONE's descriptors (machine 4): TUNE RATIO MOD FDBK MENV PNCH OVER DEC */
 #define R_TUNE  190
@@ -48,15 +46,15 @@ typedef uint32_t u32;
 #define R_LEVEL 10
 #define R_DUAL_DET 369     /* SY DUAL VCO "Osc 2 Detune" */
 
-/* The placeholders page 2/2 takes over, in knob order A..H. */
-#define R_ALGO 254
-#define R_RAT3 255
-#define R_LEV3 256
-#define R_DEC3 257
-#define R_RAT4 258
-#define R_LEV4 259
-#define R_DEC4 260
-#define R_DET  261
+/* Page 2/2's parameters, in knob order A..H: ids of the mods (mods/idspace; 254..261 are the MIDI machine's). */
+#define R_ALGO 521
+#define R_RAT3 522
+#define R_LEV3 523
+#define R_DEC3 524
+#define R_RAT4 525
+#define R_LEV4 526
+#define R_DEC4 527
+#define R_DET  528
 
 #define PAGE2_FIRST 0x36
 #define PAGE2_N 8
@@ -101,7 +99,7 @@ static const u32 page2[9] = {R_RAT3, R_LEV3, R_DEC3, R_DET,
                              R_RAT4, R_LEV4, R_DEC4, R_ALGO, R_LEVEL};
 static const u32 page3[9] = {R_ALGO, 0, 0, 0, 0, 0, 0, 0, R_LEVEL};
 /* Where each new descriptor takes its knob/formatter/icon info from. */
-static const u32 info_from[PAGE2_N] = {R_MOD, R_RATIO, R_MOD, R_MENV,
+__attribute__((used)) const u32 fm4m_info_from[PAGE2_N] = {R_MOD, R_RATIO, R_MOD, R_MENV,
                                        R_RATIO, R_MOD, R_MENV, R_DUAL_DET};
 
 /* ---- algorithms, drawn as SY FM4 routes them (engine/fm4.c): operators in boxes, modulation as lines into
@@ -223,22 +221,14 @@ static int nothing(void *dst, const void *src, int op) {
     return 0;
 }
 
-static const void *const algo_gfx_proto[4] __attribute__((aligned(4))) = {0, 0, (const void *)nothing,
+__attribute__((used)) const void *const fm4m_algo_gfx_proto[4] __attribute__((aligned(4))) = {0, 0, (const void *)nothing,
                                                                           (const void *)algo_gfx};
 
 static int ready;
 
+/* The objects of page 2/2 (knob scaling, formatter, icon) are built by idspace from info_from, with
+ * algo_gfx_proto as ALGO's knob graphic (make_patch.py writes the definitions). */
 static void init_once(void) {
-    if (ready)
-        return;
-    for (int i = 0; i < PAGE2_N; i++) {
-        const u32 *src = REC_INFO(info_from[i]);
-        u32 *dst = REC_INFO(fm4m_record_index[i]);
-        for (int k = 0; k < INFO_LONGS; k++)
-            dst[k] = src[k];
-    }
-    for (int k = 0; k < 4; k++)                 /* +36: the knob graphic */
-        REC_INFO(R_ALGO)[9 + k] = (u32)algo_gfx_proto[k];
     ready = 1;
 }
 

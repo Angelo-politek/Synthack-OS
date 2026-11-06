@@ -27,6 +27,7 @@ sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
 import engine_layout as E  # noqa: E402
 import modarea_layout as M  # noqa: E402
+import idspace_layout as IDS  # noqa: E402
 import registry  # noqa: E402
 import synpages_layout as SP  # noqa: E402
 import xparams_layout as XP  # noqa: E402
@@ -41,7 +42,7 @@ CFLAGS = f"-DSP_TABLE={SP.TABLE:#x} -DXP_TABLE={XP.TABLE:#x} -mcpu=54418 -ffrees
 # sezione 3 (OS 1.42)
 PAGE1_IDS = range(190, 198)             # SY TONE: nomi di pagina 1/2 (fm4m_names)
 DESC = 0x4022_D83C                      # descrittori, 52 B per id
-PAGE2_IDS = range(254, 262)             # "CC1..CC8 Value" delle tracce MIDI della Digitakt: nessuna pagina sulla Syntakt
+PAGE2_IDS = range(521, 529)             # id delle mod (mods/idspace); 254..261 sono della machine MIDI
 INDEX_DONE = 0x400A_61B0                # tabelle degli indici: default di 2/3 (salvataggio, p-lock, copia: xparams)
 NAME, SHORT = 0x4025_38C7, 0x4025_38CF
 # sezione 7 (identica in 1.40A, 1.41, 1.42)
@@ -149,15 +150,19 @@ def main() -> None:
         struct.pack_into(">I", st, 48, short_name)
         p.append(fixed(sec3, 3, row, bytes(st), f"descrittore {i}: nome di SY FM4 pagina 1/2"))
     recs = s3["fm4m_records"] - main_ram
+    info = struct.unpack_from(">8I", blob3, s3["fm4m_info_from"] - main_ram)
+
+    def ext(at: int, data: bytes, what: str) -> dict:
+        return {"section": 3, "addr": f"{M.IMG + at - M.RAM:#010X}", "len": len(data), "append": True,
+                "hex": data.hex(), "ram": f"{at:#010x}", "what": what}
     for k, i in enumerate(PAGE2_IDS):
-        row = DESC + 52 * i
-        group, iid = struct.unpack_from(">ii", sec3, row - LOAD)
-        if (group, iid) != (0x39, 0x19 + k):
-            raise SystemExit(f"descrittore {i}: non e' il 'CC{k + 1} Value' delle tracce MIDI ({group:#x}, {iid:#x})")
         rec = blob3[recs + 52 * k:recs + 52 * (k + 1)]
         if struct.unpack_from(">I", rec, 32)[0] != i:
             raise SystemExit(f"record {k}: id {struct.unpack_from('>I', rec, 32)[0]}, atteso {i}")
-        p.append(fixed(sec3, 3, row, rec, f"descrittore {i}: SY FM4 pagina 2/2"))
+        p.append(ext(IDS.desc(i), rec, f"idspace: descrittore dell'id {i} (SY FM4 pagina 2/2)"))
+        gfx = s3["fm4m_algo_gfx_proto"] if k == 0 else 0                   # ALGO: il disegno dell'algoritmo
+        p.append(ext(IDS.objdef(i), struct.pack(">4I", info[k], 0, gfx, 0),
+                     f"idspace: oggetto dell'id {i} (SY FM4 pagina 2/2), modello {info[k]}"))
     p += [
         fixed(sec3, 3, INDEX_DONE, b"\x4e\xb9" + long(s3["fm4m_index_done"]), "tabelle degli indici: default di 2/2"),
         fixed(sec3, 3, NAME, b"SY FM4\x00\x00", "nome della machine 4", b"SY TONE\x00"),
@@ -172,7 +177,7 @@ def main() -> None:
          "ram": f"{E.RAM + OFF_ENGINE:#010x}", "what": "(area motori) SY FM4 sulla CPU #2"},
     ]
     spec = {
-        "name": "sy-fm4", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "xparams", "fastmix"],
+        "name": "sy-fm4", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "xparams", "fastmix", "idspace"],
         "description": "SY FM4 (Rxuting, MIT): SY TONE diventa una machine FM a 4 operatori. ALGO 0 = SY TONE, "
                        "ALGO 1-11 algoritmi FM; seconda pagina SYN (ALGO, RAT3, LEV3, DEC3, DET, RAT4, LEV4, DEC4), "
                        "salvata con il suono e con i p-lock.",
