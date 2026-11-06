@@ -36,8 +36,8 @@ ENG = 0x8000_21B0                      # copia dei parametri del motore: 142 B p
 VEL = 0x8000_4670                      # velocity dell'ultima nota per traccia
 SMOOTH_S, SMOOTH_OUT, SMOOTH_N = 0x8000_E9B0, 0x8000_6348, 938
 SET = 0x4000_DA32                      # scrittura di un parametro di kit (vparams per gli id virtuali)
-FX3 = {"TYPE": 246, "SPD": 247, "DEP": 248, "TIME": 250, "FDBK": 251, "WID": 252, "DSND": 249, "RSND": 253}
-COMP_RAT = 266
+FX3 = {"TYPE": 505, "SPD": 506, "DEP": 507, "TIME": 509, "FDBK": 510, "WID": 511, "DSND": 508, "RSND": 512}   # idspace
+COMP_RAT = 518                                  # idspace
 NAMES = {
     0x4008F242: "mix (master/FX)", 0x40096EB4: "reverb", 0x40096908: "delay", 0x400979CA: "parameter smoothing",
     0x4008EF8C: "sum 10 ch", 0x4008F024: "sum 9 ch", 0x4008F0B6: "sum 8 ch", 0x40097B74: "modulation",

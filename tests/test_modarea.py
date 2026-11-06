@@ -29,7 +29,7 @@ import lz  # noqa: E402
 import modarea_layout as L  # noqa: E402
 
 STOCK = ROOT / "firmware" / "Syntakt_OS1.42.syx"
-MODS = [ROOT / "mods" / m for m in ("modarea", "vparams", "fastmix", "master-comp", "readable-values", "perf-fx", "kitstore", "fx3")]
+MODS = [ROOT / "mods" / m for m in ("modarea", "vparams", "fastmix", "master-comp", "readable-values", "perf-fx", "kitstore", "idspace", "fx3")]
 pytestmark = pytest.mark.skipif(not STOCK.exists() or not all((m / "patch.json").exists() for m in MODS),
                                 reason="firmware stock o patch assenti")
 LOAD = 0x4000_0400
@@ -117,7 +117,11 @@ def test_boot_decompresses_the_area_and_clears_the_rest_of_bss(built):
     img = area_image()
     ram = bytes(uc.mem_read(RAM, SIZE))
     assert ram[:len(img)] == img
-    assert not any(ram[len(img):])                              # resto dell'area azzerato
+    import idspace_layout as I                                  # lista di avvio: idspace copia i descrittori
+    t0, t1 = I.TABLE - RAM, I.TABLE - RAM + 52 * I.N
+    stock = sec3[0x4022_D83C - LOAD:0x4022_D83C - LOAD + 52 * 505]
+    assert ram[t0:t0 + 52 * 505] == stock
+    assert not any(ram[len(img):t0]) and not any(ram[t1:])      # resto dell'area azzerato
     for a in (BSS_LO + 0x10_0000, RAM - 0x10, RAM + SIZE, BSS_HI - 0x10):
         assert not any(uc.mem_read(a, 16)), hex(a)              # BSS a zero intorno all'area
     assert uc.mem_read(BSS_HI, 16) == b"\x77" * 16

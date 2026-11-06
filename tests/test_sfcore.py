@@ -29,7 +29,7 @@ SPEC = json.loads((ROOT / "mods" / "sfcore" / "patch.json").read_text(encoding="
 SYM = {k: int(v, 16) for k, v in SPEC["symbols"].items()}
 SERVICES = sorted({p["service"] for p in SPEC["patches"] if "service" in p})
 TABLE = MA.RAM + R.SFCORE_TABLE
-PROBE = MA.RAM + 0x3E000                       # libero nel registro: solo nei test
+PROBE = MA.RAM + 0x4_8000                      # libero nel registro (solo RAM): solo nei test
 PROBE_SLOT = 7
 EV = {"tick": 0, "draw": 1, "key": 2, "enc": 3, "render_in": 5, "fs_write": 8, "fs_written": 9, "main_mix": 10,
       "native": 11}
