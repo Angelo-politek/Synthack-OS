@@ -29,6 +29,7 @@ struct fn { u32 data, reserved, manager, invoke; };
 #define CATALOGUE_END 0x602u                      /* ST_HZ_DATA: windows 0x600, 0x601 hold the catalogues */
 
 extern void core_fn_manager(void);
+extern u32 ls_refresh(void);
 u32 ls_transfer_closes;                           /* windows closed (tests) */
 
 static void close_window(void)
@@ -37,6 +38,7 @@ static void close_window(void)
     volatile u32 ev[8];                           /* KeyEvent: +12 key, +16 flags (no memset from the compiler) */
     u32 i;
 
+    ls_refresh();                                 /* new files to the voice CPU now: playable without a reboot */
     LOCK(list + 4);
     for (node = *(u32 *)(list + 20); node != list + 20; node = *(u32 *)node) {
         view = *(u32 *)(node + 8);

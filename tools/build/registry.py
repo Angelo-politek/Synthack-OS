@@ -89,6 +89,7 @@ SEC3_NOT_FREE = [
 ENGINE = [
     (0x0000, 0x4000, "sy-fm4", "voice engine (engine 4) and its state"),
     (0x4000, 0x20000, "sampler", "voice engine (engine 11), interpolation table, zero-crossing grids"),
+    (0x20000, 0x20400, "long-samples", "runtime receiver of long samples (engine/rx.c), end of the audio interrupt"),
 ]
 
 # ---- lista di avvio dell'area mod: posto -> mod (modarea_layout.boot_slot)
@@ -105,7 +106,8 @@ SHARED_RAM = [
     (0x780, 0x7C8, "long-samples", "the project's list of long samples: 'LSM1' +0x780, count +0x784, 64 positions "
                                    "+0x788 (index in the CPU #2 table, 0xFF = empty), read by the SAMPLER engine"),
     (0x7F0, 0x7F4, "sampler", "tempo, BPM x 120"),
-    (0x800, 0x1000, "OS", "boot-time upload window"),
+    (0x800, 0x1000, "OS", "boot-time upload window; after boot 0x800..0xC00 is long-samples' runtime upload "
+                          "window (Synfact's: request +0x800, answer +0x818, data +0x820)"),
 ]
 
 # ---- vparams: posto nella tabella -> (mod, id)

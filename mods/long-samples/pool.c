@@ -48,7 +48,7 @@ extern int fw_mmc_read(u32 lba, u32 bytes, void *buf);
 struct file { u32 id, ptr, frames, page0, pages, mmc; };
 static struct file files[MAX_FILES];
 u32 ls_loaded;                                              /* files on CPU #2 (boot plan, then added ones) */
-static u32 stock_pages, extra_pages;
+static u32 stock_pages, extra_pages, used_pages;      /* used: pages after the stock ones, table first */
 u32 ls_cpu2[2 + 2 * MAX_FILES];                             /* CPU #2's table, sent as the first extra page */
 u32 ls_table[2 + 2 * MAX_FILES];                            /* the project's list: 'SHLS', count, {pointer, frames} */
 char ls_names[MAX_FILES][16];                               /* and its names, for the SAMP value text (CPU #1) */
@@ -138,6 +138,7 @@ void ls_plan(void)
     int r;
 
     ls_loaded = extra_pages = 0;
+    used_pages = 1;
     stock_pages = (stock_bytes() + 2047) >> 11;
     ls_cpu2[0] = 0x53484C53;                                /* 'SHLS' */
     ls_cpu2[1] = 0;
@@ -193,8 +194,63 @@ void ls_plan(void)
     ls_cpu2[1] = ls_loaded;
     if (ls_loaded)
         extra_pages = next;
+    used_pages = next;
     ls_status = ls_loaded;
     ls_apply();
+}
+
+/* ---- files added while the Syntakt runs (upload.c) */
+
+/* first free page on CPU #2 for pages more (absolute page index from the pool's start), 0 if they don't fit */
+u32 ls_free_page(u32 pages)
+{
+    if (!stock_pages || stock_pages + used_pages + pages > POOL_PAGES)
+        return 0;
+    return stock_pages + used_pages;
+}
+
+int ls_file_index(u32 id)
+{
+    for (u32 j = 0; j < ls_loaded; j++)
+        if (files[j].id == id)
+            return (int)j;
+    return -1;
+}
+
+void ls_file_rename(u32 j, const char *name)
+{
+    u32 k, changed = 0;
+    for (k = 0; k < 15 && name[k]; k++) {
+        changed |= loaded_names[j][k] != name[k];
+        loaded_names[j][k] = name[k];
+    }
+    for (; k < 16; k++)
+        loaded_names[j][k] = 0;
+    if (changed)
+        ls_apply();
+}
+
+/* a file now on CPU #2 at ptr (its PCM): loaded index, at the end of the project's list */
+int ls_file_add(u32 id, u32 ptr, u32 frames, u32 pages, u32 mmc, const char *name)
+{
+    if (ls_loaded >= MAX_FILES)
+        return -1;
+    struct file *f = &files[ls_loaded];
+    f->id = id;
+    f->ptr = ptr;
+    f->frames = frames;
+    f->page0 = used_pages;
+    f->pages = pages;
+    f->mmc = mmc;
+    ls_cpu2[2 + 2 * ls_loaded] = ptr;
+    ls_cpu2[3 + 2 * ls_loaded] = frames;
+    ls_cpu2[1] = ++ls_loaded;
+    used_pages += pages;
+    for (u32 k = 0; k < 16; k++)
+        loaded_names[ls_loaded - 1][k] = 0;
+    ls_file_rename(ls_loaded - 1, name);
+    ls_apply();
+    return (int)ls_loaded - 1;
 }
 
 /* bytes the uploader sends (it rounds up to pages): the stock total, or all pages ours included */

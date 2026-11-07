@@ -294,6 +294,7 @@ def test_transfer_window(m):
         m.call(m.long(info + 76 + 12), [info + 76, 0])       # a data window written: stays open
         assert not posted
         info = route(0x600)
+        m.disk.s.clear()                                     # no catalogue: nothing for ls_refresh to send
         m.call(m.long(info + 76 + 12), [info + 76, 0])       # the catalogue written: closed in the UI task
         p, = posted
         m.uc.mem_write(SCRATCH, struct.pack(">4I", *p))
@@ -359,3 +360,82 @@ def test_project_list(m):
     m.call(s["ls_project_loaded"], [0])                                 # load failed: list unchanged
     assert saved() == [999, sec[3]] + [sec[x] for x in rest]
     m.call(s["ls_project_new"])
+
+
+@pytest.fixture(scope="module")
+def voice(tmp_path_factory):
+    """CPU #2 of a build with long-samples and sampler: the receiver at the end of the audio interrupt."""
+    sys.path[:0] = [str(ROOT.parent / "tools" / "build"), str(ROOT.parent / "tools" / "unpack")]
+    import build
+    import eft
+    import engine as eng
+    t = tmp_path_factory.mktemp("ls7")
+    build.build(SY, [ROOT.parent / "mods" / "long-samples", ROOT.parent / "mods" / "sampler"], t / "o.syx",
+                log=lambda *_: None)
+    e = eng.Engine(image=eft.unpack(t / "o.syx", t / "u", ids=[7])[7].read_bytes())
+    e.boot(cold=True)
+    return e
+
+
+def link(m, e):
+    """Shared RAM between the two emulators: when CPU #1 reads the answer word, CPU #2 runs one audio block on the
+    window CPU #1 wrote (and the project's positions)."""
+    from unicorn import UC_HOOK_MEM_READ
+    import cli
+
+    def answer(uc, access, addr, size, value, _):
+        e.uc.mem_write(0x780, bytes(m.uc.mem_read(0x1000_0780, 0x48)))
+        e.uc.mem_write(0x800, bytes(m.uc.mem_read(0x1000_0800, 0x400)))
+        e.render_block(bytes(cli.make_params(44, 60)))
+        m.uc.mem_write(0x1000_0818, bytes(e.uc.mem_read(0x818, 4)))
+    return m.uc.hook_add(UC_HOOK_MEM_READ, answer, begin=0x1000_0818, end=0x1000_081B)
+
+
+def test_hot_upload_plays_without_reboot(m, voice):
+    """A file stored while the Syntakt runs goes to the voice CPU through the runtime window (upload.c -> engine/rx.c)
+    and plays at once: SAMP 1 (no stock samples, the first long one) after ls_refresh, as after a web upload."""
+    import math
+    import cli
+    s, e = m.sym, voice
+    io = s["core_hzfs_native_io"]
+    m.put(s["ls_up_fault"], ">I", 0)
+    m.disk.s.clear()
+    assert m.call(s["core_hzfs_ensure"], [io], count=400_000_000) == 1
+    m.uc.mem_write(TOTAL, struct.pack(">I", 256))                     # no stock samples (as on the device)
+    e.uc.mem_write(0x4404_F754, bytes(512))
+    m.call(s["ls_plan"], count=400_000_000)                          # boot: no long samples yet
+    m.call(s["ls_project_new"])
+    assert m.long(s["ls_loaded"]) == 0
+    frames = 24000
+    pcm = [int(12000 * math.sin(2 * math.pi * 1000 * i / 48000)) for i in range(frames)]
+    head = bytearray(64)
+    head[0:4], head[12:16] = b"SAMP", b"rec1"
+    struct.pack_into(">I", head, 8, frames)
+    m.body = bytes(head) + struct.pack(f">{frames}h", *pcm)
+    m.uc.mem_write(SCRATCH, b"rec1\0")
+    assert m.call(s["core_hzfs_put"], [io, SCRATCH, len(m.body), 0, STREAM, 0, SCRATCH + 64],
+                  count=2_000_000_000) == 1
+    h = link(m, e)
+    try:
+        assert m.call(s["ls_refresh"], count=2_000_000_000) == 1
+    finally:
+        m.uc.hook_del(h)
+    assert m.long(s["ls_up_fault"]) == 0 and m.long(s["ls_table"] + 4) == 1
+    table = CPU2_POOL + 2048
+    magic, n, ptr, got = struct.unpack(">4I", e.uc.mem_read(table, 16))
+    assert (magic, n, got) == (0x5348_4C53, 1, frames) and ptr == m.long(s["ls_table"] + 8)
+    assert bytes(e.uc.mem_read(ptr, 2 * frames)) == m.body[64:]
+    words = [0x4000, 0x300, 0, 0, 0, 0x7800, 0, 0x6400]              # SAMP 1, ONESHOT
+    p = bytearray(cli.make_params(44, 60))
+    for k, w in enumerate(words):
+        struct.pack_into(">h", p, 2 + 2 * k, w)
+    e.uc.mem_write(0x640, struct.pack(">10h", 44, *words, 0))
+    out = []
+    for b in range(24):
+        q = bytearray(p)
+        if b in (0, 2):
+            q[0x180] = 1
+        out += e.render_block(bytes(q))[0]
+    tail = out[256:]
+    zc = sum(1 for i in range(1, len(tail)) if (tail[i - 1] < 0) != (tail[i] < 0))
+    assert abs(zc / 2 / (len(tail) / 48000) - 1000) < 60              # the new sample, 1 kHz

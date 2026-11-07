@@ -63,6 +63,7 @@ Free tails that the stock boot zeroes: `0x80007330–0x80008000`, `0x8000f860–
 |---|---|---|---|
 | `0x0000` | `0x4000` | sy-fm4 | voice engine (engine 4) and its state |
 | `0x4000` | `0x00020000` | sampler | voice engine (engine 11), interpolation table, zero-crossing grids |
+| `0x00020000` | `0x00020400` | long-samples | runtime receiver of long samples (engine/rx.c), end of the audio interrupt |
 
 ## Shared RAM (CPU #1 at `0x10000000` + offset, CPU #2 at offset)
 
@@ -75,7 +76,7 @@ Free tails that the stock boot zeroes: `0x80007330–0x80008000`, `0x8000f860–
 | `0x0700` | `0x0780` | xparams | logical indices 0x36..0x3d of each digital track, locks applied (sy-fm4 pages 2/3 and 3/3, sampler knob H) |
 | `0x0780` | `0x07c8` | long-samples | the project's list of long samples: 'LSM1' +0x780, count +0x784, 64 positions +0x788 (index in the CPU #2 table, 0xFF = empty), read by the SAMPLER engine |
 | `0x07f0` | `0x07f4` | sampler | tempo, BPM x 120 |
-| `0x0800` | `0x1000` | OS | boot-time upload window |
+| `0x0800` | `0x1000` | OS | boot-time upload window; after boot 0x800..0xC00 is long-samples' runtime upload window (Synfact's: request +0x800, answer +0x818, data +0x820) |
 
 ## Section 3 free fill (`0x40339740–0x4033a000`)
 
