@@ -56,7 +56,7 @@ def test_boot_list_fills_the_storage_tables(built, stock):
     lane = struct.unpack(">71I", uc.mem_read(SYM["xp_lane_of_lix"], 4 * 71))
     assert l2p[:54] == lix2phys and p2l[:54] == phys2lix and lane[:54] == lix2phys
     assert l2p[54:] == p2l[54:] == tuple(range(54, 71))
-    assert lane[54:70] == tuple(range(0x50, 0x60)) and set(lane[70:]) == {0xFF}       # 0x36..0x3d, 0x3e..0x45 (LFO3)
+    assert lane[54:70] == tuple(range(0x50, 0x60)) and lane[70:] == (0x60,)       # 0x36..0x3d, 0x3e..0x45 (LFO3), 0x46 ARP
 
 
 def test_stock_sound_without_a_machine_hook_stays_zero(built):
