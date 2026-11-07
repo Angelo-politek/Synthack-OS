@@ -300,6 +300,48 @@ void fx3_resync(void)
     derive();
 }
 
+/* ---- LFO della FX track sulla pagina FX3. Le DEST sono id interni di parole del kit FX che l'OS non usa
+ * (FX_SLOT, make_patch.py): l'LFO nativo vi calcola la modulazione nel suo stato (traccia 12: +28 LFO1, +68
+ * LFO2) ma nessuno la applica. Qui, a ogni blocco con una DEST su FX3: valori della pagina + modulazione
+ * (valore << 8 come le manopole), valori derivati ricalcolati; senza, una volta i valori veri e poi nulla. */
+#define FX_DEST(k)  (*(volatile const unsigned char *)(0x80002874u + 2u * (4u + 8u * (k))))   /* byte alto della DEST */
+#define FX_MOD(k)   (*(volatile const s32 *)(0x444DB72Cu + 0x50u * 12u + 28u + 40u * (k)))
+static const unsigned char lfo_slot[NP] = {0xFF, FX_SLOT_SPD, FX_SLOT_DEP, FX_SLOT_TIME, FX_SLOT_FDBK, 0xFF,
+                                FX_SLOT_DSND, FX_SLOT_RSND};
+/* byte alto della DEST -> 1 se e' una nostra (controllo nell'interrupt prima di chiamare fx3_lfo_tick) */
+const unsigned char fx3_lfo_dest[256] = {[FX_SLOT_SPD] = 1, [FX_SLOT_DEP] = 1, [FX_SLOT_TIME] = 1, [FX_SLOT_FDBK] = 1,
+                              [FX_SLOT_DSND] = 1, [FX_SLOT_RSND] = 1};
+unsigned char fx3_lfo_on DATA = 0;
+#define lfo_on fx3_lfo_on
+
+void fx3_lfo_tick(void)
+{
+    u32 a = FX_DEST(0), b = FX_DEST(1), i, hit = 0;
+    unsigned char save[NP];
+
+    for (i = 0; i < NP; i++)
+        hit |= lfo_slot[i] == a || lfo_slot[i] == b;
+    if (!hit) {
+        if (lfo_on) {                                    /* fine della modulazione: valori veri */
+            lfo_on = 0;
+            derive();
+        }
+        return;
+    }
+    lfo_on = 1;
+    for (i = 0; i < NP; i++) {
+        s32 v = save[i] = fx3_p[i];
+        if (lfo_slot[i] == a)
+            v += FX_MOD(0) >> 8;
+        if (lfo_slot[i] == b)
+            v += FX_MOD(1) >> 8;
+        fx3_p[i] = (unsigned char)(v < 0 ? 0 : v > 127 ? 127 : v);
+    }
+    derive();
+    for (i = 0; i < NP; i++)
+        fx3_p[i] = save[i];
+}
+
 /* nuovo tipo: niente coda del precedente. La linea (4 KB) si svuota in CLR_N blocchi, 1/CLR_N per blocco,
  * con l'effetto muto: tutta in un blocco sono ~1 000 scritture e 256 righe di cache, l'interrupt sfora il blocco */
 #define CLR_N 8
@@ -749,7 +791,18 @@ __asm__(
     "        cmp.l   " ST(O_SEEN + 4) ",%d1\n"
     "        beq.s   2f\n"
     "1:      jsr     fx3_resync\n"
-    "2:      move.l  " ST(O_MOVING) ",%d0\n"
+    "2:      mvz.b   0x8000287C,%d0\n"                    /* LFO della FX track sulla pagina FX3: */
+    "        lea     fx3_lfo_dest,%a0\n"                    /* DEST di LFO1 e LFO2 su un nostro slot, */
+    "        mvz.b   (%a0,%d0.l),%d1\n"                     /* o modulazione appena finita */
+    "        mvz.b   0x8000288C,%d0\n"
+    "        mvz.b   (%a0,%d0.l),%d0\n"
+    "        or.l    %d0,%d1\n"
+    "        mvz.b   fx3_lfo_on,%d0\n"
+    "        or.l    %d0,%d1\n"
+    "        beq.s   .Lnolfo\n"
+    "        jsr     fx3_lfo_tick\n"
+    ".Lnolfo:\n"
+    "        move.l  " ST(O_MOVING) ",%d0\n"
     "        or.l    " ST(O_RAMP) ",%d0\n"
     "        beq.s   3f\n"
     "        bsr.w   f3_ramp\n"

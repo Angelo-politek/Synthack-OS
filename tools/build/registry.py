@@ -145,7 +145,7 @@ IDS = {
 
 # ---- pagine dell'interfaccia (indice -> mod) riusate
 # ---- voci in piu' del menu DEST degli LFO (idspace_layout.DESTX): posto -> mod
-DESTX_SLOTS = {**{k: "sy-fm4" for k in range(13)}, 13: "sampler"}
+DESTX_SLOTS = {**{k: "sy-fm4" for k in range(13)}, 13: "sampler", **{k: "fx3" for k in range(14, 20)}}
 
 PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 37: ("dual-mono", "IN R in the MIXER tab (idspace page)")}
 

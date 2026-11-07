@@ -39,12 +39,17 @@ LOAD = 0x4000_0400
 MODAREA_RAM, MODAREA_IMG = modarea_layout.RAM, modarea_layout.IMG
 CODE_BASE, CODE_END = MODAREA_RAM + 0xA000, MODAREA_RAM + 0xDFF0   # linea a +0xE000 (4 KB)
 TOOLS = "~/tools/m68k/root"
-_ids_spec = json.loads((REPO / "mods" / "idspace" / "patch.json").read_text(encoding="utf-8"))
-IDS_OBJ = int(_ids_spec["symbols"]["ids_obj32"], 16)    # oggetto per parametro (id dell'OS o delle mod)
+IDS_OBJ = IDS.OBJ_ENTRY                 # oggetto per parametro (id dell'OS o delle mod), ingresso fisso di idspace
 NEW = {old: old + 259 for old in range(246, 254)} | {269: 513}   # id delle mod (idspace) al posto di quelli MIDI
 # id stock modello dell'oggetto (dati +0..+19 e funzioni non sostituite), trovati nell'emulatore il 2026-11-06
+# LFO della FX track: id interni di parole del kit FX che l'OS non usa (<= 70, limite dell'LFO), come DEST dei
+# parametri della pagina FX3. Sei liberi: WID resta senza (e TYPE). Gruppo del riverbero (49): la pagina e' REVERB 2.
+FX_SLOT = {247: 0x24, 248: 0x27, 250: 0x29, 251: 0x1A, 249: 0x46, 253: 0x37}
+FX_GROUP = 49
+FX_DESTX_FIRST = 14                     # posti DESTX (registro): 14..19
 TEMPLATE = {246: 288, 247: 34, 248: 34, 249: 277, 250: 34, 251: 34, 252: 34, 253: 277, 269: 277}
-CFLAGS = f"-DIDS_OBJ={IDS_OBJ:#x} -DMODAREA_RAM={modarea_layout.RAM:#x} -DDM_HDR={DL.HDR:#x} -DKS_FX3_R={DL.FX3_R:#x} -DKS_FX3_FX={KS.word(*KS.PARTS["fx3"][0]):#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
+CFLAGS = (f"-DFX_SLOT_SPD={FX_SLOT[247]} -DFX_SLOT_DEP={FX_SLOT[248]} -DFX_SLOT_TIME={FX_SLOT[250]} "
+          f"-DFX_SLOT_FDBK={FX_SLOT[251]} -DFX_SLOT_DSND={FX_SLOT[249]} -DFX_SLOT_RSND={FX_SLOT[253]} ") + f"-DIDS_OBJ={IDS_OBJ:#x} -DMODAREA_RAM={modarea_layout.RAM:#x} -DDM_HDR={DL.HDR:#x} -DKS_FX3_R={DL.FX3_R:#x} -DKS_FX3_FX={KS.word(*KS.PARTS["fx3"][0]):#x} -mcpu=54418 -O2 -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -Wall -Wextra"
 FS = 24000                              # il chorus lavora a 24 kHz
 DESC = 0x4022_D83C
 P_PLAIN, G_KNOB, G_SEND, S_BAR = 0x41B9_EFD0, 0x41B9_ECD0, 0x41B9_EBD0, 0x41B9_E5D0
@@ -276,6 +281,8 @@ def main() -> None:
         d[8:20] = struct.pack(">III", 0, mx << 8, df << 8)
         d[24:32] = struct.pack(">II", 0xFFFF_FFFF, 0xFFFF_FFFF)                 # niente CC ne' NRPN
         d[40:44], d[48:52] = long(nl), long(ns)
+        if old in FX_SLOT:                                                       # DEST dell'LFO della FX track
+            d[0:8] = struct.pack(">ii", FX_GROUP, FX_SLOT[old])
         o = struct.pack(">4I", TEMPLATE[old], *(resolve(protos[f]) if f in protos else 0 for f in (20, 36, 68)))
         return [ext(IDS.desc(pid), bytes(d), f"idspace: descrittore dell'id {pid} ({what})"),
                 ext(IDS.objdef(pid), o, f"idspace: oggetto dell'id {pid} ({what}), modello {TEMPLATE[old]}")]
@@ -296,6 +303,9 @@ def main() -> None:
                 fixed(r + 48, long(syms["fx3_snd_s"]), "id 144: nome breve 'FX3'"),
                 fixed(r + 28, long(0xFFFF_FFFF), "id 144: niente NRPN", "00000097")]
     # pagina FX3
+    for k, old in enumerate((247, 248, 250, 251, 249, 253)):             # menu DEST della FX track (riga 45)
+        patches.append(ext(IDS.destx(FX_DESTX_FIRST + k), struct.pack(">BBH", 45, 3, NEW[old]),
+                           f"idspace: menu DEST della FX track, voce {NEW[old]}"))
     for n, (pid, short, ln, mx, df, protos, extra) in enumerate(PARAMS):
         patches.append(vparams.entry(VP_SLOT + n, NEW[pid], syms["fx3_get"], syms["fx3_set"], f"fx3 {short}"))
         patches += new_id(pid, mx, df, syms[f"fx3_n{n}_l"], syms[f"fx3_n{n}_s"],
@@ -312,7 +322,7 @@ def main() -> None:
             "fx3_fmt_type", "fx3_fmt_fdbk", "fx3_fmt_wid", "fx3_fmt_vol", "fx3_type_gfx",
             "fx3_draw_hook", "fx3_mgr", "fx3_phs", "fx3_n1_s", "fx3_n3_s", "fx3_n3_l", "fx3_page_l",
             "fx3_kser_hook", "fx3_kdes_hook", "fx3_rev_hook", "fx3_addsat", "fx3_in_hook", "fx3_in_page", "fx3_in_get", "fx3_in_set", "fx3_fx_get", "fx3_fx_set", "fx3_fxamp_stub",
-            "fx3_route", "fx3_rt_key", "fx3_rt_get", "fx3_rt_draw")},
+            "fx3_route", "fx3_rt_key", "fx3_rt_get", "fx3_rt_draw", "fx3_lfo_on", "fx3_lfo_tick")},
         "emac_sites": [f"{x:#010x}" for x in allowed],
         "patches": patches,
     }

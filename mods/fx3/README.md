@@ -10,6 +10,7 @@ Third send effect next to delay and reverb: **chorus**, **flanger**, **phaser** 
 | External input FX3 send | External Mixer page, knob C. With dual-mono in mono: next to REV | kit: low byte of FX-track word 0x37 |
 | FX track FX3 send | FX track **AMP page 1**, knob G, next to DEL and REV. PAN moves to page 2, knob E | kit (kitstore word) |
 | FX3 page | FX track → **REVERB** tab, press again for page 2 | kit (pattern) |
+| LFO | The FX track's LFO1/LFO2 DEST menu lists SPD, DEP, TIME, FDBK, DEL, REV of the FX3 page (WID not: no free slot) | — |
 | Return routing | ROUTING screen (FUNC+FX), **trig 13**, next to delay (14) and reverb (15) | kit: bit 8 of FX-track word 0x37 |
 
 FX3 page: A `TYPE`; B–F change name and range with TYPE; G `DEL`; H `REV`.
@@ -54,6 +55,7 @@ FX3 page: A `TYPE`; B–F change name and range with TYPE; G `DEL`; H `REV`.
 | DEL / REV sends | Previous block's output goes into the delay and reverb input buses (0.67 ms later), inside our replacement of the OS loops that finish those buses (`0x4008F852`, `0x4008F98A`): same result as the OS loop, fewer instructions. |
 | Routing | Hooks on the ROUTING key handler (`0x4004C5E2`), entry state (`0x4004BF86`), drawing of entry 13 (`0x4004C242`), its LED (`0x4004C480`). Return goes to the direct bus, or to the FX track (analog FX block, bus compressor). |
 | UI | Page 25 (unused "OB8") becomes REVERB page 2, drawn as 8 plain slots. Controls: ids 505–512 ([idspace](../idspace)) via [vparams](../vparams). Names are RAM strings rewritten with the icons and slots when TYPE changes, from UI code only ([modding guide](../../docs/modding-guide.md#5-text-icons-and-styles)). The AMP tab is patched to give SND3 its own graphic. |
+| LFO | The FX3 controls take internal ids of FX kit words the OS does not use (0x24, 0x27, 0x29, 0x1A, 0x46, 0x37): the FX track's LFOs compute their modulation there and nobody else applies it. Each block the audio hook reads the two DESTs (a 256-byte table); on a hit the page values + modulation give the derived values, then the knob values return. |
 | Idle | Nothing runs without sends, or once the inputs are silent (sequencer stopped) and the tail has died out. |
 
 ## Cost

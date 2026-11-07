@@ -1431,3 +1431,27 @@ def test_same_output_as_the_c_version(seed, steady):
     for b, st in enumerate(scenario(seed, 600, steady)):
         for name, x, y in zip(names, one_block(old, st), one_block(new, st)):
             assert x == y, (seed, b, name)
+
+
+# ----------------------------------------------------------------------------- LFO della FX track sulla pagina FX3
+def test_fx_track_lfo_modulates_the_fx3_page():
+    """LFO1 della FX track con DEST sullo slot di SPD (0x24): l'incremento del chorus (valore derivato) segue la
+    modulazione; tolta la DEST, torna quello della manopola. Gli slot sono parole del kit FX che l'OS non usa."""
+    import isr
+    m = isr.Isr(["fx3"])
+    fx = lambda iid: 0x8000_2874 + 2 * iid                                        # noqa: E731
+    inc = lambda: struct.unpack(">I", bytes(m.uc.mem_read(m.sym["fx3_s"] + 232, 4)))[0]   # noqa: E731 (O_INC)
+    m.scene("typ")
+    base = inc()
+    for iid, v in ((1, 0x7F00), (2, 0x0B00), (3, 0x4000), (5, 0), (6, 0), (7, 0), (8, 0x7F00)):
+        m.put16(fx(iid), v)
+    m.put16(fx(4), 0x2400)                                       # DEST = slot di SPD
+    seen = set()
+    for _ in range(12):
+        m.fast(8)
+        seen.add(inc())
+    assert len(seen) > 4, seen
+    m.put16(fx(4), 0x7F00)                                       # nessuna DEST
+    m.fast(4)
+    assert inc() == base
+    assert m.uc.mem_read(m.sym["fx3_lfo_on"], 1)[0] == 0
