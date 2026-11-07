@@ -112,7 +112,7 @@ def main() -> None:
                        "a 60 s, rifilo, normalizzazione, salvataggio tra i campioni lunghi, subito suonabile.",
         "license": "GPL-2.0-or-later", "credits": "Synfact (GSM1980), elekloader (irpina)",
         "generated_by": "mods/recorder/make_patch.py",
-        "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items()) if k.startswith(("recorder", "sam_"))},
+        "symbols": {k: f"{v:#010x}" for k, v in sorted(syms.items()) if k.startswith(("recorder", "sam_", "rec_"))},
         "patches": patches,
     }
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

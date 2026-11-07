@@ -18,6 +18,8 @@
   "credits": "Synfact (GSM1980), elekloader (irpina)",
   "generated_by": "mods/recorder/make_patch.py",
   "symbols": {
+    "rec_publish": "0x44508f74",
+    "rec_samp_engine": "0x44508f6c",
     "recorder_audio": "0x44508f3c",
     "recorder_draw": "0x4450888c",
     "recorder_encoder": "0x44507ad2",
