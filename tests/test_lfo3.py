@@ -174,9 +174,9 @@ def test_unused_costs_nothing():
 def test_destination_modulates_before_native_lfos():
     """DEST della traccia 3 sul volume (slot 0x30), profondita' piena: la parola di lavoro e' quella del
     blocco piu' la modulazione di LFO3 (stato +28), poi le LFO native. Costo misurato."""
-    def setup(m):
-        bank = BANK + 13 * 40 + 8
-        m.uc.mem_write(bank + 16 * 3, struct.pack(">8H", 0x7000, 0x300, 0x4000, 0x3000, 1, 0, 0, 0x7F00))
+    def setup(m):                                   # parametri: indici 0x3e..0x45 della traccia (xparams)
+        m.uc.mem_write(0x8000_21B0 + 28 + 142 * 3 + 2 * 0x3E,
+                       struct.pack(">8H", 0x7000, 0x300, 0x4000, 0x3000, 1, 0, 0, 0x7F00))
         m.ui.call(SYM["lfo3_update"])
     _, a = run(["sfcore"], uses=["sfcore:lfo"])
     m, b = run(["lfo3"], setup=setup)

@@ -66,13 +66,27 @@ static u32 install(void)
     return 0;
 }
 /* The record the kernel reads this block: the bank's parameters (p-locks come later). */
-const u16 *lfo3_events_bank(void){return &lfo3_bank->params[0][0];}
+/* SyntHack: the 8 parameters are logical indices 0x3e..0x45 of each audio track's Sound (mods/xparams, second
+ * group: saved, p-locked). The kernel reads them from the working copy of this block, locks applied: copied into the
+ * bank's record before each render. The FX track has no LFO3 (its words 0x3e..0x45 are the FX amp block). */
+#define LFO3_LIX 0x3Eu
+#define WORK(t) ((volatile const u16 *)(0x800021B0u + 28u + 142u * (t) + 2u * LFO3_LIX))
+const u16 *lfo3_events_bank(void)
+{
+    u32 t,*d=(u32 *)&lfo3_bank->params[0][0];        /* long words: odd tracks are 2-aligned (2 bus reads) */
+    for(t=0;t<12u;t++,d+=4){
+        volatile const u32 *w=(volatile const u32 *)WORK(t);
+        d[0]=w[0];d[1]=w[1];d[2]=w[2];d[3]=w[3];
+    }
+    lfo3_bank->params[12][3]=0x7f00u;               /* FX track: none */
+    return &lfo3_bank->params[0][0];
+}
 /* An engine matters when its destination is a Sound slot (1..70): 0 is the native None, 0x7f (and anything above
- * 70) is skipped by the kernel itself. */
+ * 70) is skipped by the kernel itself. Read from the working copy, in the UI task. */
 static u32 active_mask(void)
 {
     u32 t,m=0,slot;
-    for(t=0;t<LFO3_TRACKS;t++){slot=lfo3_bank->params[t][3]>>8;if(slot && slot<=70)m|=1u<<t;}
+    for(t=0;t<12u;t++){slot=WORK(t)[3]>>8;if(slot && slot<=70)m|=1u<<t;}
     return m;
 }
 int lfo3_native(u32 op,const u32 *a,u32 *result)
