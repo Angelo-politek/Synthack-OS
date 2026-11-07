@@ -1,0 +1,33 @@
+Synfact (https://github.com/GSM1980/synfact-dev), commit 1a6d0c74469db4c30423be29c90e0b07ba7f8003, mods/arp-st.
+GPL-2.0-or-later, GSM1980 and contributors, on elekloader by irpina.
+
+Changes for SyntHack on OS 1.42:
+- OS 1.41 addresses translated with tools/build/port_source.py 1.42 (85). The ASCII command tags ARP1 and
+  CFG1 look like addresses and were put back by hand.
+- persist.c is not used: the settings of each audio track are saved with the project (../glue.c, mods/projstore)
+  instead of with the Sound; persist.h declares that interface.
+- locks.h, view.c: MODE, SPEED, RANGE and LEN lock as one packed native lock on the Sound's spare logical
+  index 0x46 (../glue.c) instead of the shared lock service of Synfact's LFO3 (lanes 0x60..0x63). LEN takes
+  56 of its 128 values.
+- module.c: no SOUND_META (Sound lifecycle) subscription; MAIN blocks counted in arp_frame stand for the host's
+  machine telemetry; the view's memory comes from the OS heap. Lines marked "SyntHack:".
+
+sha256 of the upstream files (LF line ends), before the changes:
+arp.h        c610f2342d20152c683499196254e10693295a8da320efb6ef3ecb3d6e87ed9c
+clock.c      d1229eaa85fd3f1ef2034d46dffb306a54cfcd17768f35f94646805c3463b4cb
+clock.h      7244c0bcc9d98734a302bbb2d1a71cb02efea9196f1c6fad4ec46b1dbcc552cf
+input.c      a927a712a9568e924e62ad190d68f75f10b03cf53cd9cfd0b6760c384c298327
+keyboard.c   ae519b1fb5e76a6dfc79530b7081947f4cf5944f1b66353bfc26100675e3cc0a
+keyboard.h   bd4aedb94432a8f449c767fb47cbf6390a1340acca3817d53e201640c094b5b4
+length.c     dd20d435bed364006dd11b3833808825e7ff2205b5cad72390b82f62a391aac4
+length.h     6b20d11d1617e3285c11cd82a8c0f54bc6c2dc957f93c3121c806777291bacde
+locks.h      ce7126337c223fd9059ed65b61c16ccbb2d561b822d3d1db5db478b1aee111f3
+module.c     638e735c2910a439defd2175391b89bf9ef96479cf4872cec85a858dfc78cf46
+native-st.h  c1db9f714a06ba6dd82024d17fe4cb50016d519796308ede23ff31db87b1f9cd
+persist.h    21fd8be44f4df097d97574e528da0294a2ed9ad2c8bbf80b40d4d7f0042a632a
+runtime.c    5cf27dddd73bc02c7294541e19958f0d3200bc61b4f3fef9ead579e37bf4ee47
+runtime.h    c91b4b2543448fc2a1fded05da8ef4c84eae397192b3ffa718a8318917b377bf
+selector.c   a200839a7133fd1a77bebab06932acab0010709433a3836b08c6f619ce31bb99
+ui.c         83ce53277da3761bf14a22ebdee5299f180fe625cb7eba861022312d1d01f71e
+ui.h         93b7474e27427982f053929dc8bc8284b382f3875047ff864ddf9882213c9bd7
+view.c       f2d4c0cefab40271222fdedb10d11abbce3b5286d95488e69ac799e8692d109e

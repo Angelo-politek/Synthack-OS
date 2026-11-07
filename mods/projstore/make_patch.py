@@ -49,7 +49,7 @@ def main() -> None:
         shutil.copy(HERE / "projstore.S", tmp / "projstore.S")
         w = eft.to_wsl_path(tmp)
         bu = f"R={WSL_BINUTILS}; export LD_LIBRARY_PATH=$R/usr/lib/x86_64-linux-gnu; cd {w}; "
-        wsl(bu + f"$R/usr/bin/m68k-linux-gnu-as -mcpu=54418 --defsym PS_SIZE={L.SIZE} projstore.S -o p.o")
+        wsl(bu + f"$R/usr/bin/m68k-linux-gnu-as -mcpu=54418 --defsym PS_SIZE={L.SIZE} --defsym ps_data={L.DATA:#x} projstore.S -o p.o")
         wsl(bu + f"$R/usr/bin/m68k-linux-gnu-ld -N -Ttext={CODE_BASE:#x} -o p.elf p.o")
         wsl(bu + "$R/usr/bin/m68k-linux-gnu-objcopy -O binary -j .text -j .data p.elf p.bin")
         syms = {}
@@ -58,6 +58,7 @@ def main() -> None:
             if len(parts) == 3:
                 syms[parts[2]] = int(parts[0], 16)
         blob = (tmp / "p.bin").read_bytes()
+    assert L.SIZE % 4 == 0 and L.SIZE <= 0x400 - 0x22C and max(o + n for o, n in L.PARTS.values()) <= L.SIZE
     if CODE_BASE + len(blob) > CODE_END:
         raise SystemExit(f"non ci sta: {len(blob)} B")
     patches = [{"section": 3, "addr": f"{modarea_layout.IMG + L.OFFSET:#010X}", "len": len(blob), "append": True,
@@ -70,7 +71,7 @@ def main() -> None:
                         "hex": struct.pack(">HIH", 0x4EF9, syms[sym], 0x4E71).hex(), "what": what})
     spec = {
         "name": "projstore", "os": "1.42", "requires": ["modarea"],
-        "description": f"Memoria delle mod salvata con il progetto: {L.SIZE} byte a ps_data, nell'area riservata "
+        "description": f"Memoria delle mod salvata con il progetto: {L.SIZE} byte a ps_data (RAM), nell'area riservata "
                        "delle impostazioni del progetto nel file.",
         "generated_by": "mods/projstore/make_patch.py",
         "layout": {"data": f"{syms['ps_data']:#010x}", "size": L.SIZE},

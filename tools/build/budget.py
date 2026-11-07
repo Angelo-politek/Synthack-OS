@@ -64,6 +64,10 @@ AUDIO_CYCLES["cpu-meter"] = 800
 # 1 su 64 di controllo) gira lo stock piu' la registrazione (tests/test_modulation_skip.py).
 # sfcore: solo interfaccia (0); gli adattatori audio e nativi si contano nella mod che li usa ("uses").
 AUDIO_CYCLES["modulation-skip"] = -5000
+# arp (2026-11-07, scena "max"): a riposo +357 cicli (render_in: conta il blocco ed esce); 12 arp in corsa +4 277
+# (tests/test_arp.py; Synfact ricalcolava la velocita' a ogni blocco: +11 747). Qui il costo a riposo.
+AUDIO_CYCLES["arp"] = 400
+AUDIO_CPU["arp"] = 40
 AUDIO_CPU["modulation-skip"] = -5500
 
 SEC7_ROOM = 127_695
@@ -95,7 +99,7 @@ LIMITS = {
     "cpu": 10000,
     "modarea": modarea_layout.SIZE,
     "kit": kitstore_layout.WORDS_PER_BLOCK * kitstore_layout.N_BLOCKS,
-    "project": 256,
+    "project": projstore_layout.SIZE,
     # staging della sezione 7 (0x60000 - 5) meno lo stub di modarea7 e la sezione stock compressa (SHLZ):
     # il codice dei motori si conta non compresso, quindi per eccesso (tests/test_modarea7.py controlla il valore)
     "sec7": SEC7_ROOM,

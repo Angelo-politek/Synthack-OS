@@ -27,6 +27,8 @@ __attribute__((section(".entries"), used)) xp_table_t xp_table = {0};
 #define STOCK_LIX 0x36
 #define ALL_LIX 0x47
 #define LANE_FIRST 0x50
+#define ARP_LIX 0x46                            /* mods/arp: its packed lock (MODE, SPEED, RANGE, LEN) */
+#define ARP_LANE 0x60
 
 u32 xp_sound_l2p[ALL_LIX];
 u32 xp_sound_p2l[ALL_LIX];
@@ -41,6 +43,8 @@ void xp_boot(void) {
             xp_lane_of_lix[i] = LIX2PHYS[i];
         else if (i < XP2_FIRST + XP2_N)          /* both groups: lanes 0x50..0x5f */
             xp_lane_of_lix[i] = LANE_FIRST + (i - XP_FIRST);
+        else if (i == ARP_LIX)
+            xp_lane_of_lix[i] = ARP_LANE;
         else
             xp_lane_of_lix[i] = 0xff;
     }
@@ -57,6 +61,8 @@ u32 xp_phys_to_lix(u32 track, u32 phys) {
         return PHYS2LIX[phys];
     if (phys >= LANE_FIRST && phys < LANE_FIRST + XP_N + XP2_N)
         return XP_FIRST + (phys - LANE_FIRST);
+    if (phys == ARP_LANE)
+        return ARP_LIX;
     return 0;
 }
 

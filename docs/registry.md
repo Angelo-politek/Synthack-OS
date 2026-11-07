@@ -13,7 +13,7 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x5800` | `0x6700` | sy-fm4 | main CPU side: pages, algorithm drawings, page 1/3 names |
 | `0x6700` | `0x6dc0` | xparams | table (xparams_layout.TABLE), storage tables, sound loader, shared RAM publisher |
 | `0x6dc0` | `0x7000` | cpu-meter | code and data: audio interrupt load on screen (diagnostic) |
-| `0x7000` | `0x7200` | projstore | code, then the 256 bytes saved with the project |
+| `0x7000` | `0x7200` | projstore | code (the bytes saved with the project: +0x58000) |
 | `0x7200` | `0x7400` | kitstore | code |
 | `0x7400` | `0x7420` | modarea | boot list: 8 pointers, called after unpacking (BOOT_SLOTS) |
 | `0x7420` | `0x7e00` | syn-pages | machine table (synpages_layout.TABLE), SRC view: pages, titles, drawing |
@@ -32,19 +32,21 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x00020000` | `0x00026000` | recorder | Synfact recorder port: code and data (PCM in the OS heap) |
 | `0x00026000` | `0x0002a000` | lfo3 | third LFO (Synfact port): engine (source of the SRAM copy), page, actions |
 | `0x0002a000` | `0x00032000` | xstore | planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks) |
-| `0x00032000` | `0x00038000` | arp | planned: arpeggiator (cells in the OS heap) |
+| `0x00032000` | `0x00038000` | arp | arpeggiator (Synfact port): code and data |
 | `0x00038000` | `0x0003e000` | poly | POLY (Synfact port): groups, voice allocation, TRIG page 3 (GPL-2.0-or-later) |
 | `0x0003e000` | `0x0003fff0` | idspace | code; descriptors, object definitions and pages the mods write (idspace_layout) |
 | `0x0003fff0` | `0x00040000` | **free** |  |
 | `0x00040000` | `0x0004c000` | idspace | runtime: descriptor table copy (569 x 52 B), mod parameter objects, packed LFO DEST rows (+0xA000) |
 | `0x0004c000` | `0x00058000` | recorder | BSS of the recorder (runtime RAM only, zeroed by the loader) |
-| `0x00058000` | `0x0007fff0` | **free** |  |
+| `0x00058000` | `0x00058200` | projstore | the bytes saved with the project (projstore_layout: SIZE, PARTS) |
+| `0x00058200` | `0x0005c000` | arp | BSS of the arpeggiator (runtime RAM only, zeroed by the loader) |
+| `0x0005c000` | `0x0007fff0` | **free** |  |
 
 Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams, slot 3 sfcore, slot 4 idspace.
 
 sfcore module table (`+0x1b000`, 8 pointers, initialized in this order): slot 0 modulation-skip, slot 1 xstore, slot 2 recorder, slot 3 lfo3, slot 4 arp, slot 5 poly.
 
-Planned (space claimed, code not written yet): arp, xstore.
+Planned (space claimed, code not written yet): xstore.
 
 ## SRAM (CPU #1, internal: never a cache miss)
 
@@ -201,3 +203,4 @@ Ids without a page often carry a MIDI CC or are aliases: clear the CC, check ali
 | kitstore | dual-mono | block 0 word 0, block 0 word 1, block 0 word 2 |
 | kitstore | fx3 | block 1 word 0 |
 | projstore | long-samples | 0–132 |
+| projstore | arp | 132–420 |

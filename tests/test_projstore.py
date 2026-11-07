@@ -109,3 +109,20 @@ def test_failures_pass_through():
     ours.uc.mem_write(FILE, struct.pack(">I", 3))                         # versione diversa: rifiutato
     assert ours.call(READ, SET_B, FILE) == 0
     assert bytes(ours.uc.mem_read(ours.data, ours.size)) == b"\x77" * ours.size
+
+
+def test_project_saved_with_fewer_bytes_loads_them_and_zeros():
+    """Fino al 2026-11-07 i byte erano 256 (marcatore 'SH', 1, 64): tornano quelli, il resto (ARP) a zero.
+    Una lunghezza oltre la nostra o zero: nessun byte, come un progetto senza marcatore."""
+    ours = Machine(True)
+    f = bytearray(write(ours, settings(6)))
+    old = bytes(random.Random(8).randrange(1, 256) for _ in range(256))
+    f[0x228:0x22C + 256] = bytes([0x53, 0x48, 1, 64]) + old
+    ours.uc.mem_write(ours.data, b"\x77" * ours.size)
+    read(ours, bytes(f))
+    assert bytes(ours.uc.mem_read(ours.data, ours.size)) == old + bytes(ours.size - 256)
+    for words in (0, ours.size // 4 + 1, 0xFF):
+        f[0x22B] = words
+        ours.uc.mem_write(ours.data, b"\x77" * ours.size)
+        read(ours, bytes(f))
+        assert bytes(ours.uc.mem_read(ours.data, ours.size)) == bytes(ours.size)

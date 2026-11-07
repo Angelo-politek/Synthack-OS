@@ -3,7 +3,7 @@
     "cpu": 10000,
     "modarea": 524272,
     "kit": 36,
-    "project": 256,
+    "project": 420,
     "sec7": 127695
   },
   "audio": {
@@ -11,6 +11,13 @@
     "stock": 0.89
   },
   "mods": {
+    "arp": {
+      "cpu": 400,
+      "modarea": 40448,
+      "kit": 0,
+      "project": 288,
+      "sec7": 0
+    },
     "cpu-meter": {
       "cpu": 800,
       "modarea": 576,
@@ -118,7 +125,7 @@
     },
     "projstore": {
       "cpu": 0,
-      "modarea": 512,
+      "modarea": 1024,
       "kit": 0,
       "project": 0,
       "sec7": 0

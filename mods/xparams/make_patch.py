@@ -128,7 +128,7 @@ def main() -> None:
                b"\x4b\xf9" + long(LIX2PHYS)),
          fixed(LOCK_W_B, b"\x45\xf9" + long(s["xp_lane_of_lix"]), "p-lock, scrittura B: lane degli indici extra",
                b"\x45\xf9" + long(LIX2PHYS)),
-         fixed(LOCK_R_BOUND, bytes.fromhex("7a5f"), "p-lock, lettura: lane fino a 0x5f", bytes.fromhex("7a46")),
+         fixed(LOCK_R_BOUND, bytes.fromhex("7a60"), "p-lock, lettura: lane fino a 0x60 (0x60: ARP, indice 0x46)", bytes.fromhex("7a46")),
          fixed(PHYS_TO_LIX, b"\x4e\xf9" + long(s["xp_phys_to_lix"]), "slot/lane -> indice logico"),
          fixed(DMA_WAIT, b"\x4e\xf9" + long(s["xp_dma_wait"]), "attesa eDMA 47: indici extra nella RAM condivisa")]
     spec = {

@@ -153,6 +153,7 @@ All four ports go into 1.0: third LFO, arpeggiator, POLY, recorder. Plan: M0 too
 1. `[ok]` M0: `tools/emu/cycles.py` counts no cache miss for code run from SRAM (stock calibration unchanged: the stock interrupt runs no SRAM code). `tools/build/budget.py` profiles: measured combinations, the site's sum is never below them; the CPU meter shows % of the block and turns red with the heaviest mods named. Over budget still builds.
 2. `[ok]` M1: mod area 128 → 256 KB. After boot (emulator, new project) the largest free heap block is 8 MB, 13.3 MB free in all. Registry: space for sfcore, xstore, recorder, lfo3, arp, poly; SRAM section; sfcore module table. [sfcore](../mods/sfcore): event bus, native transactions, host API 12; chained after perf-fx, cpu-meter, fx3, long-samples, sampler. Audio/native adapters only in builds that use them (`"uses"`, `"service"`). `[ ]` Device: boot, project in PLAY, perf-fx, cpu-meter.
 3. `[ok]` M2: [modulation-skip](../mods/modulation-skip), hot data in SRAM. Bit for bit equal to stock in the emulator. Skipped block −6 174 cycles, recomputed +2 594; every mod 101.7 % → 98.0 % of the block. `[ ]` Device: VERIFY build with cpu-meter for a session (`E000`), then ON.
+4. `[ok]` M7 (emulator): [arp](../mods/arp). Settings per audio track saved with the project; MODE/SPEED/RANGE/LEN p-locks packed in one native lock (logical index `0x46`, lane `0x60`), so no lock service of its own. Selector equal to Digitone 1.44's. Idle +400 cycles, 12 running arps +4 300. `[ ]` Device: view, locks, save.
 
 ## Next session
 

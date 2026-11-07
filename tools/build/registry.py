@@ -27,7 +27,7 @@ MODAREA = [
     (0x5800, 0x6700, "sy-fm4", "main CPU side: pages, algorithm drawings, page 1/3 names"),
     (0x6700, 0x6DC0, "xparams", "table (xparams_layout.TABLE), storage tables, sound loader, shared RAM publisher"),
     (0x6DC0, 0x7000, "cpu-meter", "code and data: audio interrupt load on screen (diagnostic)"),
-    (0x7000, 0x7200, "projstore", "code, then the 256 bytes saved with the project"),
+    (0x7000, 0x7200, "projstore", "code (the bytes saved with the project: +0x58000)"),
     (0x7200, 0x7400, "kitstore", "code"),
     (0x7400, 0x7420, "modarea", "boot list: 8 pointers, called after unpacking (BOOT_SLOTS)"),
     (0x7420, 0x7E00, "syn-pages", "machine table (synpages_layout.TABLE), SRC view: pages, titles, drawing"),
@@ -45,17 +45,19 @@ MODAREA = [
     (0x20000, 0x26000, "recorder", "Synfact recorder port: code and data (PCM in the OS heap)"),
     (0x26000, 0x2A000, "lfo3", "third LFO (Synfact port): engine (source of the SRAM copy), page, actions"),
     (0x2A000, 0x32000, "xstore", "planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks)"),
-    (0x32000, 0x38000, "arp", "planned: arpeggiator (cells in the OS heap)"),
+    (0x32000, 0x38000, "arp", "arpeggiator (Synfact port): code and data"),
     (0x38000, 0x3E000, "poly", "POLY (Synfact port): groups, voice allocation, TRIG page 3 (GPL-2.0-or-later)"),
     (0x3E000, 0x3FFF0, "idspace", "code; descriptors, object definitions and pages the mods write (idspace_layout)"),
     # 512 KB area from 2026-11-06: the second half is runtime RAM only (zeroed by the loader)
     (0x40000, 0x4C000, "idspace", "runtime: descriptor table copy (569 x 52 B), mod parameter objects, packed LFO DEST rows (+0xA000)"),
     (0x4C000, 0x58000, "recorder", "BSS of the recorder (runtime RAM only, zeroed by the loader)"),
-    # 0x58000..0x7FFF0: free (runtime RAM only)
+    (0x58000, 0x58200, "projstore", "the bytes saved with the project (projstore_layout: SIZE, PARTS)"),
+    (0x58200, 0x5C000, "arp", "BSS of the arpeggiator (runtime RAM only, zeroed by the loader)"),
+    # 0x5C000..0x7FFF0: free (runtime RAM only)
 ]
 
 # ---- mod con spazio prenotato ma non ancora scritte (port di Synfact, piano 2026-11-05): ammesse come proprietarie
-PLANNED = {"xstore", "arp"}
+PLANNED = {"xstore"}
 
 # ---- tabella dei moduli di sfcore (area mod + SFCORE_TABLE): posto -> mod. sfcore li inizializza in quest'ordine.
 SFCORE_TABLE, SFCORE_N = 0x1B000, 8
