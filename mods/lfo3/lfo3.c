@@ -166,8 +166,18 @@ static void lfo3_draw(void *bitmap,void *controller)
     LFO3_FILL(bitmap,18,54,127,63,0);
     LFO3_TEXT(bitmap,LFO3_FONT,20,55,0,"%s",line);
 }
+/* a new Sound takes each logical index's default from the descriptor these tables name (FUN_400a5490; sy-fm4 does
+ * the same for 0x36..0x3d): LFO3's indices get LFO1's defaults (SPD, MULT...) instead of zeros */
+#define LIX_TABLE_A ((volatile u32 *)0x43bdf7fcu)
+#define LIX_TABLE_B ((volatile u32 *)0x43bdf6e0u)
+static void defaults_for_new_sounds(void)
+{
+    u32 k;
+    for(k=0;k<8;k++){LIX_TABLE_A[LFO3_LIX+k]=530u+k;LIX_TABLE_B[LFO3_LIX+k]=530u+k;}
+}
 static int initialize(const struct st_smz_api *api)
 {
+    defaults_for_new_sounds();
     if(!api || api->version<3 || !api->ui || api->ui->version<7 || !api->ui->host)return 1;
     host=api->ui->host;
     lfo3_refused=install();if(lfo3_refused)use_ddr();
