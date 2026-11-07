@@ -6,6 +6,7 @@
  * Sound (Synfact's SOUND_META side storage). */
 void arp_track_read(arp_u32 track,struct arp_settings *);
 int arp_track_store(arp_u32 track,const struct arp_settings *);
+int arp_track_changed(arp_u32 track);   /* saved bytes changed since the last call */
 /* Note LEN steps through 56 values (the packed lock's room: glue.c) */
 unsigned int arp_len_step(unsigned int n,int delta);
 /* Locks of the active pattern's lock model: a field's value or -1; set, or clear with -1. */

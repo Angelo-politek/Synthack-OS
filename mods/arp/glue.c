@@ -115,6 +115,23 @@ void arp_track_read(arp_u32 track, struct arp_settings *p)
     unpack(p, (const u8 *)"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
 }
 
+/* 1 if the track's saved bytes changed since the last call (6 long compares: NOTE_ACCEPT runs it on every note) */
+int arp_track_changed(arp_u32 track)
+{
+    static u32 seen[ARP_TRACKS][6];
+    const volatile u32 *w = (const volatile u32 *)track_bytes(track);
+    u32 *c, k, changed = 0;
+    if (track >= ARP_TRACKS)
+        return 0;
+    c = seen[track];
+    for (k = 0; k < 6; k++)
+        if (c[k] != w[k]) {
+            c[k] = w[k];
+            changed = 1;
+        }
+    return (int)changed;
+}
+
 int arp_track_store(arp_u32 track, const struct arp_settings *p)
 {
     unsigned int i;

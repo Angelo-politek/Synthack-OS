@@ -86,7 +86,7 @@ static int arp_track_configure(arp_u32 track,const struct arp_settings *p)
 static void restore_track(unsigned int track)
 {
     struct arp_settings p;unsigned int i;int different=0;
-    if(arp_lab_override[track])return;
+    if(arp_lab_override[track] || !arp_track_changed(track))return;   /* SyntHack: per note, a quick compare */
     arp_track_read(track,&p);
     for(i=0;i<sizeof(p);i++)if(i!=5 && ((const unsigned char *)&p)[i]!=((const unsigned char *)&arp_parameters[track])[i]){different=1;break;}
     if(different && (p.mode!=arp_parameters[track].mode || p.speed!=arp_parameters[track].speed))stop_locked(track);
