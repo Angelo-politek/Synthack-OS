@@ -1,0 +1,38 @@
+// SY CHORD wave pictures: where the 128 on-screen pictures live inside the raw (decompressed)
+// MAIN OS section (section 3) of Syntakt OS 1.41. Found by static analysis on 2026-09-22 and
+// checked by rendering the pixels. Offsets are into the DECOMPRESSED section, not the file.
+//
+// Each picture is 17x17 px, 1 bpp, 17 rows x 4 bytes = 68 bytes. 128 WAVE values share 125
+// blocks in one contiguous run; three values reuse another value's block. For those three the
+// firmware holds a 4-byte pointer in code (`OPERANDS`) that a mod repoints to the block of the
+// neighbouring value, so every value keeps a picture of its own shape.
+export const PICTURE_BYTES = 68;
+export const BLOCK_REGION = { start: 0x31e7a8, end: 0x3208dc }; // 125 blocks
+/** value (0..127) -> offset of its 68-byte block in the raw section. */
+export const BLOCK_OF_VALUE = [
+  0x31e7a8, 0x31e7ec, 0x31e830, 0x31e874, 0x31e8b8, 0x31e8fc, 0x31e940, 0x31e984,
+  0x31e9c8, 0x31ea0c, 0x31ea50, 0x31ea94, 0x31ead8, 0x31eb1c, 0x31eb60, 0x31eba4,
+  0x31ebe8, 0x31ec2c, 0x31ec70, 0x31ecb4, 0x31ecf8, 0x31ed3c, 0x31ed80, 0x31edc4,
+  0x31ee08, 0x31ee4c, 0x31ee90, 0x31eed4, 0x31ef18, 0x31ef5c, 0x31efa0, 0x31efe4,
+  0x31f028, 0x31f06c, 0x31f0b0, 0x31f0f4, 0x31f138, 0x31f17c, 0x31f1c0, 0x31f204,
+  0x31f248, 0x31f28c, 0x31f2d0, 0x31f314, 0x31f358, 0x31f39c, 0x31f3e0, 0x31f424,
+  0x31f468, 0x31f4ac, 0x31f4f0, 0x31f534, 0x31f578, 0x31f5bc, 0x31f600, 0x31f644,
+  0x31f688, 0x31f6cc, 0x31f710, 0x31f754, 0x31f798, 0x31f7dc, 0x31f820, 0x31f864,
+  0x31f8a8, 0x31f8ec, 0x31f930, 0x31f974, 0x31f9b8, 0x31f9fc, 0x31fa40, 0x31fa84,
+  0x31fac8, 0x31fb0c, 0x31fb50, 0x31fb94, 0x31fbd8, 0x31fc1c, 0x31fc60, 0x31fca4,
+  0x31fce8, 0x31fd2c, 0x31fd70, 0x31fdb4, 0x31fdf8, 0x31fe3c, 0x31fe80, 0x31fec4,
+  0x31ff08, 0x31ff4c, 0x31ff90, 0x31ffd4, 0x320018, 0x32005c, 0x3200a0, 0x31f39c,
+  0x3200e4, 0x320128, 0x32016c, 0x3201b0, 0x3201f4, 0x320238, 0x32027c, 0x3202c0,
+  0x320304, 0x320348, 0x32038c, 0x3203d0, 0x320414, 0x320458, 0x32049c, 0x3204e0,
+  0x320524, 0x320568, 0x3205ac, 0x3205f0, 0x320634, 0x320678, 0x3206bc, 0x320700,
+  0x320744, 0x320788, 0x3207cc, 0x320810, 0x320854, 0x320898, 0x320854, 0x320854,
+];
+/** Values whose block is shared with another value, the offset of the 4-byte big-endian pointer
+ *  that selects their block, and the value whose block they should show instead. */
+export const OPERANDS = [
+  { value: 95, pointer: 0x13772a, showValue: 94 },
+  { value: 124, pointer: 0x137a58, showValue: 123 },
+  { value: 126, pointer: 0x137a90, showValue: 125 },
+];
+/** Virtual address the pointers are expressed in: pointer value = SECTION_BASE + block offset. */
+export const SECTION_BASE = 0x40000400;
