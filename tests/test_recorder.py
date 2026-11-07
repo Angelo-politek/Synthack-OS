@@ -40,7 +40,7 @@ def test_idle_costs_almost_nothing():
         m.run()
         m.fast(4)
         return m.run().n
-    a = cost(["sfcore", "long-samples", "sampler", "idspace"], uses=["sfcore:main_mix", "sfcore:fs", "sfcore:view"])
+    a = cost(["sfcore", "long-samples", "sampler", "idspace"], uses=["sfcore:main_mix", "sfcore:fs", "sfcore:pages"])
     b = cost(["recorder"])
     print("istruzioni:", a, b)
     assert b - a <= 60

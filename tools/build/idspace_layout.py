@@ -18,6 +18,7 @@ FIRST, N = 505, 569              # id delle mod: 505..568
 N_EXT = N - FIRST
 CODE = L.RAM + 0x3_E000          # codice (immagine)
 OBJ_ENTRY = CODE                 # jmp ids_obj32: oggetto per parametro dell'id 4(sp) -> d0 (indirizzo fisso)
+PAGE_HOOK = CODE + 8             # u32: funzione (indice) -> elemento di pagina o 0, chiesta per prima (sfcore: POLY)
 EXT = L.RAM + 0x3_EA00           # descrittori sorgente delle mod (immagine): 64 x 52 B
 OBJDEF = L.RAM + 0x3_F700        # definizioni degli oggetti (immagine): 64 x 16 B
 PAGEDEF = L.RAM + 0x3_FB00       # pagine in piu' (immagine): 4 x 44 B

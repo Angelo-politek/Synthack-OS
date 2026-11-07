@@ -107,7 +107,7 @@ def main() -> None:
     spec = {
         "name": "recorder", "os": "1.42",
         "requires": ["modarea", "sfcore", "long-samples", "sampler", "idspace"],
-        "uses": ["sfcore:main_mix", "sfcore:fs", "sfcore:view"],
+        "uses": ["sfcore:main_mix", "sfcore:fs", "sfcore:pages"],
         "description": "Registratore di Synfact (recorder-st): doppio SOUND apre la vista; ripresa mono a 48 kHz fino "
                        "a 60 s, rifilo, normalizzazione, salvataggio tra i campioni lunghi, subito suonabile.",
         "license": "GPL-2.0-or-later", "credits": "Synfact (GSM1980), elekloader (irpina)",

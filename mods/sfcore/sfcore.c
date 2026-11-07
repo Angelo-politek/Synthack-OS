@@ -20,7 +20,7 @@ extern const struct st_smz_module *const sfcore_modules[SLOTS];  /* registry: SF
 
 /* ---- event lists, read by the adapters (adapters.S). Zero-terminated. */
 u32 ev_tick[CAP],ev_draw[CAP],ev_key[CAP],ev_enc[CAP],ev_render_in[CAP],ev_main_mix[CAP],ev_fs_write[CAP],
-    ev_fs_written[CAP],ev_native[CAP],ev_view_draw[CAP];    /* ev_view_draw: ST_EV_DRAW | ST_EV_VIEW */
+    ev_fs_written[CAP],ev_native[CAP];
 static u32 *const lists[ST_EV_COUNT]={ev_tick,ev_draw,ev_key,ev_enc,0,ev_render_in,0,0,ev_fs_write,ev_fs_written,
     ev_main_mix,ev_native};
 
@@ -30,6 +30,29 @@ u32 sfcore_status[SLOTS],sfcore_bound,sfcore_subscriptions;
 
 extern u32 sfcore_irq_off(void);
 extern void sfcore_irq_on(u32);
+
+/* ---- view contexts (Synfact modules.c core_event_view). A DRAW/KEY/ENC subscription with ST_EV_VIEW sits in the
+ * same list with the top bit set (the global adapters skip it); ST_EV_PRE (KEY only) adds bit 0. Called by the
+ * page adapters of the service sfcore:pages (adapters.S), installed only when a mod of the build uses it. */
+#define VIEW_ENTRY 0x80000000u
+extern void core_view_draw(void);
+static u32 core_pages_installed(void)
+{
+    return *(const volatile unsigned short *)0x401009f4u==0x4ef9u &&
+           *(const volatile u32 *)0x401009f6u==(u32)core_view_draw;
+}
+int core_event_view(u32 event,void *view,void *data,u32 id)
+{
+    const u32 *p=lists[event];u32 fn;int taken;
+    while((fn=*p++))if(fn&VIEW_ENTRY){
+        if(event==ST_EV_KEY && !!(fn&1u)!=(id==1))continue;
+        if(event==ST_EV_ENC || (event==ST_EV_KEY && id==1)){
+            taken=((int (*)(void *,void *,u32))(fn&~(VIEW_ENTRY|1u)))(view,data,id);
+            if(taken)return taken;
+        }else ((void (*)(void *,void *,u32))(fn&~VIEW_ENTRY))(view,data,id);
+    }
+    return 0;
+}
 
 /* ---- native transactions (Synfact native.c, modules.c) */
 #define NATIVE_WORDS ((ST_NATIVE_OPERATION_LIMIT+3)/4)
@@ -88,7 +111,8 @@ extern u32 core_stock_trig(u32,u32,u32,u32,u32,u32);
 extern u32 core_stock_enqueue(u32,u32);
 extern u32 core_stock_header_load(u32,u32);
 extern void core_stock_header_reset(u32,u32);
-/* PAGE_LAYOUT has no adapter yet (LFO3/POLY pages): no override. */
+/* the OS's page element for index < 37 (0x4007BA48 without the hooks: idspace owns that site) */
+static u32 core_stock_page_layout(u32 index){return index<37u?0x41BA03C8u+44u*index:0;}
 __attribute__((noinline)) u32 core_native_original(u32 op,const u32 *a)
 {
     switch(op){
@@ -97,6 +121,7 @@ __attribute__((noinline)) u32 core_native_original(u32 op,const u32 *a)
     case ST_NATIVE_TYPE:return (u32)(int)*(const signed char *)a[0];
     case ST_NATIVE_HEADER_LOAD:return core_stock_header_load(a[0],a[1]);
     case ST_NATIVE_HEADER_RESET:core_stock_header_reset(a[0],a[1]);return 0;
+    case ST_NATIVE_PAGE_LAYOUT:return core_pages_installed()?core_stock_page_layout(a[0]):0;
     case ST_NATIVE_SOUND_ALLOWED:case ST_NATIVE_MACHINE_ALLOWED:return 1;
     case ST_NATIVE_PAGE_NAV:return 0xffffffffu;
     default:return 0;
@@ -120,6 +145,17 @@ u32 core_native_view(u32 op,void *view,u32 other)
     if(v && (op==ST_NATIVE_PAGE_SYNC || op==ST_NATIVE_PAGE_NAV) && *(u32 *)view!=v)
         return core_native_original(op,a);
     return core_native(op,a);
+}
+/* ---- page adapters (Synfact machine-pages.c, machine-ui.c), without the SMZ machines: notifications only. */
+void core_page_sync(void *view){core_native_view(ST_NATIVE_PAGE_SYNC,view,0);}
+u32 core_page_begin(void *view){core_native_view(ST_NATIVE_PAGE_BEGIN,view,0);return 0;}
+void core_page_end(u32 old){(void)old;core_native_view(ST_NATIVE_PAGE_END,0,0);}
+u32 core_page_layout_override(u32 id){return id==3?core_native(ST_NATIVE_PAGE_LAYOUT,&id):0;}   /* 37.. idspace */
+/* One gate before any module encoder: native page guards (POLY slaves), then the ENC view context. */
+int core_editor_event(void *view,void *event,u32 id)
+{
+    if(core_native_view(ST_NATIVE_PAGE_GUARD,view,0))return 1;
+    return core_event_view(ST_EV_ENC,view,event,id);
 }
 
 /* ---- parameter provider (host API 7). Called by the Sound setter adapter (query 24) for the LFO3 engine IDs.
@@ -148,7 +184,6 @@ static void pool_write(u8 *out,const u16 *in){(void)out;(void)in;}
 static int pool_ready(void){return 0;}
 static int pool_apply(const u16 *before){(void)before;return -1;}
 static void preview_stop(void){}
-static int view_event(u32 event,void *view,void *data,u32 id){(void)event;(void)view;(void)data;(void)id;return 0;}
 static void clock_snapshot(u32 *out){out[0]=CORE_NATIVE_TIMER();out[1]=out[2]=0;}
 static void additem(void *menu,const void *item){(void)menu;(void)item;}
 static const u32 zero[8];
@@ -156,7 +191,7 @@ static u32 query_owner;
 static const u8 core_info[40+1]={'s','f','c','o','r','e'};   /* one record: id "sfcore", version "1.0" */
 static const u8 *const bank_info=0;
 static struct st_machine_host_api host={
-    12,0,0,0,crc_bits,pool_read,pool_write,pool_ready,pool_apply,preview_stop,view_event,clock_snapshot,additem,
+    12,0,0,0,crc_bits,pool_read,pool_write,pool_ready,pool_apply,preview_stop,core_event_view,clock_snapshot,additem,
     zero,&query_owner,core_native_original,(const volatile u32 *)zero,core_native_profile,core_native_interest_set,
     core_native_page_view_set,core_parameter_provider_set,{core_native},0,core_info,&bank_info};
 const struct st_machine_host_api *const sfcore_host=&host;
@@ -180,19 +215,22 @@ static u32 bind(const struct st_smz_module *m)
     for(e=0;e<ST_EV_COUNT;e++)add[e]=0;
     for(j=0;j<m->count;j++){
         u32 ev=m->subscriptions[j].event;e=ST_EV_INDEX(ev);
-        if(ev==(ST_EV_DRAW|ST_EV_VIEW))continue;     /* view draw: its own list (ev_view_draw) */
-        if(e>=ST_EV_COUNT || !lists[e] || ev&(ST_EV_VIEW|ST_EV_PRE))return 3;   /* other contexts: not yet */
+        if(e>=ST_EV_COUNT || !lists[e])return 3;
+        /* view contexts: DRAW/KEY/ENC, pre-native for KEY only, with the page adapters in the build */
+        if(ev&(ST_EV_VIEW|ST_EV_PRE)){
+            if(e<ST_EV_DRAW || e>ST_EV_ENC || (ev&ST_EV_PRE && e!=ST_EV_KEY) || !core_pages_installed())return 3;
+            if(api.version<2)api.version=2;
+        }
         add[e]++;
-        if(e==ST_EV_NATIVE)api.version=3;
+        if(e==ST_EV_NATIVE || ev&ST_EV_PRE)api.version=3;
     }
     for(e=0;e<ST_EV_COUNT;e++)if(add[e] && length(lists[e])+add[e]>=CAP)return 4;
     if(m->init && (u32)m->init!=0xffffffffu && m->init(&api))return 2;
     for(j=0;j<m->count;j++){
-        u32 *l=m->subscriptions[j].event==(ST_EV_DRAW|ST_EV_VIEW)?ev_view_draw:lists[ST_EV_INDEX(m->subscriptions[j].event)],
-            n=length(l);
-        if(n+1>=CAP)return 4;
+        u32 *l=lists[ST_EV_INDEX(m->subscriptions[j].event)],n=length(l);
         sr=sfcore_irq_off();                    /* the zero after it is already there: one aligned store */
-        l[n]=(u32)m->subscriptions[j].callback;
+        l[n]=(u32)m->subscriptions[j].callback|(m->subscriptions[j].event&ST_EV_VIEW?VIEW_ENTRY:0)|
+             (m->subscriptions[j].event&ST_EV_PRE?1u:0);
         sfcore_irq_on(sr);
         sfcore_subscriptions++;
     }
@@ -208,6 +246,9 @@ void sfcore_bind(void)
     if(ls_header_at[0]==LS_MAGIC){
         host.storage=&ls_native_io;host.hz_open=ls_hz_open;host.hz_close=ls_hz_close;host.crc_update=ls_crc_update;
     }
+    /* idspace (its fixed entry jmp at IDS_CODE) asks core_page_layout_override first when the page services exist */
+    if(*(const volatile unsigned short *)IDS_CODE==0x4ef9u && core_pages_installed())
+        *(volatile u32 *)(IDS_CODE+8u)=(u32)core_page_layout_override;
     for(i=0;i<SLOTS;i++)if(sfcore_modules[i])sfcore_status[i]=bind(sfcore_modules[i]);
     native_publish();
 }

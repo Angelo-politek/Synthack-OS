@@ -1,0 +1,25 @@
+Synfact (https://github.com/GSM1980/synfact-dev), commit 1a6d0c74469db4c30423be29c90e0b07ba7f8003, mods/poly-st
+(poly-st 1.0). GPL-2.0-or-later, GSM1980 and contributors, on elekloader by irpina.
+
+Changes for SyntHack on OS 1.42:
+- OS 1.41 addresses translated with tools/build/port_source.py 1.42 (87). The four ASCII command tags ('COPY',
+  'CFG1', 'CFG2', 'ANLG') look like addresses and were put back by hand.
+- Lines marked "SyntHack:": the code limit 0x40338600 (unmapped) is 0x40339740 on 1.42; OS calls that return a
+  pointer take it as u32 (m68k-linux-gnu-gcc reads pointers from a0, the OS returns them in d0); digital tracks
+  only: no analog groups, no imported analog kernels (Synfact's guards.s is not in its public sources).
+
+sha256 of the upstream files (LF line ends), before the changes:
+main.c              ee0fe9a479d8e0c8612b79010603ea1062836a29d6b116a694a2efd61ce78a40
+native.s            c4bbbc7301e0d7648f48c6bb8d60abf0c4e5ffbcf314742e567ffac61d4829d3
+poly_codec.c        62cf3ca5e409f1e2b6624fa4d7a4abbe4bdf27a35319d165310a29d0c4f6a222
+poly_copy.c         048fe472133993f5a0489e392001bd9ed0ee5435db1d9cb6d943000f813c45e1
+poly_core.c         1849eed97bbc99cd8ebd1b0eacf4dcbdc493792525baccfa449254397b71a1fd
+poly_event.c        3b06dd4b2b3edee382e2042af3563e772ccd3eee8c69f7576dbbbaefc5693301
+poly_groups.c       29e473fec63a15d6b51b81beea8ef1b51b1027aeec999982f3dcd8cf6d110054
+poly_pattern.c      c503a5afda21197951d627f849378a7a5b2e60bf7b16e843e1b6c852035669d1
+poly_play.c         dc71f514af45dc27afc79fb853d039e5eca113e00d645b9258d62b6f1fc6ad13
+poly_publication.c  55671a510144abef6a1acc5f292a1192896841672b4adafd4e454ff9af9d4220
+poly_sequence.c     568a61268f778df26bd4665f8078655fb8d39552891b67b1658167eb2b6a76fd
+poly_type.c         de148e7c0b7597059dc719597098eeb632bb4080a26281edcc25d41b09338ff3
+poly_ui.c           3e61477755dc4e523bf111cbabff2191a62d3348377bca6ea3fcaf3e4cd48228
+publication.s       b6f30f056ce165a7cdf0f6ee858c636d60d454225ec1e9b01520e7771d0494e6

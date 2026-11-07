@@ -58,6 +58,7 @@ core_draw:
         lea     ev_draw,%a2
 1:      move.l  (%a2)+,%d0
         beq.s   2f
+        bmi.s   1b                              | view-context entry: core_view_draw calls it
         move.l  8(%sp),-(%sp)
         move.l  16(%sp),-(%sp)
         movea.l %d0,%a0
@@ -66,32 +67,6 @@ core_draw:
         bra.s   1b
 2:      movea.l (%sp)+,%a2
         rts
-
-| ---- ev_draw with ST_EV_VIEW (Synfact view-draw.s): after each native view of the stack draws itself
-| (0x401009F2 jsr (a0): view a4, bitmap d3), in place of move.l a4,-(sp) ; jsr (a5) ; movea.l (a3),a3 (0x401009F4,
-| 1.41 0x40100830). Handlers f(view, bitmap, 0). Service sfcore:view.
-        .globl  core_view_draw
-core_view_draw:
-        lea     -16(%sp),%sp
-        movem.l %d0-%d1/%a0-%a1,(%sp)
-        move.l  %a2,-(%sp)
-        lea     ev_view_draw,%a2
-1:      move.l  (%a2)+,%d0
-        beq.s   2f
-        clr.l   -(%sp)
-        move.l  %d3,-(%sp)
-        move.l  %a4,-(%sp)
-        movea.l %d0,%a0
-        jsr     (%a0)
-        lea     12(%sp),%sp
-        bra.s   1b
-2:      movea.l (%sp)+,%a2
-        movem.l (%sp),%d0-%d1/%a0-%a1
-        lea     16(%sp),%sp
-        move.l  %a4,-(%sp)
-        jsr     (%a5)
-        movea.l (%a3),%a3
-        jmp     0x401009FA
 
 | ---- ev_key: at KEYDISP 0x4000839E (Synfact: its call 0x4000B420), lea -16(sp),sp; movem.l d2-d3/a2-a3,(sp)
 | moved here. (sp) ret, 4 brain, 8 event. Handlers f(brain, event) -> nonzero consumes (no stock after it).
@@ -124,6 +99,7 @@ core_enc:
 dispatch:
 1:      move.l  (%a2)+,%d0
         beq.s   2f
+        bmi.s   1b                              | view-context entry: the page adapters call it
         move.l  16(%sp),-(%sp)
         move.l  16(%sp),-(%sp)
         movea.l %d0,%a0
@@ -468,3 +444,159 @@ note_stock:
         jmp     0x400A42BC
 note_consumed:
         jmp     0x400A4796
+
+| ================= pages and view contexts (Synfact machine-pages.s, machine-ui.s, view-draw.s): service
+| sfcore:pages. UI task only. Without Synfact's SMZ machines: the native PAGE_* operations and the view contexts
+| of DRAW/KEY/ENC (ST_EV_VIEW, ST_EV_PRE) only. Addresses below 0x4004DAEE are the same on 1.41 and 1.42.
+
+| PAGE_NAV 0x40037D9E (view, knob): a subscriber's control ID, or the stock one.
+        .globl  core_page_nav
+core_page_nav:
+        move.l  8(%sp),-(%sp)
+        move.l  8(%sp),-(%sp)
+        pea     10
+        jsr     core_native_view
+        lea     12(%sp),%sp
+        cmpi.l  #-1,%d0
+        beq.s   1f
+        rts
+1:      move.l  %d2,-(%sp)
+        moveq   #8,%d0
+        movea.l 8(%sp),%a0
+        jmp     0x40037DA6
+
+| Page mutations (copy, paste, clear, reload...): PAGE_GUARD may consume one; PAGE_BEGIN/END around the stock
+| body, so PAGE_LAYOUT knows the view.
+        .macro  PAGEOP  addr,cont,b0,b1,b2,b3,b4,b5,b6,b7,b8=,b9=
+        .globl  core_page_\addr
+core_page_\addr:
+        pea     0
+        move.l  8(%sp),-(%sp)
+        pea     14
+        jsr     core_native_view
+        lea     12(%sp),%sp
+        tst.l   %d0
+        beq.s   8f
+        moveq   #1,%d0
+        rts
+8:      move.l  %a2,-(%sp)
+        move.l  8(%sp),-(%sp)
+        jsr     core_page_begin
+        addq.l  #4,%sp
+        movea.l %d0,%a2
+        move.l  12(%sp),-(%sp)
+        move.l  12(%sp),-(%sp)
+        bsr.s   9f
+        addq.l  #8,%sp
+        move.l  %d0,-(%sp)
+        move.l  %a2,-(%sp)
+        jsr     core_page_end
+        addq.l  #4,%sp
+        move.l  (%sp)+,%d0
+        movea.l (%sp)+,%a2
+        rts
+9:      .byte   \b0,\b1,\b2,\b3,\b4,\b5,\b6,\b7
+        .ifnb   \b8
+        .byte   \b8,\b9
+        .endif
+        jmp     \cont
+        .endm
+        PAGEOP  385dc,0x400385E6,0x2f,0x0a,0x70,0xff,0x2f,0x02,0x24,0x6f,0x00,0x0c
+        PAGEOP  38642,0x4003864C,0x4f,0xef,0xff,0xf4,0x70,0xff,0x48,0xd7,0x04,0x0c
+        PAGEOP  3b1f0,0x4003B1F8,0x4e,0x56,0xff,0xf0,0x70,0xff,0x2f,0x0a
+        PAGEOP  3b29e,0x4003B2A6,0x4e,0x56,0xff,0xf0,0x70,0xff,0x2f,0x0a
+        PAGEOP  3b3b8,0x4003B3C0,0x4e,0x56,0xff,0xf0,0x70,0xff,0x2f,0x0a
+
+| 0x4003A244 (view, arg): PAGE_SYNC first.
+        .globl  core_page_3a244
+core_page_3a244:
+        move.l  4(%sp),-(%sp)
+        jsr     core_page_sync
+        addq.l  #4,%sp
+        move.l  8(%sp),-(%sp)
+        move.l  8(%sp),-(%sp)
+        bsr.s   1f
+        addq.l  #8,%sp
+        rts
+1:      lea     -80(%sp),%sp
+        movem.l %d2-%d7/%a2-%a6,(%sp)
+        jmp     0x4003A24C
+
+| ParameterView key 0x4003BC74 (view, event): pre-native KEY context (consuming), PAGE_SYNC, stock, post-native
+| KEY context.
+        .globl  core_page_key
+core_page_key:
+        pea     1
+        move.l  12(%sp),-(%sp)
+        move.l  12(%sp),-(%sp)
+        pea     2
+        jsr     core_event_view
+        lea     16(%sp),%sp
+        tst.l   %d0
+        beq.s   7f
+        moveq   #1,%d0
+        rts
+7:      move.l  4(%sp),-(%sp)
+        jsr     core_page_sync
+        addq.l  #4,%sp
+        move.l  8(%sp),-(%sp)
+        move.l  8(%sp),-(%sp)
+        bsr.s   1f
+        addq.l  #8,%sp
+        move.l  %d0,-(%sp)
+        clr.l   -(%sp)
+        move.l  16(%sp),-(%sp)
+        move.l  16(%sp),-(%sp)
+        pea     2
+        jsr     core_event_view
+        lea     16(%sp),%sp
+        move.l  (%sp)+,%d0
+        rts
+1:      link    %a6,#-88
+        movem.l %d2-%d7/%a2-%a5,(%sp)
+        jmp     0x4003BC7C
+
+| Page layout 0x4007BA48 (index -> element): owned by idspace (mods/idspace, its pages 37..40), which asks sfcore
+| first through its hook slot (sfcore.c, core_page_layout_override: PAGE_LAYOUT for page 3, POLY's TRIG page).
+
+| View draw 0x401009F4 (1.41 0x40100830): DRAW view context after each complete view (a4), bitmap in d3.
+        .globl  core_view_draw
+core_view_draw:
+        lea     -16(%sp),%sp
+        movem.l %d0-%d1/%a0-%a1,(%sp)
+        clr.l   -(%sp)
+        move.l  %d3,-(%sp)
+        move.l  %a4,-(%sp)
+        pea     1
+        jsr     core_event_view
+        lea     16(%sp),%sp
+        movem.l (%sp),%d0-%d1/%a0-%a1
+        lea     16(%sp),%sp
+        move.l  %a4,-(%sp)
+        jsr     (%a5)
+        movea.l (%a3),%a3
+        jmp     0x401009FA
+
+| Encoder resolver 0x4003B8C6 (1.41 same): after the view's own resolver (id in d0; view a2, event d4), PAGE_GUARD
+| and the ENC view context. Consumed: return 1 from the encoder handler 0x4003B870 (link a6,#-72).
+        .globl  core_editor_resolve
+core_editor_resolve:
+        movea.l 0xBC(%a0),%a0
+        move.l  8(%sp),-(%sp)
+        move.l  8(%sp),-(%sp)
+        jsr     (%a0)
+        addq.l  #8,%sp
+        move.l  %d0,-(%sp)
+        move.l  %d0,-(%sp)
+        move.l  %d4,-(%sp)
+        move.l  %a2,-(%sp)
+        jsr     core_editor_event
+        lea     12(%sp),%sp
+        tst.l   %d0
+        bne.s   1f
+        move.l  (%sp)+,%d0
+        rts
+1:      movem.l -72(%a6),%d2-%d7/%a2-%a5
+        unlk    %a6
+        moveq   #1,%d0
+        rts

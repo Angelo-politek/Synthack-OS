@@ -46,7 +46,7 @@ MODAREA = [
     (0x26000, 0x2A000, "lfo3", "third LFO (Synfact port): engine (source of the SRAM copy), page, actions"),
     (0x2A000, 0x32000, "xstore", "planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks)"),
     (0x32000, 0x38000, "arp", "planned: arpeggiator (cells in the OS heap)"),
-    (0x38000, 0x3E000, "poly", "planned: POLY with its native kernels"),
+    (0x38000, 0x3E000, "poly", "POLY (Synfact port): groups, voice allocation, TRIG page 3 (GPL-2.0-or-later)"),
     (0x3E000, 0x3FFF0, "idspace", "code; descriptors, object definitions and pages the mods write (idspace_layout)"),
     # 512 KB area from 2026-11-06: the second half is runtime RAM only (zeroed by the loader)
     (0x40000, 0x4C000, "idspace", "runtime: descriptor table copy (569 x 52 B), mod parameter objects, packed LFO DEST rows (+0xA000)"),
@@ -55,7 +55,7 @@ MODAREA = [
 ]
 
 # ---- mod con spazio prenotato ma non ancora scritte (port di Synfact, piano 2026-11-05): ammesse come proprietarie
-PLANNED = {"xstore", "arp", "poly"}
+PLANNED = {"xstore", "arp"}
 
 # ---- tabella dei moduli di sfcore (area mod + SFCORE_TABLE): posto -> mod. sfcore li inizializza in quest'ordine.
 SFCORE_TABLE, SFCORE_N = 0x1B000, 8

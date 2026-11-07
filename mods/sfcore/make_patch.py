@@ -25,6 +25,7 @@ REPO = HERE.parents[1]
 sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
 import modarea_layout  # noqa: E402
+import idspace_layout as IDS  # noqa: E402
 import registry  # noqa: E402
 
 LOAD = 0x4000_0400
@@ -33,11 +34,11 @@ OFFSET, END = next((a, b) for a, b, who, _ in registry.MODAREA if who == "sfcore
 CODE_BASE = modarea_layout.RAM + OFFSET
 SLOT = next(s for s, who in registry.BOOT_SLOTS.items() if who == "sfcore")
 TOOLS = "~/tools/m68k/root"
-CFLAGS = ("-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -fno-jump-tables "
+CFLAGS = (f"-DIDS_CODE={IDS.CODE:#x}u " "-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -fno-jump-tables "
           "-fno-tree-loop-distribute-patterns -Iinclude -Wall -Wextra -Wno-unused-parameter")
 NOP = b"\x4e\x71"
-UI, RENDER, MIX, FS, NATIVE = None, "sfcore:render_in", "sfcore:main_mix", "sfcore:fs", "sfcore:native"
-VIEW = "sfcore:view"
+UI, RENDER, MIX, FS, NATIVE, PAGES = (None, "sfcore:render_in", "sfcore:main_mix", "sfcore:fs", "sfcore:native",
+                                      "sfcore:pages")
 # un servizio per operazione dove una mod ne usa una sola: lfo3 vuole l'operazione LFO (interrupt) e il setter del
 # Sound (interfaccia), non gli altri 11 adattatori (~900 cicli a blocco anche senza iscritti)
 LFO, SOUND_SET = "sfcore:lfo", "sfcore:sound_set"
@@ -47,7 +48,6 @@ SITES = [
     (0x4000_A286, "4eb940100992", "jsr", "core_draw", UI, "ev_draw: sopra ogni schermata composta"),
     (0x4000_839E, "4feffff048d70c0c", "jmp", "core_key", UI, "ev_key: ingresso del dispatcher dei tasti (dopo perf-fx)"),
     (0x4000_B468, "4eb9400083f0", "jsr", "core_enc", UI, "ev_enc: dispatcher degli encoder"),
-    (0x4010_09F4, "2f0c4e952653", "jmp", "core_view_draw", VIEW, "ev_draw (vista): dopo il disegno di ogni vista"),
     (0x400A_38D6, "203c7fffffff", "jmp", "core_render_in", RENDER, "ev_render_in: interrupt audio, dopo il prologo"),
     (0x4008_FB86, "487980003950", "jsr", "core_main_mix", MIX, "ev_main_mix: bus del master (dopo fx3)"),
     (0x400B_620C, "266e000c280e", "jmp", "core_fs_write", FS, "ev_fs_write: Data RPC, dopo il prologo (dopo long-samples)"),
@@ -65,6 +65,17 @@ SITES = [
     (0x4009_7B74, "4fefffc448d77cfc", "jmp", "core_native_modulation", NATIVE, "MODULATION"),
     (0x4011_942A, "4fefffc048d77cfc", "jmp", "core_native_lfo", LFO, "LFO"),
     (0x400A_42B6, "202a00247201", "jmp", "core_native_note_accept", NATIVE, "NOTE_ACCEPT"),
+    # pagine e contesti di vista (Synfact machine-pages.s, machine-ui.s, view-draw.s): solo interfaccia
+    (0x4003_7D9E, "2f027008206f0008", "jmp", "core_page_nav", PAGES, "PAGE_NAV: id del controllo per manopola"),
+    (0x4003_85DC, "2f0a70ff2f02246f000c", "jmp", "core_page_385dc", PAGES, "azione di pagina: GUARD, BEGIN/END"),
+    (0x4003_8642, "4feffff470ff48d7040c", "jmp", "core_page_38642", PAGES, "azione di pagina: GUARD, BEGIN/END"),
+    (0x4003_A244, "4fefffb048d77cfc", "jmp", "core_page_3a244", PAGES, "pagina: PAGE_SYNC"),
+    (0x4003_B1F0, "4e56fff070ff2f0a", "jmp", "core_page_3b1f0", PAGES, "azione di pagina: GUARD, BEGIN/END"),
+    (0x4003_B29E, "4e56fff070ff2f0a", "jmp", "core_page_3b29e", PAGES, "azione di pagina: GUARD, BEGIN/END"),
+    (0x4003_B3B8, "4e56fff070ff2f0a", "jmp", "core_page_3b3b8", PAGES, "azione di pagina: GUARD, BEGIN/END"),
+    (0x4003_BC74, "4e56ffa848d73cfc", "jmp", "core_page_key", PAGES, "tasti della ParameterView: KEY prima e dopo"),
+    (0x4010_09F4, "2f0c4e952653", "jmp", "core_view_draw", PAGES, "DRAW nel contesto della vista"),
+    (0x4003_B8C6, "206800bc4e90", "jsr", "core_editor_resolve", PAGES, "encoder: PAGE_GUARD e ENC nel contesto"),
 ]
 # simboli di long-samples (stesso codice di Synfact): storage, HZFS, CRC. Usati solo se la sua intestazione c'e'.
 LS = {"ls_header_at": "ls_header", "ls_native_io": "core_hzfs_native_io", "ls_hz_open": "core_hzfs_open",

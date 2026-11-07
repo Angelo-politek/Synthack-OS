@@ -33,7 +33,7 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x00026000` | `0x0002a000` | lfo3 | third LFO (Synfact port): engine (source of the SRAM copy), page, actions |
 | `0x0002a000` | `0x00032000` | xstore | planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks) |
 | `0x00032000` | `0x00038000` | arp | planned: arpeggiator (cells in the OS heap) |
-| `0x00038000` | `0x0003e000` | poly | planned: POLY with its native kernels |
+| `0x00038000` | `0x0003e000` | poly | POLY (Synfact port): groups, voice allocation, TRIG page 3 (GPL-2.0-or-later) |
 | `0x0003e000` | `0x0003fff0` | idspace | code; descriptors, object definitions and pages the mods write (idspace_layout) |
 | `0x0003fff0` | `0x00040000` | **free** |  |
 | `0x00040000` | `0x0004c000` | idspace | runtime: descriptor table copy (569 x 52 B), mod parameter objects, packed LFO DEST rows (+0xA000) |
@@ -44,7 +44,7 @@ Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 
 
 sfcore module table (`+0x1b000`, 8 pointers, initialized in this order): slot 0 modulation-skip, slot 1 xstore, slot 2 recorder, slot 3 lfo3, slot 4 arp, slot 5 poly.
 
-Planned (space claimed, code not written yet): arp, poly, xstore.
+Planned (space claimed, code not written yet): arp, xstore.
 
 ## SRAM (CPU #1, internal: never a cache miss)
 

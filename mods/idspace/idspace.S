@@ -11,9 +11,12 @@
         .text
 | ---- fixed entry at CODE + 0 (idspace_layout.OBJ_ENTRY): the mods call the object lookup through it, so the
 | addresses inside idspace can move without rebuilding them
-        .globl  ids_entry
+        .globl  ids_entry, ids_page_hook
 ids_entry:
         jmp     ids_obj32
+        .word   0
+ids_page_hook:                                  | CODE + 8: u32 (*)(u32 index), 0 = none (sfcore: POLY's page 3)
+        .long   0
 | ---- boot list (before the static constructors): the OS's 505 descriptors, then the mods' (empty: as id 0)
         .globl  ids_boot
 ids_boot:
@@ -156,7 +159,16 @@ ids_obj52:
 | ---- 0x4007BA48: page element of index 4(sp); PAGE_FIRST.. are the mods' (PAGEDEF)
         .globl  ids_page
 ids_page:
-        move.l  4(%sp),%d0
+        move.l  ids_page_hook,%d0               | first the hook: an element, or 0
+        beq.s   3f
+        move.l  4(%sp),-(%sp)
+        movea.l %d0,%a0
+        jsr     (%a0)
+        addq.l  #4,%sp
+        tst.l   %d0
+        beq.s   3f
+        rts
+3:      move.l  4(%sp),%d0
         moveq   #PAGE_FIRST,%d1
         cmp.l   %d1,%d0
         bcs.s   1f

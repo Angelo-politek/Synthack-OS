@@ -109,6 +109,13 @@
       "project": 0,
       "sec7": 0
     },
+    "poly": {
+      "cpu": 0,
+      "modarea": 24576,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
     "projstore": {
       "cpu": 0,
       "modarea": 512,
