@@ -9,6 +9,11 @@
         .equ    RESULT52,       0x41B9FBCC      | where the OS's +52 lookup leaves its result
 
         .text
+| ---- fixed entry at CODE + 0 (idspace_layout.OBJ_ENTRY): the mods call the object lookup through it, so the
+| addresses inside idspace can move without rebuilding them
+        .globl  ids_entry
+ids_entry:
+        jmp     ids_obj32
 | ---- boot list (before the static constructors): the OS's 505 descriptors, then the mods' (empty: as id 0)
         .globl  ids_boot
 ids_boot:
@@ -33,7 +38,7 @@ ids_boot:
         movea.l %d0,%a0
         subq.l  #1,%d1
         bne.s   2b
-        rts
+        bra.w   ids_dest_boot                   | then the DEST lists (rts there)
 
 | ---- object of id d1 -> a0 (UI only). OS ids and unknown ids as the OS does (unknown: object 0); mods' ids
 | from OBJDEF, built at the first lookup. Saves everything but a0.
@@ -167,3 +172,143 @@ ids_page:
         muls.l  %d1,%d0
         addi.l  #PAGES,%d0
         rts
+
+| ==== menu DEST degli LFO: 66 voci invece di 33 (due id da 16 bit per parola della lista dell'OS) ============
+        .equ    DEST_STOCK,     0x4022B390      | righe stock: 46 x 33 id (45 machine, poi la FX track)
+        .equ    TYPE_OF,        0x400A5CE4      | gruppo (tipo) di un id: il ciclo del menu e le etichette
+        .equ    MENU_EXIT,      0x4004E672      | fine del ciclo che crea le voci del menu
+
+| ---- avvio (da ids_boot): righe impacchettate = voci stock, ognuna seguita dalle voci DESTX registrate dopo di lei
+        .globl  ids_dest_boot
+ids_dest_boot:
+        lea     -24(%sp),%sp
+        movem.l %d2-%d5/%a2-%a3,(%sp)
+        lea     DEST_STOCK,%a0
+        lea     ROWS,%a1
+        moveq   #0,%d2                          | riga (machine)
+1:      movea.l %a1,%a3                         | inizio della riga
+        moveq   #0,%d3                          | voce stock
+2:      move.l  (%a0)+,%d0
+        move.w  %d0,(%a1)+
+        lea     DESTX,%a2                       | voci registrate dopo questa
+        moveq   #DESTX_N,%d4
+3:      mvz.w   2(%a2),%d0                      | id (0 = vuota)
+        beq.s   4f
+        mvz.b   (%a2),%d1
+        cmp.l   %d2,%d1
+        bne.s   4f
+        mvz.b   1(%a2),%d1
+        cmp.l   %d3,%d1
+        bne.s   4f
+        move.l  %a1,%d5                         | posto nella riga (al massimo DEST_N - 1 voci)
+        sub.l   %a3,%d5
+        cmpi.l  #2*(DEST_N-1),%d5
+        bcc.s   4f
+        move.w  %d0,(%a1)+
+4:      addq.l  #4,%a2
+        subq.l  #1,%d4
+        bne.s   3b
+        addq.l  #1,%d3
+        moveq   #33,%d0
+        cmp.l   %d3,%d0
+        bne.s   2b
+        lea     2*DEST_N(%a3),%a2               | resto della riga: fine
+5:      cmpa.l  %a2,%a1
+        bcc.s   6f
+        move.w  #-1,(%a1)+
+        bra.s   5b
+6:      addq.l  #1,%d2
+        moveq   #DEST_ROWS,%d0
+        cmp.l   %d2,%d0
+        bne.s   1b
+        movem.l (%sp),%d2-%d5/%a2-%a3
+        lea     24(%sp),%sp
+        rts
+
+| ---- 0x400A6598: riga della machine 4(sp) nella lista a0 (0x84 B, ora 66 id da 16 bit); d0 = a0
+        .globl  ids_destcopy
+ids_destcopy:
+        move.l  4(%sp),%d1
+        moveq   #0x2C,%d0
+        cmp.l   %d1,%d0
+        bcc.s   1f
+        moveq   #0x22,%d1                       | come l'OS: machine sconosciuta -> riga vuota
+1:      mulu.w  #2*DEST_N,%d1
+        lea     ROWS,%a1
+        adda.l  %d1,%a1
+        move.l  %a0,%d0
+        moveq   #DEST_N/2,%d1
+2:      move.l  (%a1)+,(%a0)+
+        subq.l  #1,%d1
+        bne.s   2b
+        rts
+
+| ---- 0x400A65D2: (voce 4(sp), machine 8(sp), tipo 12(sp)) -> id interno della voce, -1 se non c'e'
+        .globl  ids_destiid
+ids_destiid:
+        move.l  12(%sp),%d0
+        moveq   #12,%d1
+        cmp.l   %d0,%d1
+        bcs.s   9f
+        beq.s   1f
+        move.l  8(%sp),%d1
+        moveq   #0x2C,%d0
+        cmp.l   %d1,%d0
+        bcs.s   9f
+        bra.s   2f
+1:      moveq   #0x2D,%d1                       | FX track
+2:      move.l  4(%sp),%d0
+        cmpi.l  #DEST_N-1,%d0
+        bhi.s   9f
+        mulu.w  #2*DEST_N,%d1
+        lea     ROWS,%a0
+        adda.l  %d1,%a0
+        mvz.w   (%a0,%d0.l*2),%d1
+        cmpi.l  #0xFFFF,%d1
+        beq.s   9f
+        cmpi.l  #N,%d1
+        bcs.s   3f
+        moveq   #0,%d1
+3:      mulu.w  #52,%d1
+        lea     TABLE,%a0
+        move.l  4(%a0,%d1.l),%d0
+        rts
+9:      moveq   #-1,%d0
+        rts
+
+| ---- 0x4004E55E, ciclo delle voci del menu (al posto di lea TYPE_OF,a3 ; move.l (a0)+,-$310(a6)): la voce dalla
+| lista impacchettata; alla fine della riga esce dal ciclo
+        .globl  ids_destnext
+ids_destnext:
+        lea     TYPE_OF,%a3
+        mvz.w   (%a0)+,%d0
+        cmpi.l  #0xFFFF,%d0
+        beq.s   1f
+        move.l  %d0,-0x310(%a6)
+        rts
+1:      addq.l  #4,%sp
+        jmp     MENU_EXIT
+
+| ---- 0x4004E8A8 (al posto di move.l 4(a2,d0.l*4),-(sp) ; jsr TYPE_OF): la voce d0 della closure a2
+        .globl  ids_dest_e8a8
+ids_dest_e8a8:
+        movea.l (%sp)+,%a1
+        mvz.w   4(%a2,%d0.l*2),%d0
+        move.l  %d0,-(%sp)
+        move.l  %a1,-(%sp)
+        jmp     TYPE_OF
+
+| ---- 0x4004EC0A (al posto di lea (a6,d0.l*4),a0 ; move.l -$84(a0),-(sp) ; jsr TYPE_OF): la voce d0 della lista
+        .globl  ids_dest_ec0a
+ids_dest_ec0a:
+        movea.l (%sp)+,%a1
+        lea     0(%a6,%d0.l*2),%a0
+        mvz.w   -0x84(%a0),%d0
+        move.l  %d0,-(%sp)
+        move.l  %a1,-(%sp)
+        jmp     TYPE_OF
+
+| ---- istruzione per 0x4004E090 (closure del testo della voce): mvz.w 4(a3,d0.l*2),d4 al posto di move.l
+        .globl  ids_op_e090
+ids_op_e090:
+        mvz.w   4(%a3,%d0.l*2),%d4

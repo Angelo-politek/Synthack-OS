@@ -105,3 +105,28 @@ def test_cpu1_cost_per_block(built):
     assert got == tuple(seq[0xE + t * 0x47 + 0x36 + k] for t in range(8) for k in range(8))
     raw = struct.unpack(">80H", uc.mem_read(0x1000_0640, 160))           # le parole della machine, non smussate
     assert raw == tuple(seq[0xE + t * 0x47 + 0x11 + k] for t in range(8) for k in range(10))
+
+
+def test_lfo_dest_on_an_extra_index_modulates_what_the_voice_cpu_gets():
+    """LFO1 con DEST sull'indice 0x37 (RAT3 di SY FM4): il valore in RAM condivisa segue la modulazione (stato
+    dell'LFO +28), dentro 0..0x7F00; gli altri indici e una traccia senza DEST restano come impostati."""
+    import isr
+    m = isr.Isr(["sy-fm4"])
+    eng = lambda t, iid: 0x8000_21B0 + 142 * t + 28 + 2 * iid                      # noqa: E731
+    shared = lambda t, lix: struct.unpack(">H", bytes(m.uc.mem_read(0x1000_0700 + 16 * t + 2 * (lix - 0x36), 2)))[0]  # noqa: E731
+    m.run()
+    for t in (0, 1):
+        m.put16(eng(t, 0x37), 0x4000)
+        m.put16(eng(t, 0x38), 0x1234)
+        for iid, v in ((1, 0x7F00), (2, 0x0B00), (3, 0x4000), (5, 0), (6, 0), (7, 0), (8, 0x7F00)):
+            m.put16(eng(t, iid), v)
+    m.put16(eng(0, 4), 0x3700)                                  # traccia 0: DEST = indice 0x37
+    m.put16(eng(1, 4), 0x7F00)                                  # traccia 1: nessuna DEST
+    seen = set()
+    for _ in range(16):
+        m.fast(8)
+        d = struct.unpack(">i", bytes(m.uc.mem_read(0x444D_B72C + 28, 4)))[0]
+        assert shared(0, 0x37) == max(0, min(0x7F00, 0x4000 + d))
+        assert shared(0, 0x38) == 0x1234 and shared(1, 0x37) == 0x4000
+        seen.add(shared(0, 0x37))
+    assert len(seen) > 8 and max(seen) - min(seen) > 0x4000

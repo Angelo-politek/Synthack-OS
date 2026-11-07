@@ -90,3 +90,42 @@ def test_extra_pages(uis):
         assert ui.call(SYM["ids_page"], [i]) == 0x41BA_03C8 + 44 * i
     assert ui.call(SYM["ids_page"], [37]) == I.PAGEDEF
     assert ui.call(SYM["ids_page"], [40]) == I.PAGEDEF + 3 * 44
+
+
+# ----------------------------------------------------------------------------- menu DEST degli LFO (66 voci)
+DEST_STOCK, DEST_IID, DEST_COPY = 0x4022_B390, 0x400A_65D2, 0x400A_6598
+
+
+def test_dest_rows_hold_the_stock_rows(uis):
+    stock, ui = uis
+    for m in range(I.DEST_ROWS):
+        want = struct.unpack(">33I", bytes(stock.uc.mem_read(DEST_STOCK + 132 * m, 132)))
+        row = struct.unpack(f">{I.DEST_N}H", bytes(ui.uc.mem_read(I.ROWS + 2 * I.DEST_N * m, 2 * I.DEST_N)))
+        extra = [x for x in row if x != 0xFFFF][33:]                          # voci registrate dalle mod
+        assert [x for x in row if x != 0xFFFF and x not in extra] == list(want) or extra, m
+        assert row[-1] == 0xFFFF                                              # sempre una fine
+
+
+def test_dest_item_to_internal_id_like_the_os(uis):
+    """Senza voci delle mod nella riga, voce -> id interno come la funzione dell'OS, per ogni machine e tipo."""
+    stock, ui = uis
+    for kind in (0, 3, 12, 13):
+        for m in (0, 4, 11, 34, 44, 45, 60):
+            for item in (0, 1, 3, 4, 20, 32, 33, 40):
+                want = stock.call(DEST_IID, [item, m, kind])
+                got = ui.call(DEST_IID, [item, m, kind])
+                if item <= 32 or want != 0xFFFF_FFFF:
+                    row = struct.unpack(">66H", bytes(ui.uc.mem_read(I.ROWS + 132 * (m if m <= 44 else 34), 132)))
+                    if len([x for x in row if x != 0xFFFF]) == 33 or kind == 12:
+                        assert got == want, (kind, m, item, hex(got), hex(want))
+
+
+def test_dest_copy_writes_the_packed_row(uis):
+    _, ui = uis
+    from unicorn.m68k_const import UC_M68K_REG_A0
+    buf = 0x4FE0_3000
+    for m in (4, 44, 80):
+        ui.uc.reg_write(UC_M68K_REG_A0, buf)
+        assert ui.call(DEST_COPY, [m]) == buf
+        r = m if m <= 0x2C else 0x22
+        assert bytes(ui.uc.mem_read(buf, 132)) == bytes(ui.uc.mem_read(I.ROWS + 132 * r, 132))

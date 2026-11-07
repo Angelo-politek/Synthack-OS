@@ -25,8 +25,8 @@ MODAREA = [
     (0x4000, 0x5000, "perf-fx", "code and data"),
     (0x5000, 0x5800, "dual-mono", "dualmono2.c; header read by fx3 at +0x5000 (dualmono_layout.py)"),
     (0x5800, 0x6700, "sy-fm4", "main CPU side: pages, algorithm drawings, page 1/3 names"),
-    (0x6700, 0x6D00, "xparams", "table (xparams_layout.TABLE), storage tables, sound loader, shared RAM publisher"),
-    (0x6D00, 0x7000, "cpu-meter", "code and data: audio interrupt load on screen (diagnostic)"),
+    (0x6700, 0x6DC0, "xparams", "table (xparams_layout.TABLE), storage tables, sound loader, shared RAM publisher"),
+    (0x6DC0, 0x7000, "cpu-meter", "code and data: audio interrupt load on screen (diagnostic)"),
     (0x7000, 0x7200, "projstore", "code, then the 256 bytes saved with the project"),
     (0x7200, 0x7400, "kitstore", "code"),
     (0x7400, 0x7420, "modarea", "boot list: 8 pointers, called after unpacking (BOOT_SLOTS)"),
@@ -143,6 +143,9 @@ IDS = {
 }
 
 # ---- pagine dell'interfaccia (indice -> mod) riusate
+# ---- voci in piu' del menu DEST degli LFO (idspace_layout.DESTX): posto -> mod
+DESTX_SLOTS = {**{k: "sy-fm4" for k in range(13)}}
+
 PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 37: ("dual-mono", "IN R in the MIXER tab (idspace page)")}
 
 

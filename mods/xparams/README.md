@@ -19,6 +19,7 @@ The indices are per track: a track has one machine, so two machines can give the
 | Loading | The deserializer's slot loop (`0x400A706A`) calls `xp_load_params`: slots to logical indices, then the registered machine's values if the extra indices are all zero. |
 | p-locks | Lock lanes `0x50`–`0x57` for the extra indices (`0x400A81CA`, `0x400A8336`, read bound `0x400A803E`); `0x400A6D32` maps a lane back. A stock OS drops lanes above `0x46`. |
 | Voice CPU | `0x400A20AE`, the render's wait for eDMA 47; at its first call of the block (return `0x400A4E34`, before the frame transfer: the second, at the end of the interrupt, only waits) a copy of the 8 × 8 extra words to shared RAM `0x700` and of the 8 × 10 machine words, as set, to `0x640` (~230 instructions a block since 2026-11-05, one loop per track: the unrolled copy ran fewer instructions and cost ~4 500 cycles more in cache misses, `tools/emu/cycles.py`). |
+| LFO | The native LFOs keep their modulation in their state (+28 LFO1, +68 LFO2) and the OS applies it only to the indices it knows. Every 8 blocks xparams finds the tracks whose LFO1/LFO2 DEST is an extra index; on those, each block, the value sent is value + modulation, kept in 0..0x7F00 (Synfact's machine-params.c does the same). Nothing more runs when no LFO targets them. The entries reach the DEST menu through [idspace](../idspace). |
 | Boot | `xp_boot` from the mod area's boot list fills the tables before the OS reads a sound. |
 
 `[!]` A project with p-locks on these parameters, opened on a stock OS, loses those locks.

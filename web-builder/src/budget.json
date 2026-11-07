@@ -13,7 +13,7 @@
   "mods": {
     "cpu-meter": {
       "cpu": 800,
-      "modarea": 768,
+      "modarea": 576,
       "kit": 0,
       "project": 0,
       "sec7": 0
@@ -166,8 +166,8 @@
       "sec7": 0
     },
     "xparams": {
-      "cpu": 1700,
-      "modarea": 1536,
+      "cpu": 2100,
+      "modarea": 1728,
       "kit": 0,
       "project": 0,
       "sec7": 0

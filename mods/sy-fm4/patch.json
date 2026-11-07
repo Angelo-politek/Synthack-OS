@@ -255,6 +255,123 @@
     },
     {
       "section": 3,
+      "addr": "0X40388940",
+      "len": 4,
+      "append": true,
+      "hex": "040300bf",
+      "ram": "0x44524210",
+      "what": "idspace: menu DEST della machine 4, voce 191"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388944",
+      "len": 4,
+      "append": true,
+      "hex": "040300c0",
+      "ram": "0x44524214",
+      "what": "idspace: menu DEST della machine 4, voce 192"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388948",
+      "len": 4,
+      "append": true,
+      "hex": "040300c1",
+      "ram": "0x44524218",
+      "what": "idspace: menu DEST della machine 4, voce 193"
+    },
+    {
+      "section": 3,
+      "addr": "0X4038894C",
+      "len": 4,
+      "append": true,
+      "hex": "040300c2",
+      "ram": "0x4452421c",
+      "what": "idspace: menu DEST della machine 4, voce 194"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388950",
+      "len": 4,
+      "append": true,
+      "hex": "040300c3",
+      "ram": "0x44524220",
+      "what": "idspace: menu DEST della machine 4, voce 195"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388954",
+      "len": 4,
+      "append": true,
+      "hex": "04030209",
+      "ram": "0x44524224",
+      "what": "idspace: menu DEST della machine 4, voce 521"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388958",
+      "len": 4,
+      "append": true,
+      "hex": "0403020a",
+      "ram": "0x44524228",
+      "what": "idspace: menu DEST della machine 4, voce 522"
+    },
+    {
+      "section": 3,
+      "addr": "0X4038895C",
+      "len": 4,
+      "append": true,
+      "hex": "0403020b",
+      "ram": "0x4452422c",
+      "what": "idspace: menu DEST della machine 4, voce 523"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388960",
+      "len": 4,
+      "append": true,
+      "hex": "0403020c",
+      "ram": "0x44524230",
+      "what": "idspace: menu DEST della machine 4, voce 524"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388964",
+      "len": 4,
+      "append": true,
+      "hex": "0403020d",
+      "ram": "0x44524234",
+      "what": "idspace: menu DEST della machine 4, voce 525"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388968",
+      "len": 4,
+      "append": true,
+      "hex": "0403020e",
+      "ram": "0x44524238",
+      "what": "idspace: menu DEST della machine 4, voce 526"
+    },
+    {
+      "section": 3,
+      "addr": "0X4038896C",
+      "len": 4,
+      "append": true,
+      "hex": "0403020f",
+      "ram": "0x4452423c",
+      "what": "idspace: menu DEST della machine 4, voce 527"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388970",
+      "len": 4,
+      "append": true,
+      "hex": "04030210",
+      "ram": "0x44524240",
+      "what": "idspace: menu DEST della machine 4, voce 528"
+    },
+    {
+      "section": 3,
       "addr": "0X400A61B0",
       "len": 6,
       "expect_sha256": "7e404cbc76922f3c2f49b86396feeee412460f93d90bda2bac61e36e4f7398a2",

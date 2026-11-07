@@ -90,6 +90,9 @@ def test_mod_area_writes_inside_own_space():
         elif SFC <= ram < SFC + 4 * R.SFCORE_N:
             assert (ram - SFC) % 4 == 0 and n == 4
             assert R.SFCORE_SLOTS.get((ram - SFC) // 4) == name, f"{name}: posto {(ram - SFC) // 4} dei moduli sfcore"
+        elif IL.DESTX <= ram < IL.DESTX + 4 * IL.DESTX_N:        # idspace: voce in piu' del menu DEST
+            assert (ram - IL.DESTX) % 4 == 0 and n == 4
+            assert R.DESTX_SLOTS.get((ram - IL.DESTX) // 4) == name, f"{name}: voce DEST {(ram - IL.DESTX) // 4}"
         elif IL.EXT <= ram < IL.PAGEDEF:                         # idspace: descrittore o oggetto di un id
             base, size = (IL.EXT, 52) if ram < IL.OBJDEF else (IL.OBJDEF, 16)
             pid = IL.FIRST + (ram - base) // size

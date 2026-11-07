@@ -36,6 +36,7 @@ One row per modulator: operator 2 under the common controls on 1/3, operators 3 
 |---|---|
 | CPU #2 | `engine/syn`, `engine/fm4.c`. Engine 4 (SY TONE) prep/render → SY FM4, in the [modarea7](../modarea7) engine area. SY TONE's prep always runs; ALGO 0 is SY TONE's render. Section 7 is the same in 1.40A, 1.41 and 1.42. |
 | CPU #1 | `engine/main/main_fm4.c`, mod area `+0x5800`. Three pages for machine 4 through [syn-pages](../syn-pages); descriptors 190–197 renamed; the algorithm drawn on page 3/3 under row 13 (above it the OS writes a turned value); turning `ALGO` leaves its name under the box (its knob not highlighted). |
+| LFO | Every parameter is an LFO destination: RAT2, LEV2, FDBK, DEC2, PNCH and pages 2/3 and 3/3 follow OVER in the DEST menu ([idspace](../idspace), [xparams](../xparams)). |
 | Parameters | Ids 521–528 ([idspace](../idspace)), logical indices `0x36–0x3D`. Up to v0.9: 254–261, the MIDI machine's CC Value page. The original uses the MIDI CC placeholders 1–5 and 12–14: on 1.42 they carry CC 1, 2, 6, 7, 10, 120, 121, 123. |
 | Storage, p-locks, to CPU #2 | Pages 2/3 and 3/3 are logical indices `0x36–0x3D` of [xparams](../xparams): saved with the sound, p-lock lanes `0x50–0x57`, copied with the locks to shared RAM `0x700` every block. `fm4m_boot` registers page 2/3's defaults for sounds saved by a stock OS (`xp_on_empty`). |
 | Port | Addresses moved with `tools/build/osmap.py`. With the 1.40A addresses put back, every patched site has the hash of the original patcher (`tests/test_sy_fm4.py`). |

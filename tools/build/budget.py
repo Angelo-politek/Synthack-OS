@@ -40,7 +40,7 @@ OUT = REPO / "web-builder" / "src" / "budget.json"
 # xparams (2026-11-04): copia in un ciclo per traccia (362, piu' istruzioni, meno codice: vedi AUDIO_CYCLES).
 # 2026-11-05: fx3 in assembly (2 664), xparams una copia a blocco invece di due (~240), fastmix con meno codice e
 # qualche istruzione in piu' (credito -5 000).
-AUDIO_CPU = {"fx3": 2680, "master-comp": 578, "dual-mono": 331 + 133, "xparams": 240, "sampler": 8, "fastmix": -5000}
+AUDIO_CPU = {"fx3": 2680, "master-comp": 578, "dual-mono": 331 + 133, "xparams": 260, "sampler": 8, "fastmix": -5000}
 
 # cicli in piu' per blocco (2026-11-04 sera: fastmix senza smussamento, xparams a parole lunghe, fx3 con i valori
 # derivati precalcolati; tools/emu/cycles.py, scena "max", taratura prudente CPI 1.0: una riga
@@ -51,7 +51,9 @@ AUDIO_CPU = {"fx3": 2680, "master-comp": 578, "dual-mono": 331 + 133, "xparams":
 # dati di ogni blocco contigui): misurati fx3 10 730, master-comp 3 353, dual-mono 2 386, xparams 1 589, sampler 303,
 # fastmix -4 588; tutte le mod dell'audio 162 200 cicli = 97,3 % del blocco (prima 101,2 %).
 # 2026-11-06: fx3 11 204 con la mandata FX3 della FX track (bersagli dei canali 14/15 a ogni blocco, ~5 righe).
-AUDIO_CYCLES = {"fx3": 11300, "master-comp": 3500, "dual-mono": 2400, "xparams": 1700, "sampler": 400, "sy-fm4": 0,
+# 2026-11-07: xparams con l'LFO sugli indici extra (scansione delle DEST ogni 8 blocchi): 6 454 cicli nel blocco
+# tipico sopra fastmix, 6 854 in quello della scansione (prima 6 177): ~+330 in media.
+AUDIO_CYCLES = {"fx3": 11300, "master-comp": 3500, "dual-mono": 2400, "xparams": 2100, "sampler": 400, "sy-fm4": 0,
                 "fastmix": -4300}
 # cpu-meter (2026-11-05): lettura del timer all'ingresso e all'uscita dell'interrupt, 10 righe di codice: 735 cicli.
 # Senza, il profilo "every mod" sul sito restava sotto il misurato (20 500 contro 21 131).

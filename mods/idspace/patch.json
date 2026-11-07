@@ -12,18 +12,22 @@
     "first": 505
   },
   "symbols": {
-    "ids_boot": "0x445228d0",
-    "ids_obj32": "0x44522a30",
-    "ids_obj52": "0x44522a40",
-    "ids_page": "0x44522a72"
+    "ids_boot": "0x445228d6",
+    "ids_obj32": "0x44522a38",
+    "ids_obj52": "0x44522a48",
+    "ids_page": "0x44522a7a",
+    "ids_destcopy": "0x44522b22",
+    "ids_destiid": "0x44522b46",
+    "ids_dest_boot": "0x44522aac",
+    "ids_destnext": "0x44522ba2"
   },
   "patches": [
     {
       "section": 3,
       "addr": "0X40387000",
-      "len": 468,
+      "len": 792,
       "append": true,
-      "hex": "41f94022d83c43f9445248d0203c000019a522d8538066fa41f9445238d072204aa80028660641f94022d83c700d22d8538066fa200904804452af640680445238d02040538166d84e750c81000001f9654e0c810000021964444feffff048d702074ab94452c35066046100004624010482000001f92042e98a43f944523f504ab128004cd702074fef001067102208c2fc005441f94452b8d0d1c14e7572002f01c2fc005441f941ba0a24d1c1221f4e754fefffdc48d70f1f700123c04452c35045f944523f5047f94452b8d0782022126764c2fc005443f941ba0a24d3c126912769000400042769000800082769000c000c27690010001041fa005275586b3677582009d0824a43670a48c32232380067022001220bd2824fefffe848d7071c2f002f014eb940188482508f4cd7071c4fef001860c645ea001047eb00545384668c4cd70f1f4fef00244e750014000400240008003400000044000cffff222f00042f086100fee22008205f4e75222f00042f086100fed22008205f068000000014487941b9fbcc2f2f000c2f004eb94018837a4fef000c203c41b9fbcc4e75202f00047225b081651a7229b0816412048000000025c0fc002c0680445241504e7570ff722c4c010800068041ba03c84e75",
+      "hex": "4ef944522a3841f94022d83c43f9445248d0203c000019a522d8538066fa41f9445238d072204aa80028660641f94022d83c700d22d8538066fa200904804452af640680445238d02040538166d86000018c0c81000001f9654e0c810000021964444feffff048d702074ab94452c35066046100004624010482000001f92042e98a43f944523f504ab128004cd702074fef001067102208c2fc005441f94452b8d0d1c14e7572002f01c2fc005441f941ba0a24d1c1221f4e754fefffdc48d70f1f700123c04452c35045f944523f5047f94452b8d0782022126764c2fc005443f941ba0a24d3c126912769000400042769000800082769000c000c27690010001041fa005275586b3677582009d0824a43670a48c32232380067022001220bd2824fefffe848d7071c2f002f014eb940188482508f4cd7071c4fef001860c645ea001047eb00545384668c4cd70f1f4fef00244e750014000400240008003400000044000cffff222f00042f086100fee22008205f4e75222f00042f086100fed22008205f068000000014487941b9fbcc2f2f000c2f004eb94018837a4fef000c203c41b9fbcc4e75202f00047225b081651a7229b0816412048000000025c0fc002c0680445241504e7570ff722c4c010800068041ba03c84e754fefffe848d70c3c41f94022b39043f94452e8d0740026497600201832c045f944524210784071ea0002671c7392b282661673aa0001b283660e2a099a8b0c8500000082640232c0588a538466d852837021b08366c445eb0084b3ca640632fcffff60f65282702eb08266aa4cd70c3c4fef00184e75222f0004702cb08164027222c2fc008443f94452e8d0d3c12008722120d9538166fa4e75202f000c720cb280654e670c222f0008702cb08165426002722d202f00040c80000000416232c2fc008441f94452e8d0d1c173f00a000c810000ffff671a0c810000021965027200c2fc003441f9445248d0203018044e7570ff4e7547f9400a5ce471d80c800000ffff67062d40fcf04e75588f4ef94004e672225f71f20a042f002f094ef9400a5ce4225f41f60a0071e8ff7c2f002f094ef9400a5ce479f30a04",
       "ram": "0x445228d0",
       "what": "(area mod) idspace: copia, oggetti, pagine"
     },
@@ -32,7 +36,7 @@
       "addr": "0X40350410",
       "len": 4,
       "append": true,
-      "hex": "445228d0",
+      "hex": "445228d6",
       "ram": "0x444ebce0",
       "what": "lista di avvio di modarea, posto 4: ids_boot"
     },
@@ -41,7 +45,7 @@
       "addr": "0X4007BA2A",
       "len": 6,
       "expect_sha256": "9abf8e4eeb1e70fdecdc80733d07cd2e27733ababa9f19b036e356fd93694cea",
-      "hex": "4ef944522a30",
+      "hex": "4ef944522a38",
       "what": "jmp ids_obj32: oggetto per parametro"
     },
     {
@@ -49,7 +53,7 @@
       "addr": "0X4007BBE2",
       "len": 6,
       "expect_sha256": "9abf8e4eeb1e70fdecdc80733d07cd2e27733ababa9f19b036e356fd93694cea",
-      "hex": "4ef944522a40",
+      "hex": "4ef944522a48",
       "what": "jmp ids_obj52: oggetto per parametro: chiamata del testo (+20)"
     },
     {
@@ -57,8 +61,72 @@
       "addr": "0X4007BA48",
       "len": 6,
       "expect_sha256": "0fbc1e7867ae69055826fb539800554f1e416e22a759807b3fcd56a4df09cb69",
-      "hex": "4ef944522a72",
+      "hex": "4ef944522a7a",
       "what": "jmp ids_page: elemento di pagina dall'indice"
+    },
+    {
+      "section": 3,
+      "addr": "0X400A6598",
+      "len": 6,
+      "expect_sha256": "fcdc30a3ed2331f02415558237ff05e17fed03999e922c67ea4d9c94db799963",
+      "hex": "4ef944522b22",
+      "what": "jmp ids_destcopy: menu DEST: riga della machine (impacchettata)"
+    },
+    {
+      "section": 3,
+      "addr": "0X400A65D2",
+      "len": 6,
+      "expect_sha256": "3be507936205af3def3579799b294d7edfd234979554e6c0dd020b9b0d8f8740",
+      "hex": "4ef944522b46",
+      "what": "jmp ids_destiid: menu DEST: voce -> id interno"
+    },
+    {
+      "section": 3,
+      "addr": "0X4004E55A",
+      "len": 4,
+      "expect_sha256": "e49752a740b4d8845efe860866d5feaba677b58099a6214b9f251fe095a3259a",
+      "hex": "54aefcf8",
+      "what": "ciclo delle voci: puntatore della lista +2 (id da 16 bit)"
+    },
+    {
+      "section": 3,
+      "addr": "0X4004E55E",
+      "len": 10,
+      "expect_sha256": "e44bdfa7ae3431a3f9578833b9057cf708f86f2141de45ef85eb770a8151dcb8",
+      "hex": "4eb944522ba24e714e71",
+      "what": "ciclo delle voci: voce da 16 bit, fine riga"
+    },
+    {
+      "section": 3,
+      "addr": "0X4004E66A",
+      "len": 2,
+      "expect_sha256": "c1ef9be1d2efb123c75f87371649a10b1c8b05cde0f95b14d5fe7ac279952386",
+      "hex": "7042",
+      "what": "ciclo delle voci: al massimo 66"
+    },
+    {
+      "section": 3,
+      "addr": "0X4004E090",
+      "len": 4,
+      "expect_sha256": "943e58939702030d23cbbe8c743b2e99ffc98ed9f0923a86930f9fbdab23dfe8",
+      "hex": "79f30a04",
+      "what": "testo della voce: id da 16 bit"
+    },
+    {
+      "section": 3,
+      "addr": "0X4004E8A8",
+      "len": 10,
+      "expect_sha256": "6a6a7a8f0ba1b2177219c9d283b1d808f450d43777e6fa68c77b60302ee98977",
+      "hex": "4eb944522bc04e714e71",
+      "what": "gruppo della voce: id da 16 bit"
+    },
+    {
+      "section": 3,
+      "addr": "0X4004EC0A",
+      "len": 14,
+      "expect_sha256": "a0091f9883e9a29fcaff2bf335a42350c18876a4e2e0febd32b1092749170dbe",
+      "hex": "4eb944522bd04e714e714e714e71",
+      "what": "encoder: gruppo della voce, id da 16 bit"
     },
     {
       "section": 3,

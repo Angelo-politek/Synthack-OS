@@ -42,6 +42,8 @@ CFLAGS = f"-DSP_TABLE={SP.TABLE:#x} -DXP_TABLE={XP.TABLE:#x} -mcpu=54418 -ffrees
 # sezione 3 (OS 1.42)
 PAGE1_IDS = range(190, 198)             # SY TONE: nomi di pagina 1/2 (fm4m_names)
 DESC = 0x4022_D83C                      # descrittori, 52 B per id
+DEST_IDS = [191, 192, 193, 194, 195, *range(521, 529)]   # RAT2 LEV2 FDBK DEC2 PNCH, pagine 2/3 e 3/3
+DESTX_FIRST = 0                         # posti 0..12 di idspace_layout.DESTX (registro)
 PAGE2_IDS = range(521, 529)             # id delle mod (mods/idspace); 254..261 sono della machine MIDI
 INDEX_DONE = 0x400A_61B0                # tabelle degli indici: default di 2/3 (salvataggio, p-lock, copia: xparams)
 NAME, SHORT = 0x4025_38C7, 0x4025_38CF
@@ -163,6 +165,10 @@ def main() -> None:
         gfx = s3["fm4m_algo_gfx_proto"] if k == 0 else 0                   # ALGO: il disegno dell'algoritmo
         p.append(ext(IDS.objdef(i), struct.pack(">4I", info[k], 0, gfx, 0),
                      f"idspace: oggetto dell'id {i} (SY FM4 pagina 2/2), modello {info[k]}"))
+    # menu DEST degli LFO (idspace, 66 voci): sulle tracce SY FM4 tutti i parametri, dopo OVER (voce stock 3)
+    for k, i in enumerate(DEST_IDS):
+        p.append(ext(IDS.destx(DESTX_FIRST + k), struct.pack(">BBH", 4, 3, i),
+                     f"idspace: menu DEST della machine 4, voce {i}"))
     p += [
         fixed(sec3, 3, INDEX_DONE, b"\x4e\xb9" + long(s3["fm4m_index_done"]), "tabelle degli indici: default di 2/2"),
         fixed(sec3, 3, NAME, b"SY FM4\x00\x00", "nome della machine 4", b"SY TONE\x00"),
