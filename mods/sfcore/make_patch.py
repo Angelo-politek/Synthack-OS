@@ -37,6 +37,7 @@ CFLAGS = ("-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-c
           "-fno-tree-loop-distribute-patterns -Iinclude -Wall -Wextra -Wno-unused-parameter")
 NOP = b"\x4e\x71"
 UI, RENDER, MIX, FS, NATIVE = None, "sfcore:render_in", "sfcore:main_mix", "sfcore:fs", "sfcore:native"
+VIEW = "sfcore:view"
 # un servizio per operazione dove una mod ne usa una sola: lfo3 vuole l'operazione LFO (interrupt) e il setter del
 # Sound (interfaccia), non gli altri 11 adattatori (~900 cicli a blocco anche senza iscritti)
 LFO, SOUND_SET = "sfcore:lfo", "sfcore:sound_set"
@@ -46,6 +47,7 @@ SITES = [
     (0x4000_A286, "4eb940100992", "jsr", "core_draw", UI, "ev_draw: sopra ogni schermata composta"),
     (0x4000_839E, "4feffff048d70c0c", "jmp", "core_key", UI, "ev_key: ingresso del dispatcher dei tasti (dopo perf-fx)"),
     (0x4000_B468, "4eb9400083f0", "jsr", "core_enc", UI, "ev_enc: dispatcher degli encoder"),
+    (0x4010_09F4, "2f0c4e952653", "jmp", "core_view_draw", VIEW, "ev_draw (vista): dopo il disegno di ogni vista"),
     (0x400A_38D6, "203c7fffffff", "jmp", "core_render_in", RENDER, "ev_render_in: interrupt audio, dopo il prologo"),
     (0x4008_FB86, "487980003950", "jsr", "core_main_mix", MIX, "ev_main_mix: bus del master (dopo fx3)"),
     (0x400B_620C, "266e000c280e", "jmp", "core_fs_write", FS, "ev_fs_write: Data RPC, dopo il prologo (dopo long-samples)"),

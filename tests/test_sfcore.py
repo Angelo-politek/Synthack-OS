@@ -71,14 +71,14 @@ def test_sites_are_stock_and_audio_adapters_are_services():
     import build
     sec3 = build.eft.unpack(SY, ROOT / "unpacked" / SY.stem, ids=[3])[3].read_bytes()
     fixed = [p for p in SPEC["patches"] if not p.get("append")]
-    assert len(fixed) == 21
+    assert len(fixed) == 22
     for p in fixed:
         a, n = int(p["addr"], 16), p["len"]
         assert build.sha256(sec3[a - 0x4000_0400:a - 0x4000_0400 + n]) == p["expect_sha256"]
     ui = {int(p["addr"], 16) for p in fixed if "service" not in p}
     assert ui == {0x4000_A220, 0x4000_A286, 0x4000_839E, 0x4000_B468}          # interfaccia: sempre
     assert SERVICES == ["sfcore:fs", "sfcore:lfo", "sfcore:main_mix", "sfcore:native", "sfcore:render_in",
-                        "sfcore:sound_set"]
+                        "sfcore:sound_set", "sfcore:view"]
 
 
 def test_chained_sites_follow_the_existing_hooks():

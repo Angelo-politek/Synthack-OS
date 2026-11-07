@@ -67,6 +67,32 @@ core_draw:
 2:      movea.l (%sp)+,%a2
         rts
 
+| ---- ev_draw with ST_EV_VIEW (Synfact view-draw.s): after each native view of the stack draws itself
+| (0x401009F2 jsr (a0): view a4, bitmap d3), in place of move.l a4,-(sp) ; jsr (a5) ; movea.l (a3),a3 (0x401009F4,
+| 1.41 0x40100830). Handlers f(view, bitmap, 0). Service sfcore:view.
+        .globl  core_view_draw
+core_view_draw:
+        lea     -16(%sp),%sp
+        movem.l %d0-%d1/%a0-%a1,(%sp)
+        move.l  %a2,-(%sp)
+        lea     ev_view_draw,%a2
+1:      move.l  (%a2)+,%d0
+        beq.s   2f
+        clr.l   -(%sp)
+        move.l  %d3,-(%sp)
+        move.l  %a4,-(%sp)
+        movea.l %d0,%a0
+        jsr     (%a0)
+        lea     12(%sp),%sp
+        bra.s   1b
+2:      movea.l (%sp)+,%a2
+        movem.l (%sp),%d0-%d1/%a0-%a1
+        lea     16(%sp),%sp
+        move.l  %a4,-(%sp)
+        jsr     (%a5)
+        movea.l (%a3),%a3
+        jmp     0x401009FA
+
 | ---- ev_key: at KEYDISP 0x4000839E (Synfact: its call 0x4000B420), lea -16(sp),sp; movem.l d2-d3/a2-a3,(sp)
 | moved here. (sp) ret, 4 brain, 8 event. Handlers f(brain, event) -> nonzero consumes (no stock after it).
         .globl  core_key

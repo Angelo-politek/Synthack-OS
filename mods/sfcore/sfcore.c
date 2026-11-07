@@ -20,7 +20,7 @@ extern const struct st_smz_module *const sfcore_modules[SLOTS];  /* registry: SF
 
 /* ---- event lists, read by the adapters (adapters.S). Zero-terminated. */
 u32 ev_tick[CAP],ev_draw[CAP],ev_key[CAP],ev_enc[CAP],ev_render_in[CAP],ev_main_mix[CAP],ev_fs_write[CAP],
-    ev_fs_written[CAP],ev_native[CAP];
+    ev_fs_written[CAP],ev_native[CAP],ev_view_draw[CAP];    /* ev_view_draw: ST_EV_DRAW | ST_EV_VIEW */
 static u32 *const lists[ST_EV_COUNT]={ev_tick,ev_draw,ev_key,ev_enc,0,ev_render_in,0,0,ev_fs_write,ev_fs_written,
     ev_main_mix,ev_native};
 
@@ -180,14 +180,17 @@ static u32 bind(const struct st_smz_module *m)
     for(e=0;e<ST_EV_COUNT;e++)add[e]=0;
     for(j=0;j<m->count;j++){
         u32 ev=m->subscriptions[j].event;e=ST_EV_INDEX(ev);
-        if(e>=ST_EV_COUNT || !lists[e] || ev&(ST_EV_VIEW|ST_EV_PRE))return 3;   /* view/pre contexts: not yet */
+        if(ev==(ST_EV_DRAW|ST_EV_VIEW))continue;     /* view draw: its own list (ev_view_draw) */
+        if(e>=ST_EV_COUNT || !lists[e] || ev&(ST_EV_VIEW|ST_EV_PRE))return 3;   /* other contexts: not yet */
         add[e]++;
         if(e==ST_EV_NATIVE)api.version=3;
     }
     for(e=0;e<ST_EV_COUNT;e++)if(add[e] && length(lists[e])+add[e]>=CAP)return 4;
     if(m->init && (u32)m->init!=0xffffffffu && m->init(&api))return 2;
     for(j=0;j<m->count;j++){
-        u32 *l=lists[ST_EV_INDEX(m->subscriptions[j].event)],n=length(l);
+        u32 *l=m->subscriptions[j].event==(ST_EV_DRAW|ST_EV_VIEW)?ev_view_draw:lists[ST_EV_INDEX(m->subscriptions[j].event)],
+            n=length(l);
+        if(n+1>=CAP)return 4;
         sr=sfcore_irq_off();                    /* the zero after it is already there: one aligned store */
         l[n]=(u32)m->subscriptions[j].callback;
         sfcore_irq_on(sr);
