@@ -49,7 +49,7 @@ MODAREA = [
     (0x38000, 0x3E000, "poly", "planned: POLY with its native kernels"),
     (0x3E000, 0x3FFF0, "idspace", "code; descriptors, object definitions and pages the mods write (idspace_layout)"),
     # 512 KB area from 2026-11-06: the second half is runtime RAM only (zeroed by the loader)
-    (0x40000, 0x48000, "idspace", "parameter ids above 504: descriptor table copy (537 x 52 B), extra parameter objects, extra pages"),
+    (0x40000, 0x4C000, "idspace", "runtime: descriptor table copy (569 x 52 B), mod parameter objects, packed LFO DEST rows (+0xA000)"),
     # 0x48000..0x7FFF0: free (runtime RAM only)
 ]
 
@@ -136,6 +136,8 @@ IDS = {
     **{521 + k: ("sy-fm4", f"SYN {p} {n} (idspace)")
        for k, (n, p) in enumerate((("ALGO", "pages 2/3 and 3/3"), *((n, "page 2/3") for n in (
            "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))))},
+    **{530 + k: ("lfo3", f"LFO3 page {n} (idspace, index {0x3E + k:#x})") for k, n in enumerate(
+        ("SPD", "MULT", "FADE", "DEST", "WAVE", "SPH", "MODE", "DEP"))},
     529: ("sampler", "knob H of page 2/2 (index 0x36) as an LFO destination (idspace)"),
     **{497 + k: ("sampler", f"SAMPLER knob {n} (was SP TWINSHOT {w})") for k, (n, w) in enumerate(
         (("A TUNE", "TUN1"), ("B PLAY", "SMP1"), ("C BR", "FLT1"), ("G LOOP/BARS/GRID, lix 0x18", "MIX"),
@@ -147,7 +149,8 @@ IDS = {
 # ---- voci in piu' del menu DEST degli LFO (idspace_layout.DESTX): posto -> mod
 DESTX_SLOTS = {**{k: "sy-fm4" for k in range(13)}, 13: "sampler", **{k: "fx3" for k in range(14, 20)}}
 
-PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 37: ("dual-mono", "IN R in the MIXER tab (idspace page)")}
+PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 37: ("dual-mono", "IN R in the MIXER tab (idspace page)"),
+         38: ("lfo3", "third page of the LFO tab (idspace page)")}
 
 
 def modarea_owner(off: int) -> str | None:

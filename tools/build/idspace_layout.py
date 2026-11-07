@@ -14,18 +14,18 @@ delle mod. Ogni mod scrive, con patch accodate:
 import modarea_layout as L
 
 STOCK_N = 505                    # id dell'OS: 0..504
-FIRST, N = 505, 537              # id delle mod: 505..536
+FIRST, N = 505, 569              # id delle mod: 505..568
 N_EXT = N - FIRST
 CODE = L.RAM + 0x3_E000          # codice (immagine)
 OBJ_ENTRY = CODE                 # jmp ids_obj32: oggetto per parametro dell'id 4(sp) -> d0 (indirizzo fisso)
-EXT = L.RAM + 0x3_F000           # descrittori sorgente delle mod (immagine): 32 x 52 B
-OBJDEF = L.RAM + 0x3_F680        # definizioni degli oggetti (immagine): 32 x 16 B
-PAGEDEF = L.RAM + 0x3_F880       # pagine in piu' (immagine): 4 x 44 B
+EXT = L.RAM + 0x3_EA00           # descrittori sorgente delle mod (immagine): 64 x 52 B
+OBJDEF = L.RAM + 0x3_F700        # definizioni degli oggetti (immagine): 64 x 16 B
+PAGEDEF = L.RAM + 0x3_FB00       # pagine in piu' (immagine): 4 x 44 B
 PAGE_FIRST, PAGE_N = 37, 4
-DESTX = L.RAM + 0x3_F940         # voci in piu' del menu DEST degli LFO (immagine): DESTX_N x {u8 machine, u8 dopo, u16 id}
+DESTX = L.RAM + 0x3_FBC0         # voci in piu' del menu DEST degli LFO (immagine): DESTX_N x {u8 machine, u8 dopo, u16 id}
 DESTX_N = 64
 TABLE = L.RAM + 0x4_0000         # descrittori, N x 52 B (solo RAM, scritta all'avvio)
-OBJ = L.RAM + 0x4_7000           # oggetti delle mod, 32 x 84 B (solo RAM, costruiti alla prima ricerca)
+OBJ = L.RAM + 0x4_7400           # oggetti delle mod, 64 x 84 B (solo RAM, costruiti alla prima ricerca)
 BUILT = OBJ + N_EXT * 84         # u32: 1 = oggetti costruiti
 ROWS = L.RAM + 0x4_A000          # righe del menu DEST impacchettate: 46 x 66 id da 16 bit (0xFFFF = fine), solo RAM
 DEST_ROWS, DEST_N = 46, 66       # 45 machine + FX track; voci per riga (stock 33)

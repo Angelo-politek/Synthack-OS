@@ -45,7 +45,7 @@ def wsl(cmd: str) -> str:
 
 def entry(slot: int, pid: int, get: int, put: int, what: str) -> dict:
     """Patch accodata che registra un parametro virtuale nel posto 'slot' della tabella."""
-    if not 0 <= slot < VP_N or not 0 < pid < 537:              # 505..536: id delle mod (mods/idspace)
+    if not 0 <= slot < VP_N or not 0 < pid < 569:              # 505..568: id delle mod (mods/idspace)
         raise ValueError((slot, pid))
     addr = VP_TABLE + 12 * slot
     return {"section": 3, "addr": f"{IMG + addr - RAM:#010X}", "len": 12, "append": True,

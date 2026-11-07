@@ -366,20 +366,20 @@
     },
     {
       "section": 3,
-      "addr": "0X403881A0",
+      "addr": "0X40387BA0",
       "len": 52,
       "append": true,
       "hex": "0000003a000000280000000000007f000000000000000000ffffffffffffffff0000009300000000444f0cdf4025006d444f0cee",
-      "ram": "0x44523a70",
+      "ram": "0x44523470",
       "what": "idspace: descrittore dell'id 513 (SND3 dell'ingresso)"
     },
     {
       "section": 3,
-      "addr": "0X40388700",
+      "addr": "0X40388780",
       "len": 16,
       "append": true,
       "hex": "00000115444f0d1041b9ebd041b9e5d0",
-      "ram": "0x44523fd0",
+      "ram": "0x44524050",
       "what": "idspace: oggetto dell'id 513 (SND3 dell'ingresso), modello 277"
     },
     {
@@ -457,56 +457,56 @@
     },
     {
       "section": 3,
-      "addr": "0X40388978",
+      "addr": "0X40388BF8",
       "len": 4,
       "append": true,
       "hex": "2d0301fa",
-      "ram": "0x44524248",
+      "ram": "0x445244c8",
       "what": "idspace: menu DEST della FX track, voce 506"
     },
     {
       "section": 3,
-      "addr": "0X4038897C",
+      "addr": "0X40388BFC",
       "len": 4,
       "append": true,
       "hex": "2d0301fb",
-      "ram": "0x4452424c",
+      "ram": "0x445244cc",
       "what": "idspace: menu DEST della FX track, voce 507"
     },
     {
       "section": 3,
-      "addr": "0X40388980",
+      "addr": "0X40388C00",
       "len": 4,
       "append": true,
       "hex": "2d0301fd",
-      "ram": "0x44524250",
+      "ram": "0x445244d0",
       "what": "idspace: menu DEST della FX track, voce 509"
     },
     {
       "section": 3,
-      "addr": "0X40388984",
+      "addr": "0X40388C04",
       "len": 4,
       "append": true,
       "hex": "2d0301fe",
-      "ram": "0x44524254",
+      "ram": "0x445244d4",
       "what": "idspace: menu DEST della FX track, voce 510"
     },
     {
       "section": 3,
-      "addr": "0X40388988",
+      "addr": "0X40388C08",
       "len": 4,
       "append": true,
       "hex": "2d0301fc",
-      "ram": "0x44524258",
+      "ram": "0x445244d8",
       "what": "idspace: menu DEST della FX track, voce 508"
     },
     {
       "section": 3,
-      "addr": "0X4038898C",
+      "addr": "0X40388C0C",
       "len": 4,
       "append": true,
       "hex": "2d030200",
-      "ram": "0x4452425c",
+      "ram": "0x445244dc",
       "what": "idspace: menu DEST della FX track, voce 512"
     },
     {
@@ -520,20 +520,20 @@
     },
     {
       "section": 3,
-      "addr": "0X40388000",
+      "addr": "0X40387A00",
       "len": 52,
       "append": true,
       "hex": "000000380000001100000000000003000000000000000000ffffffffffffffff0000007800000000444f24684025409b444f247c",
-      "ram": "0x445238d0",
+      "ram": "0x445232d0",
       "what": "idspace: descrittore dell'id 505 (pagina FX3, TYPE)"
     },
     {
       "section": 3,
-      "addr": "0X40388680",
+      "addr": "0X40388700",
       "len": 16,
       "append": true,
       "hex": "00000120444f0d70444f0d0041ba0a68",
-      "ram": "0x44523f50",
+      "ram": "0x44523fd0",
       "what": "idspace: oggetto dell'id 505 (pagina FX3, TYPE), modello 288"
     },
     {
@@ -547,20 +547,20 @@
     },
     {
       "section": 3,
-      "addr": "0X40388034",
+      "addr": "0X40387A34",
       "len": 52,
       "append": true,
       "hex": "00000031000000240000000000007f0000003c0000000000ffffffffffffffff0000007900000000444f244e4025409b444f2462",
-      "ram": "0x44523904",
+      "ram": "0x44523304",
       "what": "idspace: descrittore dell'id 506 (pagina FX3, SPD)"
     },
     {
       "section": 3,
-      "addr": "0X40388690",
+      "addr": "0X40388710",
       "len": 16,
       "append": true,
       "hex": "00000022444f0d6041b9ecd000000000",
-      "ram": "0x44523f60",
+      "ram": "0x44523fe0",
       "what": "idspace: oggetto dell'id 506 (pagina FX3, SPD), modello 34"
     },
     {
@@ -574,20 +574,20 @@
     },
     {
       "section": 3,
-      "addr": "0X40388068",
+      "addr": "0X40387A68",
       "len": 52,
       "append": true,
       "hex": "00000031000000270000000000007f000000400000000000ffffffffffffffff0000007a00000000444f24344025409b444f2448",
-      "ram": "0x44523938",
+      "ram": "0x44523338",
       "what": "idspace: descrittore dell'id 507 (pagina FX3, DEP)"
     },
     {
       "section": 3,
-      "addr": "0X403886A0",
+      "addr": "0X40388720",
       "len": 16,
       "append": true,
       "hex": "00000022444f0d5041b9ecd000000000",
-      "ram": "0x44523f70",
+      "ram": "0x44523ff0",
       "what": "idspace: oggetto dell'id 507 (pagina FX3, DEP), modello 34"
     },
     {
@@ -601,20 +601,20 @@
     },
     {
       "section": 3,
-      "addr": "0X403880D0",
+      "addr": "0X40387AD0",
       "len": 52,
       "append": true,
       "hex": "00000031000000290000000000007f000000400000000000ffffffffffffffff0000007c00000e00444f241a4025409b444f242e",
-      "ram": "0x445239a0",
+      "ram": "0x445233a0",
       "what": "idspace: descrittore dell'id 509 (pagina FX3, TIME)"
     },
     {
       "section": 3,
-      "addr": "0X403886C0",
+      "addr": "0X40388740",
       "len": 16,
       "append": true,
       "hex": "00000022444f0d400000000000000000",
-      "ram": "0x44523f90",
+      "ram": "0x44524010",
       "what": "idspace: oggetto dell'id 509 (pagina FX3, TIME), modello 34"
     },
     {
@@ -628,20 +628,20 @@
     },
     {
       "section": 3,
-      "addr": "0X40388104",
+      "addr": "0X40387B04",
       "len": 52,
       "append": true,
       "hex": "000000310000001a0000000000007f000000000000000000ffffffffffffffff0000007d00000e00444f24004025409b444f2414",
-      "ram": "0x445239d4",
+      "ram": "0x445233d4",
       "what": "idspace: descrittore dell'id 510 (pagina FX3, FDBK)"
     },
     {
       "section": 3,
-      "addr": "0X403886D0",
+      "addr": "0X40388750",
       "len": 16,
       "append": true,
       "hex": "00000022444f0d300000000000000000",
-      "ram": "0x44523fa0",
+      "ram": "0x44524020",
       "what": "idspace: oggetto dell'id 510 (pagina FX3, FDBK), modello 34"
     },
     {
@@ -655,20 +655,20 @@
     },
     {
       "section": 3,
-      "addr": "0X40388138",
+      "addr": "0X40387B38",
       "len": 52,
       "append": true,
       "hex": "00000038000000180000000000007f000000400000000000ffffffffffffffff0000007e00000e00444f23e64025409b444f23fa",
-      "ram": "0x44523a08",
+      "ram": "0x44523408",
       "what": "idspace: descrittore dell'id 511 (pagina FX3, WID)"
     },
     {
       "section": 3,
-      "addr": "0X403886E0",
+      "addr": "0X40388760",
       "len": 16,
       "append": true,
       "hex": "00000022444f0d200000000000000000",
-      "ram": "0x44523fb0",
+      "ram": "0x44524030",
       "what": "idspace: oggetto dell'id 511 (pagina FX3, WID), modello 34"
     },
     {
@@ -682,20 +682,20 @@
     },
     {
       "section": 3,
-      "addr": "0X4038809C",
+      "addr": "0X40387A9C",
       "len": 52,
       "append": true,
       "hex": "00000031000000460000000000007f000000000000000001ffffffffffffffff0000007b00000e00444f23cc4025409b444f23e0",
-      "ram": "0x4452396c",
+      "ram": "0x4452336c",
       "what": "idspace: descrittore dell'id 508 (pagina FX3, DEL)"
     },
     {
       "section": 3,
-      "addr": "0X403886B0",
+      "addr": "0X40388730",
       "len": 16,
       "append": true,
       "hex": "00000115444f0d1041b9ebd041b9e5d0",
-      "ram": "0x44523f80",
+      "ram": "0x44524000",
       "what": "idspace: oggetto dell'id 508 (pagina FX3, DEL), modello 277"
     },
     {
@@ -709,20 +709,20 @@
     },
     {
       "section": 3,
-      "addr": "0X4038816C",
+      "addr": "0X40387B6C",
       "len": 52,
       "append": true,
       "hex": "00000031000000370000000000007f000000000000000000ffffffffffffffff0000007f00000000444f23b24025409b444f23c6",
-      "ram": "0x44523a3c",
+      "ram": "0x4452343c",
       "what": "idspace: descrittore dell'id 512 (pagina FX3, REV)"
     },
     {
       "section": 3,
-      "addr": "0X403886F0",
+      "addr": "0X40388770",
       "len": 16,
       "append": true,
       "hex": "00000115444f0d1041b9eba041b9e5d0",
-      "ram": "0x44523fc0",
+      "ram": "0x44524040",
       "what": "idspace: oggetto dell'id 512 (pagina FX3, REV), modello 277"
     }
   ]

@@ -162,12 +162,12 @@ def run(mods, uses=(), setup=None, blocks=4):
 def test_unused_costs_nothing():
     """Senza destinazioni l'interesse per l'operazione LFO resta spento: stesse istruzioni di sfcore da solo con
     l'adattatore dell'LFO (un tst.b), e solo quello: gli altri adattatori nativi non ci sono."""
-    _, a = run(["sfcore"], uses=["sfcore:lfo"])
+    _, a = run(["sfcore", "xparams", "idspace"], uses=["sfcore:lfo"])
     m, b = run(["lfo3"])
     assert m.ui.long(SYM["lfo3_active"]) == 0
     print("istruzioni:", a.n, b.n)
     assert b.n == a.n
-    _, s = run([])
+    _, s = run(["xparams", "idspace"])                           # lfo3 le richiede: confronto senza il loro costo
     assert b.n - s.n <= 4, (s.n, b.n)
 
 
@@ -178,10 +178,48 @@ def test_destination_modulates_before_native_lfos():
         m.uc.mem_write(0x8000_21B0 + 28 + 142 * 3 + 2 * 0x3E,
                        struct.pack(">8H", 0x7000, 0x300, 0x4000, 0x3000, 1, 0, 0, 0x7F00))
         m.ui.call(SYM["lfo3_update"])
-    _, a = run(["sfcore"], uses=["sfcore:lfo"])
+    _, a = run(["sfcore", "xparams", "idspace"], uses=["sfcore:lfo"])
     m, b = run(["lfo3"], setup=setup)
     assert m.ui.long(SYM["lfo3_active"]) == 1 << 3
     delta = struct.unpack(">i", m.uc.mem_read(BANK + 40 * 3 + 28, 4))[0]
     assert delta != 0
     print("istruzioni con un LFO3 attivo:", b.n - a.n)
     assert b.n - a.n < 2600
+
+
+# ------------------------------------------------------------------ pagina (idspace) e DEST
+def test_page_three_of_the_lfo_tab():
+    """Scheda LFO: pagine {4, 5, 38}; la 38 mostra SPD..DEP di LFO3 (id 530..537, indici 0x3e..0x45 del suono)."""
+    import screens
+    import idspace_layout as I
+    screens.TABS.setdefault("LFO", 280)
+    ui = screens.UI(["lfo3"])
+    t = ui.tab("LFO")
+    assert [ui.long(x) for x in range(ui.long(t + 124), ui.long(t + 128), 4)] == [4, 5, 38]
+    ui.page(t, 2)
+    ids = [ui.param(t, e) for e in "ABCDEFGH"]
+    assert ids == list(range(530, 538))
+    names = [bytes(ui.uc.mem_read(ui.long(I.TABLE + 52 * i + 48), 5)).split(b"\0")[0] for i in ids]
+    assert names == [b"SPD", b"MULT", b"FADE", b"DEST", b"WAVE", b"SPH", b"MODE", b"DEP"]
+    assert [struct.unpack(">I", ui.uc.mem_read(I.TABLE + 52 * i + 4, 4))[0] for i in ids] == list(range(0x3E, 0x46))
+    assert sum(bin(b).count("1") for b in ui.draw(t)) > 500
+    before = ui.raw(t, "A")
+    ui.turn(t, "A", +5)
+    assert ui.raw(t, "A") != before
+
+
+def test_dest_helpers_and_fx_track_page():
+    import screens
+    import idspace_layout as I
+    from unicorn.m68k_const import UC_M68K_REG_D0, UC_M68K_REG_D1
+    ui = screens.UI(["lfo3"])
+    stub = 0x4FE0_5000                                          # jsr lfo3_dest_d0 ; seq d1 ; rts
+    ui.uc.mem_write(stub, bytes.fromhex("4eb9") + struct.pack(">I", SYM["lfo3_dest_d0"]) + bytes.fromhex("57c14e75"))
+    for pid, z in ((89, 1), (99, 1), (533, 1), (90, 0), (532, 0)):
+        ui.uc.reg_write(UC_M68K_REG_D0, pid)
+        ui.uc.reg_write(UC_M68K_REG_D1, 0)
+        ui.call(stub)
+        assert (ui.uc.reg_read(UC_M68K_REG_D1) & 0xFF == 0xFF) == bool(z), pid
+    slots = lambda: struct.unpack(">8I", ui.uc.mem_read(I.page(38) + 8, 32))     # noqa: E731
+    ui.call(SYM["lfo3_page_slots"])
+    assert slots() == tuple(range(530, 538))                    # traccia attiva 0

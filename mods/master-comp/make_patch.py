@@ -175,8 +175,7 @@ def main() -> None:
     defs = {"C_OCT": C_OCT, "D_THR": a.thr, "D_ATK": a.atk, "D_REL": a.rel, "D_MUP": a.mup,
             "GFX_ON": 0 if a.no_drive_knob else 1}
     defs.update({f"ID_{n}": i for n, _, i, _ in PARAMS})
-    defs["IDS_OBJ"] = int(json.loads((REPO / "mods" / "idspace" / "patch.json").read_text(encoding="utf-8"))
-                          ["symbols"]["ids_obj32"], 16)
+    defs["IDS_OBJ"] = IDS.OBJ_ENTRY                     # ingresso fisso di idspace
     defs.update({f"TY_{n}": TYPES[n] for n, _, _, _ in PARAMS})
     nl = "\n"
     tables = "".join(f"        .long   {', '.join(str(v) for v in tab[k:k + 8])}{nl}"

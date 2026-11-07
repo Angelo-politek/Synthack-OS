@@ -384,29 +384,29 @@
     },
     {
       "section": 3,
-      "addr": "0X403884E0",
+      "addr": "0X40387EE0",
       "len": 52,
       "append": true,
       "hex": "0000002c000000360000000000007f000000000000000000ffffffffffffffff000002de00000e00444fec91402545c4444fec8c",
-      "ram": "0x44523db0",
+      "ram": "0x445237b0",
       "what": "idspace: descrittore dell'id 529 (manopola H, indice 0x36)"
     },
     {
       "section": 3,
-      "addr": "0X40388800",
+      "addr": "0X40388880",
       "len": 16,
       "append": true,
       "hex": "000001f7000000000000000000000000",
-      "ram": "0x445240d0",
+      "ram": "0x44524150",
       "what": "idspace: oggetto dell'id 529, modello 503"
     },
     {
       "section": 3,
-      "addr": "0X40388974",
+      "addr": "0X40388BF4",
       "len": 4,
       "append": true,
       "hex": "2c030211",
-      "ram": "0x44524244",
+      "ram": "0x445244c4",
       "what": "idspace: menu DEST della machine 44, voce 529"
     }
   ]

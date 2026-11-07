@@ -36,8 +36,8 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x00038000` | `0x0003e000` | poly | planned: POLY with its native kernels |
 | `0x0003e000` | `0x0003fff0` | idspace | code; descriptors, object definitions and pages the mods write (idspace_layout) |
 | `0x0003fff0` | `0x00040000` | **free** |  |
-| `0x00040000` | `0x00048000` | idspace | parameter ids above 504: descriptor table copy (537 x 52 B), extra parameter objects, extra pages |
-| `0x00048000` | `0x0007fff0` | **free** |  |
+| `0x00040000` | `0x0004c000` | idspace | runtime: descriptor table copy (569 x 52 B), mod parameter objects, packed LFO DEST rows (+0xA000) |
+| `0x0004c000` | `0x0007fff0` | **free** |  |
 
 Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams, slot 3 sfcore, slot 4 idspace.
 
@@ -173,6 +173,14 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 527 | sy-fm4 | SYN page 2/3 DEC4 (idspace) |
 | 528 | sy-fm4 | SYN page 2/3 DET (idspace) |
 | 529 | sampler | knob H of page 2/2 (index 0x36) as an LFO destination (idspace) |
+| 530 | lfo3 | LFO3 page SPD (idspace, index 0x3e) |
+| 531 | lfo3 | LFO3 page MULT (idspace, index 0x3f) |
+| 532 | lfo3 | LFO3 page FADE (idspace, index 0x40) |
+| 533 | lfo3 | LFO3 page DEST (idspace, index 0x41) |
+| 534 | lfo3 | LFO3 page WAVE (idspace, index 0x42) |
+| 535 | lfo3 | LFO3 page SPH (idspace, index 0x43) |
+| 536 | lfo3 | LFO3 page MODE (idspace, index 0x44) |
+| 537 | lfo3 | LFO3 page DEP (idspace, index 0x45) |
 
 Ids without a page often carry a MIDI CC or are aliases: clear the CC, check aliases. Ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).
 
@@ -182,6 +190,7 @@ Ids without a page often carry a MIDI CC or are aliases: clear the CC, check ali
 |---|---|---|
 | 25 | fx3 | REVERB page 2 (was OB8) |
 | 37 | dual-mono | IN R in the MIXER tab (idspace page) |
+| 38 | lfo3 | third page of the LFO tab (idspace page) |
 
 ## Saved with the kit / project
 

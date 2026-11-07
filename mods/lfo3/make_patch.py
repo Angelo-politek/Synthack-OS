@@ -26,13 +26,23 @@ sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
 import modarea_layout  # noqa: E402
 import registry  # noqa: E402
+import idspace_layout as IDS  # noqa: E402
 
 LOAD = 0x4000_0400
 OFFSET, END = next((a, b) for a, b, who, _ in registry.MODAREA if who == "lfo3")
 CODE_BASE = modarea_layout.RAM + OFFSET
 SLOT = next(s for s, who in registry.SFCORE_SLOTS.items() if who == "lfo3")
 TOOLS = "~/tools/m68k/root"
-CFLAGS = ("-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -fno-jump-tables "
+LFO1_IDS = (86, 87, 88, 89, 90, 92, 93, 94)   # SPD MULT FADE DEST WAVE SPH MODE DEP: modelli di 530..537
+LFO3_IDS = range(530, 538)
+# siti che riconoscono una DEST dall'id (89 LFO1, 99 LFO2): la catena di confronti -> jsr (Z = 1 se 89/99/533)
+DEST_SITES = [(0x4003_B11A, "7059b0836708103c0063b083", "lfo3_dest_d3", "menu della DEST: anche LFO3 (533)"),
+              (0x4001_49E2, "7059b08267087263b282", "lfo3_dest_d2", "randomizzazione: DEST di LFO3 (533)"),
+              (0x4001_4C5E, "b4806708143c0063b480", "lfo3_dest_d0", "passo relativo della DEST: anche LFO3 (533)"),
+              (0x4001_4E48, "b4806708143c0063b480", "lfo3_dest_d0", "passo relativo della DEST (FX): anche LFO3")]
+PAGE = 38                                      # pagina di idspace: terza della scheda LFO
+TAB_COUNT, TAB_ARRAY = 0x4003_57D2, 0x4003_57D8   # scheda LFO: moveq #2,d1 ; operando di move.l #0x401C8250 ({4, 5}),d0
+CFLAGS = (f"-DIDS_PAGE38={IDS.page(PAGE):#x}u " "-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -fno-jump-tables "
           "-fno-tree-loop-distribute-patterns -I. -Iinclude -Wall -Wextra")
 C_SOURCES = ["lfo3.c"]
 S_SOURCES = ["synfact/render.s", "synfact/sram.s"]
@@ -102,6 +112,34 @@ def main() -> None:
                {"section": 3, "addr": f"{modarea_layout.IMG + table:#010X}", "len": 4, "append": True,
                 "hex": struct.pack(">I", syms["lfo3_module"]).hex(),
                 "ram": f"{modarea_layout.RAM + table:#010x}", "what": f"tabella dei moduli di sfcore, posto {SLOT}"}]
+    # idspace: descrittori e oggetti 530..537 da quelli di LFO1, id interni 0x3e..0x45 (xparams, secondo gruppo),
+    # gruppo -1 come le pagine di SY FM4; pagina 38 nella scheda LFO
+    def ext(at: int, data: bytes, what: str) -> dict:
+        return {"section": 3, "addr": f"{modarea_layout.IMG + at - modarea_layout.RAM:#010X}", "len": len(data),
+                "append": True, "hex": data.hex(), "ram": f"{at:#010x}", "what": what}
+    for k, (src, pid) in enumerate(zip(LFO1_IDS, LFO3_IDS)):
+        d = bytearray(sec3[0x4022_D83C - LOAD + 52 * src:0x4022_D83C - LOAD + 52 * src + 52])
+        d[0:8] = struct.pack(">iI", -1, 0x3E + k)
+        d[24:32] = struct.pack(">II", 0xFFFF_FFFF, 0xFFFF_FFFF)               # niente CC ne' NRPN
+        patches += [ext(IDS.desc(pid), bytes(d), f"idspace: descrittore dell'id {pid} (LFO3, come {src})"),
+                    ext(IDS.objdef(pid), struct.pack(">4I", src, 0, 0, 0), f"idspace: oggetto dell'id {pid}, modello {src}")]
+    page = struct.pack(">2I", syms["lfo3_page_s"] + 12, syms["lfo3_page_l"] + 12) + struct.pack(">9I", *LFO3_IDS, 10)
+    patches.append(ext(IDS.page(PAGE), page, f"idspace: pagina {PAGE} (LFO3)"))
+    for addr, orig, new, what in ((TAB_COUNT, "7202", bytes.fromhex("7203"), "scheda LFO: 3 pagine"),
+                                  (TAB_ARRAY, "401c8250", struct.pack(">I", syms["lfo3_lfo_pages"]),
+                                   "scheda LFO: pagine {4, 5, 38}")):
+        old = sec3[addr - LOAD:addr - LOAD + len(orig) // 2]
+        if old.hex() != orig:
+            raise SystemExit(f"{addr:#x}: byte inattesi {old.hex()}")
+        patches.append({"section": 3, "addr": f"{addr:#010X}", "len": len(new), "expect_sha256": sha(old),
+                        "hex": new.hex(), "what": what})
+    for addr, orig, sym, what in DEST_SITES:                                 # DEST di LFO3 come quelle di LFO1/LFO2
+        old = sec3[addr - LOAD:addr - LOAD + len(orig) // 2]
+        if old.hex() != orig:
+            raise SystemExit(f"{addr:#x}: byte inattesi {old.hex()}")
+        new = struct.pack(">HI", 0x4EB9, syms[sym]) + NOP * ((len(old) - 6) // 2)
+        patches.append({"section": 3, "addr": f"{addr:#010X}", "len": len(new), "expect_sha256": sha(old),
+                        "hex": new.hex(), "what": what})
     for addr, orig, sym, what in SITES:
         n = len(orig) // 2
         old = sec3[addr - LOAD:addr - LOAD + n]
@@ -111,7 +149,7 @@ def main() -> None:
         patches.append({"section": 3, "addr": f"{addr:#010X}", "len": n, "expect_sha256": sha(old),
                         "hex": new.hex(), "what": what})
     spec = {
-        "name": "lfo3", "os": "1.42", "requires": ["modarea", "sfcore"], "uses": ["sfcore:lfo"],
+        "name": "lfo3", "os": "1.42", "requires": ["modarea", "sfcore", "idspace", "xparams"], "uses": ["sfcore:lfo"],
         "description": "Terzo LFO di Synfact (lfo3-st): 13 motori (12 tracce + FX) prima di LFO1/LFO2, nucleo e "
                        "dati nella SRAM.",
         "license": "GPL-2.0-or-later", "credits": "Synfact (GSM1980), elekloader (irpina)",

@@ -104,8 +104,52 @@ void lfo3_update(void)
     lfo3_active=m;
     host->native_interest((void (*)(void))lfo3_native,m?1u<<ST_NATIVE_LFO:0);
 }
+/* ---- the LFO3 page (idspace page 38, third page of the LFO tab, ids 530..537). The LFO tab is the same for every
+ * track: on the FX track the page is empty (its indices 0x3e..0x45 are the FX amp block). UI task only. */
+#define PAGE38_SLOTS ((volatile u32 *)(IDS_PAGE38 + 8))
+#define PROJECT ((u32 (*)(void))0x4016E9C8u)
+#define ACTIVE_TRACK ((u32 (*)(u32))0x4001FF74u)
+struct rep { u32 len, cap; int ref; char s[8]; };      /* static COW std::string: -1 = leaked, never freed */
+const struct rep lfo3_page_s = {4, 4, -1, "LFO3"};
+const struct rep lfo3_page_l = {5, 5, -1, "LFO 3"};
+const u32 lfo3_lfo_pages[3] = {4, 5, 38};               /* the LFO tab's pages */
+void lfo3_page_slots(void)
+{
+    u32 fx=ACTIVE_TRACK(PROJECT()+0x30u)==12u,k;
+    if((PAGE38_SLOTS[0]==0)==fx)return;
+    for(k=0;k<8;k++)PAGE38_SLOTS[k]=fx?0:530u+k;
+}
+/* LFO3's DEST (id 533) is a DEST like LFO1's (89) and LFO2's (99) where the OS tells them apart by id: popup
+ * (0x4003B11A, id in d3), randomize (0x400149E2, d2), relative step (0x40014C5E / 0x40014E48, d0). Each site's
+ * compare chain becomes jsr here: Z = 1 for 89, 99, 533; the site's own bne follows. Only flags change. */
+__asm__(
+    "        .text\n"
+    "        .globl  lfo3_dest_d0, lfo3_dest_d2, lfo3_dest_d3\n"
+    "lfo3_dest_d0:\n"
+    "        cmpi.l  #89,%d0\n"
+    "        beq.s   1f\n"
+    "        cmpi.l  #99,%d0\n"
+    "        beq.s   1f\n"
+    "        cmpi.l  #533,%d0\n"
+    "1:      rts\n"
+    "lfo3_dest_d2:\n"
+    "        cmpi.l  #89,%d2\n"
+    "        beq.s   1f\n"
+    "        cmpi.l  #99,%d2\n"
+    "        beq.s   1f\n"
+    "        cmpi.l  #533,%d2\n"
+    "1:      rts\n"
+    "lfo3_dest_d3:\n"
+    "        cmpi.l  #89,%d3\n"
+    "        beq.s   1f\n"
+    "        cmpi.l  #99,%d3\n"
+    "        beq.s   1f\n"
+    "        cmpi.l  #533,%d3\n"
+    "1:      rts\n");
+
 static void lfo3_tick(void *controller)
 {
+    lfo3_page_slots();
     lfo3_ticks++;
     if(lfo3_in_sram && lfo3_ticks%60u==0 && crc(LFO3_SRAM_CODE,lfo3_code_bytes)!=lfo3_code_crc){
         lfo3_refused=4;use_ddr();                      /* the copy changed: same kernel and data from DDR */
