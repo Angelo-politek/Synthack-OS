@@ -136,6 +136,7 @@ IDS = {
     **{521 + k: ("sy-fm4", f"SYN {p} {n} (idspace)")
        for k, (n, p) in enumerate((("ALGO", "pages 2/3 and 3/3"), *((n, "page 2/3") for n in (
            "RAT3", "LEV3", "DEC3", "RAT4", "LEV4", "DEC4", "DET"))))},
+    529: ("sampler", "knob H of page 2/2 (index 0x36) as an LFO destination (idspace)"),
     **{497 + k: ("sampler", f"SAMPLER knob {n} (was SP TWINSHOT {w})") for k, (n, w) in enumerate(
         (("A TUNE", "TUN1"), ("B PLAY", "SMP1"), ("C BR", "FLT1"), ("G LOOP/BARS/GRID, lix 0x18", "MIX"),
          ("E STRT/SEG/SLICE", "TUN2"), ("F LEN/MODE", "SMP2"), ("H LEV, lix 0x19 (the machine type in lix 0x1A, set from the machine menu)", "OVER"),
@@ -144,7 +145,7 @@ IDS = {
 
 # ---- pagine dell'interfaccia (indice -> mod) riusate
 # ---- voci in piu' del menu DEST degli LFO (idspace_layout.DESTX): posto -> mod
-DESTX_SLOTS = {**{k: "sy-fm4" for k in range(13)}}
+DESTX_SLOTS = {**{k: "sy-fm4" for k in range(13)}, 13: "sampler"}
 
 PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 37: ("dual-mono", "IN R in the MIXER tab (idspace page)")}
 

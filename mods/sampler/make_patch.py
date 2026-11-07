@@ -26,7 +26,7 @@ sys.path[:0] = [str(REPO / "tools" / "unpack"), str(REPO / "tools" / "build")]
 import eft  # noqa: E402
 import engine_layout as E  # noqa: E402
 import modarea_layout as M  # noqa: E402
-import idspace_layout as IDS  # noqa: E402
+import idspace_layout as IDL  # noqa: E402
 import registry  # noqa: E402
 import synpages_layout as SP  # noqa: E402
 
@@ -37,7 +37,8 @@ BOOT_SLOT = next(n for n, who in registry.BOOT_SLOTS.items() if who == "sampler"
 TOOLS = "~/tools/m68k/root"
 LS_HDR = __import__("modarea_layout").RAM + next(a for a, b, who, _ in __import__("registry").MODAREA
                                                   if who == "long-samples")    # mods/long-samples: 'LSHD'
-CFLAGS = (f"-DDESC={IDS.TABLE:#x}u -DSP_TABLE={SP.TABLE:#x} -DLS_HDR={LS_HDR:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
+XPAR_ID, DESTX_SLOT = 529, 13             # id e posto DESTX (registro)
+CFLAGS = (f"-DDESC={IDL.TABLE:#x}u -DSP_TABLE={SP.TABLE:#x} -DLS_HDR={LS_HDR:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
           "--param=min-pagesize=0")             # la RAM condivisa della CPU #2 parte da 0
 
 # sezione 3 (OS 1.42)
@@ -212,6 +213,19 @@ def main() -> None:
         {"section": 7, "addr": f"{E.IMG + OFF_ENGINE:#010X}", "len": len(blob7), "append": True, "hex": blob7.hex(),
          "ram": f"{E.RAM + OFF_ENGINE:#010x}", "what": "(area motori) SAMPLER sulla CPU #2"},
     ]
+    # knob H of page 2/2 (index 0x36 of xparams) as an LFO destination: id 529 (idspace), after the third stock entry
+    # of the SAMPLER's DEST row (machine 44)
+    def ext(at: int, data: bytes, what: str) -> dict:
+        return {"section": 3, "addr": f"{M.IMG + at - M.RAM:#010X}", "len": len(data), "append": True,
+                "hex": data.hex(), "ram": f"{at:#010x}", "what": what}
+    d = bytearray(sec3[0x4022_D83C - LOAD + 52 * 503:0x4022_D83C - LOAD + 52 * 503 + 52])
+    d[4:8] = struct.pack(">I", 0x36)
+    d[8:20] = struct.pack(">III", 0, 0x7F00, 0)
+    d[24:32] = struct.pack(">II", 0xFFFF_FFFF, 0xFFFF_FFFF)
+    d[40:44], d[48:52] = long(s3["sm_xpar_l"]), long(s3["sm_xpar_s"])
+    p += [ext(IDL.desc(XPAR_ID), bytes(d), f"idspace: descrittore dell'id {XPAR_ID} (manopola H, indice 0x36)"),
+          ext(IDL.objdef(XPAR_ID), struct.pack(">4I", 503, 0, 0, 0), f"idspace: oggetto dell'id {XPAR_ID}, modello 503"),
+          ext(IDL.destx(DESTX_SLOT), struct.pack(">BBH", 44, 3, XPAR_ID), f"idspace: menu DEST della machine 44, voce {XPAR_ID}")]
     spec = {
         "name": "sampler", "os": "1.42", "requires": ["modarea", "modarea7", "syn-pages", "xparams", "idspace"],
         "description": "SAMPLER al posto di SP TWINSHOT: le machine a campioni della Digitakt (ONESHOT, WERP, "

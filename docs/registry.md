@@ -172,6 +172,7 @@ Zero bytes are not free space: check that no code reads them (pointers, tables i
 | 526 | sy-fm4 | SYN page 2/3 LEV4 (idspace) |
 | 527 | sy-fm4 | SYN page 2/3 DEC4 (idspace) |
 | 528 | sy-fm4 | SYN page 2/3 DET (idspace) |
+| 529 | sampler | knob H of page 2/2 (index 0x36) as an LFO destination (idspace) |
 
 Ids without a page often carry a MIDI CC or are aliases: clear the CC, check aliases. Ids above 504 do not exist. See [ui-parameters.md](ui-parameters.md#hidden-ids-used-by-the-mods).
 

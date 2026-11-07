@@ -70,6 +70,9 @@ typedef struct {
 } knob_t;
 
 static const char group[] = "SMPL";
+/* names of id 529 (mods/idspace): knob H of page 2/2 (index 0x36) as an LFO destination */
+__attribute__((used)) const char sm_xpar_l[] = "Machine Param";
+__attribute__((used)) const char sm_xpar_s[] = "MPAR";
 
 static const knob_t knobs[4][3] = {
     {{"Start", "STRT", 0, 0x7800, 0}, {"Length", "LEN", 0, 0x7800, 0x7800}, {"Loop Pos", "LOOP", 0, 0x7802, 0}},
