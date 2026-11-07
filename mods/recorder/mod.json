@@ -1,0 +1,5 @@
+{
+  "title": "Audio recorder",
+  "kind": "feature",
+  "summary": "Record up to 60 s from the inputs, the main mix or a track; trim, normalize, save as a long sample that plays at once."
+}

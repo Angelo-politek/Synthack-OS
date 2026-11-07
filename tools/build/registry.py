@@ -42,7 +42,7 @@ MODAREA = [
     (0x1B000, 0x1B020, "sfcore", "module table: 8 pointers to Synfact module descriptors, written by each port (SFCORE_SLOTS)"),
     (0x1B040, 0x1FFF0, "sfcore", "Synfact core subset: event bus, adapters, native transactions, host API (GPL-2.0-or-later)"),
     # 256 KB area from 2026-11-05: the Synfact ports, claimed before their code exists (port plan)
-    (0x20000, 0x26000, "recorder", "planned: code and small data (PCM and large state in the OS heap)"),
+    (0x20000, 0x26000, "recorder", "Synfact recorder port: code and data (PCM in the OS heap)"),
     (0x26000, 0x2A000, "lfo3", "third LFO (Synfact port): engine (source of the SRAM copy), page, actions"),
     (0x2A000, 0x32000, "xstore", "planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks)"),
     (0x32000, 0x38000, "arp", "planned: arpeggiator (cells in the OS heap)"),
@@ -50,11 +50,12 @@ MODAREA = [
     (0x3E000, 0x3FFF0, "idspace", "code; descriptors, object definitions and pages the mods write (idspace_layout)"),
     # 512 KB area from 2026-11-06: the second half is runtime RAM only (zeroed by the loader)
     (0x40000, 0x4C000, "idspace", "runtime: descriptor table copy (569 x 52 B), mod parameter objects, packed LFO DEST rows (+0xA000)"),
-    # 0x48000..0x7FFF0: free (runtime RAM only)
+    (0x4C000, 0x58000, "recorder", "BSS of the recorder (runtime RAM only, zeroed by the loader)"),
+    # 0x58000..0x7FFF0: free (runtime RAM only)
 ]
 
 # ---- mod con spazio prenotato ma non ancora scritte (port di Synfact, piano 2026-11-05): ammesse come proprietarie
-PLANNED = {"recorder", "xstore", "arp", "poly"}
+PLANNED = {"xstore", "arp", "poly"}
 
 # ---- tabella dei moduli di sfcore (area mod + SFCORE_TABLE): posto -> mod. sfcore li inizializza in quest'ordine.
 SFCORE_TABLE, SFCORE_N = 0x1B000, 8

@@ -190,7 +190,7 @@ static u32 id_of(const void *fn, u32 field) {
 #define IMAGE ((const volatile uint8_t *)0x4D84F2C5u)
 #define IMAGE_TOTAL ((const volatile uint8_t *)0x4D84F2C1u)
 #define POOL_OBJ (*(const volatile u32 *)0x444E239Cu)        /* sample storage: names of the stock slots */
-#define DESC_SAMP_MAX (*(volatile u32 *)(0x40233E9Cu + 12))   /* descriptor 504 (SAMP), its maximum */
+#define DESC_SAMP_MAX (*(volatile u32 *)(DESC + 52u * 504u + 12u))   /* descriptor 504 (SAMP), its maximum (idspace copy) */
 
 static u32 be32(const volatile uint8_t *p) { return (u32)p[0] << 24 | (u32)p[1] << 16 | (u32)p[2] << 8 | p[3]; }
 
@@ -242,6 +242,12 @@ static u32 samples_count(void) {
     u32 n = stock.n + c;
     DESC_SAMP_MAX = (n ? (n > 128 ? 127 : n - 1) : 0) << 8;   /* the knob stops at the last sample */
     return n;
+}
+
+/* SAMP value of the long sample at position p of the project's list (mods/recorder: a new take on a track) */
+__attribute__((used)) u32 sm_long_samp(u32 p) {
+    stock_scan();
+    return stock.n + p;
 }
 
 /* name (up to max characters, capitals) and length of sample i of the list; 0 if there is none */

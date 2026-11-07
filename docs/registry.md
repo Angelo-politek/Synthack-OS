@@ -29,7 +29,7 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x0001b020` | `0x0001b040` | **free** |  |
 | `0x0001b040` | `0x0001fff0` | sfcore | Synfact core subset: event bus, adapters, native transactions, host API (GPL-2.0-or-later) |
 | `0x0001fff0` | `0x00020000` | **free** |  |
-| `0x00020000` | `0x00026000` | recorder | planned: code and small data (PCM and large state in the OS heap) |
+| `0x00020000` | `0x00026000` | recorder | Synfact recorder port: code and data (PCM in the OS heap) |
 | `0x00026000` | `0x0002a000` | lfo3 | third LFO (Synfact port): engine (source of the SRAM copy), page, actions |
 | `0x0002a000` | `0x00032000` | xstore | planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks) |
 | `0x00032000` | `0x00038000` | arp | planned: arpeggiator (cells in the OS heap) |
@@ -37,13 +37,14 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x0003e000` | `0x0003fff0` | idspace | code; descriptors, object definitions and pages the mods write (idspace_layout) |
 | `0x0003fff0` | `0x00040000` | **free** |  |
 | `0x00040000` | `0x0004c000` | idspace | runtime: descriptor table copy (569 x 52 B), mod parameter objects, packed LFO DEST rows (+0xA000) |
-| `0x0004c000` | `0x0007fff0` | **free** |  |
+| `0x0004c000` | `0x00058000` | recorder | BSS of the recorder (runtime RAM only, zeroed by the loader) |
+| `0x00058000` | `0x0007fff0` | **free** |  |
 
 Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams, slot 3 sfcore, slot 4 idspace.
 
 sfcore module table (`+0x1b000`, 8 pointers, initialized in this order): slot 0 modulation-skip, slot 1 xstore, slot 2 recorder, slot 3 lfo3, slot 4 arp, slot 5 poly.
 
-Planned (space claimed, code not written yet): arp, poly, recorder, xstore.
+Planned (space claimed, code not written yet): arp, poly, xstore.
 
 ## SRAM (CPU #1, internal: never a cache miss)
 
