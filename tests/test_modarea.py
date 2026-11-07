@@ -121,7 +121,9 @@ def test_boot_decompresses_the_area_and_clears_the_rest_of_bss(built):
     t0, t1 = I.TABLE - RAM, I.TABLE - RAM + 52 * I.N
     stock = sec3[0x4022_D83C - LOAD:0x4022_D83C - LOAD + 52 * 505]
     assert ram[t0:t0 + 52 * 505] == stock
-    assert not any(ram[len(img):t0]) and not any(ram[t1:])      # resto dell'area azzerato
+    r0, r1 = I.ROWS - RAM, I.ROWS - RAM + 2 * I.DEST_N * I.DEST_ROWS   # e le righe del menu DEST
+    assert any(ram[r0:r1])
+    assert not any(ram[len(img):t0]) and not any(ram[t1:r0]) and not any(ram[r1:])   # resto azzerato
     for a in (BSS_LO + 0x10_0000, RAM - 0x10, RAM + SIZE, BSS_HI - 0x10):
         assert not any(uc.mem_read(a, 16)), hex(a)              # BSS a zero intorno all'area
     assert uc.mem_read(BSS_HI, 16) == b"\x77" * 16
