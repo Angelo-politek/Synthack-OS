@@ -25,6 +25,9 @@ import lz  # noqa: E402
 NODE = shutil.which("node")
 needs_node = pytest.mark.skipif(not NODE, reason="Node.js assente")
 KINDS = {"base", "feature", "machine", "infra", "test"}
+# funzioni che ne usano altre (il builder le aggiunge, build.ts): il registratore salva tra i campioni lunghi e assegna
+# il SAMPLER
+FEATURE_DEPS = {("recorder", "long-samples"), ("recorder", "sampler")}
 
 
 def test_every_mod_has_a_card():
@@ -33,8 +36,9 @@ def test_every_mod_has_a_card():
         assert set(card) == {"title", "kind", "summary"}, d.name
         assert card["kind"] in KINDS and card["title"] and card["summary"].isascii(), d.name
         spec = json.loads((d / "patch.json").read_text(encoding="utf-8"))
-        for req in spec.get("requires", []):                # le dipendenze sono infrastruttura
-            assert json.loads((ROOT / "mods" / req / "mod.json").read_text(encoding="utf-8"))["kind"] == "infra"
+        for req in spec.get("requires", []):                # le dipendenze sono infrastruttura, tranne quelle
+            kind = json.loads((ROOT / "mods" / req / "mod.json").read_text(encoding="utf-8"))["kind"]
+            assert kind == "infra" or (d.name, req) in FEATURE_DEPS, (d.name, req)
 
 
 def node(*args, **kw):

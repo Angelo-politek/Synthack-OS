@@ -13,9 +13,9 @@
  * STOP (STOP key 40046ed8, MIDI 4010407a): UI task only, own IRQ mask. */
 #define REC_SEQ_STATE (*(volatile u32 *)0x43bd83bcu)
 #define REC_SEQ_STOP ((void (*)(void))0x4008c300u)
-#define REC_BRAIN ((u8 *(*)(void))0x4016e9c8u)
+#define REC_BRAIN() ((u8 *)((u32 (*)(void))0x4016e9c8u)())   /* SyntHack: OS results in d0, cast after the call */
 #define REC_SET_MACHINE ((u32 (*)(void *,u32,u32,u32,u32))0x4000f7beu)
-#define REC_TRACK_MODEL ((u8 *(*)(void *,u32))0x4000f04cu)
+#define REC_TRACK_MODEL(k,t) ((u8 *)((u32 (*)(void *,u32))0x4000f04cu)((k),(t)))
 #define REC_SET_PARAM ((void (*)(void *,u32,u32,u32,u32,u32))0x40013304u)
 #define REC_AVAILABILITY ((u32 (*)(void *,u32))0x4000f72au)
 #define REC_TRACK_CTOR ((void (*)(void *,void *,u32,void *))0x4006e23eu)

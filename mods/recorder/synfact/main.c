@@ -27,7 +27,7 @@ extern u32 recorder_irq_lock(void);extern void recorder_irq_unlock(u32);
 #define UI_CLOSE ((void (*)(void *))0x400ffec6u)
 #define UI_DIRTY ((void (*)(void *))0x400ffe22u)
 #define UI_OPAQUE ((void (*)(void *,u32))0x400ffcb8u)
-#define QSTR_INIT ((void *(*)(void *,const char *,void *))0x401bf31eu)
+#define QSTR_INIT ((u32 (*)(void *,const char *,void *))0x401bf31eu)   /* SyntHack: OS results in d0 */
 #define WAVE_FILL ((void (*)(void *,s32,s32,s32,s32,u32))0x400f7fb6u)
 #define WAVE_PIXEL ((void (*)(void *,s32,s32,u32))0x400f7304u)
 #define WAVE_TEXT ((void (*)(void *,void *,s32,s32,u32,const char *,...))0x400f8bd0u)
