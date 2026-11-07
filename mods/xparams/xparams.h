@@ -16,6 +16,9 @@
 
 #define XP_FIRST 0x36
 #define XP_N 8
+/* a second group, 0x3e..0x45 (LFO3): saved with the sound and p-locked like the first, not sent to the voice CPU */
+#define XP2_FIRST 0x3E
+#define XP2_N 8
 #define XP_SHARED 0x700                 /* voice CPU address; the main CPU sees it at 0x10000000 + XP_SHARED */
 
 /* The machine words (logical indices 0x11..0x1a) as set, with this block's locks: the voice frames carry them

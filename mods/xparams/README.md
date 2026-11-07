@@ -1,6 +1,6 @@
 # xparams
 
-Eight more parameters per track for the machines that need them: logical indices `0x36`–`0x3D`, saved with the sound, p-lockable, and sent to the voice CPU every audio block. Used by [sy-fm4](../sy-fm4) (pages 2/3 and 3/3) and [sampler](../sampler) (knob H of page 2/2). The code comes from SY FM4 (Rxuting, MIT).
+Eight more parameters per track for the machines that need them: logical indices `0x36`–`0x3D`, saved with the sound, p-lockable, and sent to the voice CPU every audio block. A second group, `0x3E`–`0x45`, is saved and p-lockable the same way but stays on the main CPU (LFO3). Used by [sy-fm4](../sy-fm4) (pages 2/3 and 3/3) and [sampler](../sampler) (knob H of page 2/2). The code comes from SY FM4 (Rxuting, MIT).
 
 ## Use in a machine
 

@@ -56,7 +56,7 @@ def test_boot_list_fills_the_storage_tables(built, stock):
     lane = struct.unpack(">71I", uc.mem_read(SYM["xp_lane_of_lix"], 4 * 71))
     assert l2p[:54] == lix2phys and p2l[:54] == phys2lix and lane[:54] == lix2phys
     assert l2p[54:] == p2l[54:] == tuple(range(54, 71))
-    assert lane[54:62] == tuple(range(0x50, 0x58)) and set(lane[62:]) == {0xFF}
+    assert lane[54:70] == tuple(range(0x50, 0x60)) and set(lane[70:]) == {0xFF}       # 0x36..0x3d, 0x3e..0x45 (LFO3)
 
 
 def test_stock_sound_without_a_machine_hook_stays_zero(built):
@@ -130,3 +130,20 @@ def test_lfo_dest_on_an_extra_index_modulates_what_the_voice_cpu_gets():
         assert shared(0, 0x38) == 0x1234 and shared(1, 0x37) == 0x4000
         seen.add(shared(0, 0x37))
     assert len(seen) > 8 and max(seen) - min(seen) > 0x4000
+
+
+def test_second_group_for_lfo3_is_saved_loaded_and_locked(built):
+    """Indici 0x3e..0x45 (LFO3): slot del suono 62..69 caricati, salvataggio fino a 0x45, corsie di lock 0x58..0x5f."""
+    import test_modarea as MA
+    uc, _ = MA.boot(built)
+    sound, storage = 0x47FF_0000, 0x47FF_1000
+    uc.mem_write(sound, bytes(0x100))
+    uc.mem_write(storage, bytes(0x1C) + struct.pack(">70H", *range(1, 71)))
+    MA.call(uc, SYM["xp_load_params"], sound, storage)
+    assert struct.unpack(">8H", uc.mem_read(sound + 20 + 2 * 0x3E, 16)) == tuple(range(63, 71))
+    for k in range(8):
+        assert MA.call(uc, SYM["xp_phys_to_lix"], 3, 0x58 + k) == 0x3E + k
+    assert MA.call(uc, SYM["xp_phys_to_lix"], 3, 0x60) == 0
+    spec = {int(p["addr"], 16): p["hex"] for p in json.loads(
+        (ROOT / "mods" / "xparams" / "patch.json").read_text(encoding="utf-8"))["patches"] if not p.get("append")}
+    assert spec[0x400A_7452] == "0c40008c" and spec[0x400A_803E] == "7a5f"

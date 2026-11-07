@@ -120,14 +120,15 @@ def main() -> None:
           "what": "(area mod) lista di avvio: xp_boot (tabelle degli slot e delle lane)"},
          fixed(SAVE_LEA, b"\x41\xf9" + long(s["xp_sound_l2p"]), "salvataggio del suono: tabella degli slot",
                b"\x41\xf9" + long(LIX2PHYS)),
-         fixed(SAVE_BOUND, b"\x72\x7c", "salvataggio del suono: fino all'indice 0x3d", b"\x72\x6c"),
+         fixed(SAVE_BOUND, bytes.fromhex("0c40008c"), "salvataggio del suono: fino all'indice 0x45 (cmpi.w #0x8c,d0)",
+               bytes.fromhex("726cb280")),
          fixed(LOAD_LOOP, b"\x4e\xb9" + long(s["xp_load_shim"]) + b"\x43\xf9" + long(s["xp_sound_p2l"])
                + b"\x4e\x71" * 11, "caricamento del suono: xp_load_shim (valori della machine per i suoni stock)"),
          fixed(LOCK_W_A, b"\x4b\xf9" + long(s["xp_lane_of_lix"]), "p-lock, scrittura A: lane degli indici extra",
                b"\x4b\xf9" + long(LIX2PHYS)),
          fixed(LOCK_W_B, b"\x45\xf9" + long(s["xp_lane_of_lix"]), "p-lock, scrittura B: lane degli indici extra",
                b"\x45\xf9" + long(LIX2PHYS)),
-         fixed(LOCK_R_BOUND, b"\x7a\x57", "p-lock, lettura: lane fino a 0x57", b"\x7a\x46"),
+         fixed(LOCK_R_BOUND, bytes.fromhex("7a5f"), "p-lock, lettura: lane fino a 0x5f", bytes.fromhex("7a46")),
          fixed(PHYS_TO_LIX, b"\x4e\xf9" + long(s["xp_phys_to_lix"]), "slot/lane -> indice logico"),
          fixed(DMA_WAIT, b"\x4e\xf9" + long(s["xp_dma_wait"]), "attesa eDMA 47: indici extra nella RAM condivisa")]
     spec = {

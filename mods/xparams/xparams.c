@@ -39,7 +39,7 @@ void xp_boot(void) {
         xp_sound_p2l[i] = stock ? PHYS2LIX[i] : (u32)i;
         if (stock)
             xp_lane_of_lix[i] = LIX2PHYS[i];
-        else if (i < XP_FIRST + XP_N)
+        else if (i < XP2_FIRST + XP2_N)          /* both groups: lanes 0x50..0x5f */
             xp_lane_of_lix[i] = LANE_FIRST + (i - XP_FIRST);
         else
             xp_lane_of_lix[i] = 0xff;
@@ -55,7 +55,7 @@ u32 xp_phys_to_lix(u32 track, u32 phys) {
         return phys < 0x45 ? FX_PHYS2LIX[phys] : 0;
     if (phys < STOCK_LIX)
         return PHYS2LIX[phys];
-    if (phys >= LANE_FIRST && phys < LANE_FIRST + XP_N)
+    if (phys >= LANE_FIRST && phys < LANE_FIRST + XP_N + XP2_N)
         return XP_FIRST + (phys - LANE_FIRST);
     return 0;
 }
@@ -67,7 +67,7 @@ u32 xp_phys_to_lix(u32 track, u32 phys) {
 void xp_load_params(uint8_t *sound, const uint8_t *storage) {
     volatile uint16_t *lix = (volatile uint16_t *)(sound + 10 * 2);
     const uint16_t *slot = (const uint16_t *)(storage + 0x1c);
-    for (int p = 0; p < XP_FIRST + XP_N; p++)
+    for (int p = 0; p < XP2_FIRST + XP2_N; p++)
         lix[xp_sound_p2l[p]] = slot[p];
     int empty = 1;
     for (int k = 0; k < XP_N; k++)
