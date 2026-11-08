@@ -33,11 +33,11 @@ static unsigned int arp_steps_edited DATA=0;
  * pattern's (40019000) lock model at +620h (40016062), as 4001ef50 passes it;
  * not the pattern itself, nor anything from the parameter view's +68h. */
 static void *arp_app(void)
-{return UI_CALL(0x4016e9c8u,void *(*)(void))();}
+{return (void *)UI_CALL(0x4016e9c8u,arp_u32 (*)(void))();}   /* SyntHack: OS pointers come back in d0 */
 static void *arp_pattern_model(void)
 {
-    void *app=arp_app(),*pattern=app?UI_CALL(0x40019000u,void *(*)(void *))(app):0;
-    return pattern?UI_CALL(0x40016062u,void *(*)(void *))(pattern):0;
+    void *app=arp_app(),*pattern=app?(void *)UI_CALL(0x40019000u,arp_u32 (*)(void *))(app):0;
+    return pattern?(void *)UI_CALL(0x40016062u,arp_u32 (*)(void *))(pattern):0;
 }
 static void arp_lock_read(void)
 {
@@ -176,7 +176,7 @@ static void arp_view_leds(void *handler,void *claimed,void *offered)
     struct arp_settings *p=&arp_ui_parameters;
     unsigned int k,mode,palette;void *mgr;(void)claimed;(void)offered;
     if(!arp_view || handler!=arp_view+ARP_VIEW_BYTES || arp_lock_mode || arp_recording())return;
-    mgr=UI_CALL(0x4016efa4u,void *(*)(void))();
+    mgr=(void *)UI_CALL(0x4016efa4u,arp_u32 (*)(void))();
     for(k=0;k<16;k++){
         if(k>p->length){mode=1;palette=2;}
         else{mode=2;palette=p->enabled&(1u<<k)?ARP_LED_ACTIVE:ARP_LED_INACTIVE;}
@@ -257,7 +257,7 @@ static int arp_open(void *app,arp_u32 track)
     if(track>=ARP_TRACKS || !eligible(track))return 0;
     main=arp_top(app);if(!main || view_word(main,0)!=0x401c849cu)return 0;
     parameter=*(arp_u8 **)(main+0xc0);if(!parameter || view_word(parameter,0)!=0x401c9a9cu)return 0;
-    proxy=((void *(*)(void *,arp_u32,int))(*(arp_u32 **)parameter)[0xc4/4])(parameter,0x60u,-1);
+    proxy=(void *)((arp_u32 (*)(void *,arp_u32,int))(*(arp_u32 **)parameter)[0xc4/4])(parameter,0x60u,-1);
     sound=proxy_sound(proxy);if(!sound)return 0;
     arp_track_read(track,&p);
     if(arp_view)return 0;
@@ -326,7 +326,7 @@ static void arp_view_tick(void *controller)
         if(track!=arp_track){
             arp_u8 *parameter=*(arp_u8 **)(arp_main+0xc0);void *proxy=0;arp_u32 sound=0;
             if(track<ARP_TRACKS && eligible(track) && parameter && view_word(parameter,0)==0x401c9a9cu){
-                proxy=((void *(*)(void *,arp_u32,int))(*(arp_u32 **)parameter)[0xc4/4])(parameter,0x60u,-1);
+                proxy=(void *)((arp_u32 (*)(void *,arp_u32,int))(*(arp_u32 **)parameter)[0xc4/4])(parameter,0x60u,-1);
                 sound=proxy_sound(proxy);
             }
             if(!sound){ARP_CLOSE(arp_view);return;}

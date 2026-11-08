@@ -44,10 +44,10 @@ static void poly_copy_ui(void)
     for(t=1;t<8;t++) {
         o=poly_owner_map[t];
         if(o>=t || !(pending&(1u<<t)))continue;
-        POLY_CALL(0x4011613cu,void *(*)(void *,const void *,u32))
+        POLY_CALL(0x4011613cu,u32 (*)(void *,const void *,u32))
             ((void *)(kit+0x2au+t*0x123u),(const void *)(kit+0x2au+o*0x123u),0x123u);
         if(sequence_kit && sequence_kit!=kit)
-            POLY_CALL(0x4011613cu,void *(*)(void *,const void *,u32))
+            POLY_CALL(0x4011613cu,u32 (*)(void *,const void *,u32))
                 ((void *)(sequence_kit+0x2au+t*0x123u),(const void *)(kit+0x2au+o*0x123u),0x123u);
         native_publish_sound((const volatile u8 *)(kit+0x2au+t*0x123u),t);
     }

@@ -52,6 +52,11 @@ def test_sources_are_ported_and_marked():
     origin = (MOD / "synfact" / "ORIGIN").read_text(encoding="utf-8")
     assert "1a6d0c74469db4c30423be29c90e0b07ba7f8003" in origin and "GPL-2.0-or-later" in origin
     assert not (MOD / "synfact" / "persist.c").exists()
+    # chiamate all'OS con risultato puntatore: m68k-linux-gnu-gcc lo legge da a0, l'OS lo lascia in d0 (sulla
+    # macchina il doppio TRIG non apriva la vista: proxy del parametro letto da a0)
+    import re
+    src = text + (MOD / "glue.c").read_text(encoding="utf-8")
+    assert not re.findall(r"[(,]\s*(?:const\s+)?[A-Za-z_0-9]+\s*\*+\s*\(\*\)\s*\(", src)
 
 
 def test_patch_is_current_and_registered():

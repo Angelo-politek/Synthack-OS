@@ -35,7 +35,7 @@ static const char *sam_assign_apply(u32 slot)
     kit=BRAIN()+0x130;
     REC_SET_MACHINE(kit,(u32)track,ASSIGN_TYPE,1,1);
     model=REC_TRACK_MODEL(kit,(u32)track);
-    sound=((u8 *(*)(void *))(*(u32 **)model)[0x28/4])(model);
+    sound=(u8 *)((u32 (*)(void *))(*(u32 **)model)[0x28/4])(model);   /* SyntHack: the pointer comes back in d0 */
     if(!sound || sound[0xa2]!=ASSIGN_TYPE)return "SAVED / NOT ASSIGNED";
     /* SoundParameterSet (vtable 401c3aac) borrowing the track model at +10. */
     proxy[0]=0x401c3d4cu;proxy[1]=0;proxy[2]=0;proxy[3]=0;proxy[4]=(u32)model;

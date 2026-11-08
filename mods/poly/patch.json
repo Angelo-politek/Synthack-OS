@@ -20,7 +20,7 @@
     "synfact/main.c": "16d71db896295c8f26c5c23d736a44a5897d436b9af6b8c4cae62e29d0f5a1fe",
     "synfact/native.s": "c5e044f8073254bc15e89e62d4a955dad578f39d293d2297454852dcddbddbc0",
     "synfact/poly_codec.c": "65ccae48c8b38d891e4ce3da72260713d4ba357846ebff8972590e1bfe676865",
-    "synfact/poly_copy.c": "ffdbb88f62f2952c037e63c4a595469002d3d9e8bcfc989227cb2ff5ca24831c",
+    "synfact/poly_copy.c": "76617dd1dac8fc6d92f829b0c4e5821496b6004c49b28ceec00da6f1fe68971c",
     "synfact/poly_core.c": "b63bb9b1579b82faeae759e3f50e45c8739cb3fbec5295fc887ae7cd41932d3a",
     "synfact/poly_event.c": "48d3ee14398b375bf2dc2597cb11adec8b6b49958707109d5374fdc1f989bdc1",
     "synfact/poly_groups.c": "c7fa1ed985ab2febe6a3f30dd2659eb44d9a7ac535bc46f045ba7a1e92e71848",

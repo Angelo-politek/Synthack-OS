@@ -4,7 +4,8 @@
 #ifndef ARP_ST_CALL
 #define ARP_ST_CALL(a,t) ((t)(a))
 #endif
-#define ARP_EVENT_ALLOC ARP_ST_CALL(0x4011a686u,arp_u32 *(*)(void))
+/* SyntHack: the OS returns the event in d0; a pointer result would be read from a0 (m68k-linux-gnu) */
+#define ARP_EVENT_ALLOC() ((arp_u32 *)ARP_ST_CALL(0x4011a686u,arp_u32 (*)(void))())
 #define ARP_EVENT_COPY ARP_ST_CALL(0x4011a6f0u,void (*)(arp_u32 *,const arp_u32 *))
 #define ARP_EVENT_FREE ARP_ST_CALL(0x4011a6bcu,void (*)(arp_u32 *))
 #define ARP_ENQUEUE ARP_ST_CALL(0x4011a80cu,void (*)(arp_u32 *,arp_u32))
