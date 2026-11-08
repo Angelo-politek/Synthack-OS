@@ -159,13 +159,29 @@ def test_dest_groups_and_knob_list_with_the_mod_ids(uis):
     assert ui.call(T, [529]) == 44 and ui.call(T, [530]) == 0xFFFF_FFFF
     for i in (19, 86, 96, 190, 197, 300, 504):
         assert ui.call(F, [i]) == stock.call(0x400A_66E2, [i]), i
-    def listed(dest):                                                           # come 0x400149F0..0x4001479E
+    from unicorn.m68k_const import UC_M68K_REG_A5
+    obj, inner, vt, stub, sound = 0x4FE0_6000, 0x4FE0_6040, 0x4FE0_6080, 0x4FE0_6100, 0x4FE0_6200
+    ui.put(obj + 16, ">I", inner)                                              # modello della traccia (a5): +16 ->
+    ui.put(inner, ">I", vt)                                                    # oggetto con vt[0x28] = il Sound
+    ui.put(vt + 40, ">I", stub)
+    ui.uc.mem_write(stub, bytes.fromhex("203c") + sound.to_bytes(4, "big") + bytes.fromhex("4e75"))
+
+    def listed(dest, machine):                                                  # come 0x400149F0..0x4001479E
+        ui.uc.mem_write(sound + 162, bytes([machine]))
+        ui.uc.reg_write(UC_M68K_REG_A5, obj)
         x = ui.long(I.TABLE + 52 * dest + 36)
         m = 0xE00 if x >> 17 & 1 else 0x600 if x >> 16 & 1 else 0
-        return {i for i in range(505, 569) if (~ui.call(F, [i])) & m == 0}
+        out = set()
+        for i in range(505, 569):
+            ui.uc.reg_write(UC_M68K_REG_A5, obj)
+            if (~ui.call(F, [i])) & m == 0:
+                out.add(i)
+        return out
     for dest in (89, 99, 533):                                                  # LFO1, LFO2, LFO3
-        got = listed(dest)
-        assert set(range(521, 530)) <= got and not got & set(range(530, 538)), (dest, sorted(got))
+        fm4, other, smp = listed(dest, 4), listed(dest, 0), listed(dest, 44)
+        assert set(range(521, 529)) <= fm4 and not fm4 & set(range(530, 538)) and 529 not in fm4, (dest, sorted(fm4))
+        assert not other & set(range(521, 530)) and not other & set(range(530, 538)), (dest, sorted(other))
+        assert 529 in smp and not smp & set(range(521, 529)), (dest, sorted(smp))
     for m in range(I.DEST_ROWS):                                                # menu: nessuna voce sotto ERR
         row = struct.unpack(f">{I.DEST_N}H", bytes(ui.uc.mem_read(I.ROWS + 2 * I.DEST_N * m, 2 * I.DEST_N)))
         assert all(ui.call(T, [x]) != 0xFFFF_FFFF for x in row if x != 0xFFFF), m

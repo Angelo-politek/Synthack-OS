@@ -373,10 +373,11 @@ ids_destx_find:
 2:      moveq   #1,%d0                          | Z = 0
         rts
 
-| ---- 0x4001476E (lea dell'OS 0x400A66E2 nella lista della manopola DEST, filtro coi flag del descrittore +24):
-| come l'OS per i suoi id; degli id delle mod passano solo quelli registrati come voci DESTX (SY FM4, SAMPLER,
-| fx3), come i parametri di una machine (0xE00); gli altri no (LFO3 530..537 hanno i flag di LFO1: sotto LFO2
-| comparivano in testa, sotto ERR, con i nomi di LFO1)
+| ---- 0x4001476E (lea dell'OS 0x400A66E2 nella lista della manopola DEST, 0x4001471C, filtro coi flag del
+| descrittore +24): come l'OS per i suoi id. Un id delle mod passa (come un parametro di machine, 0xE00) solo se
+| e' una voce DESTX della machine della traccia: a5 = il modello della traccia (SoundParameterSet, come in
+| 0x40011F6C: Sound = vt[0x28] dell'oggetto a +16, machine = Sound +0xA2), o della FX track (machine 45). Gli
+| altri no: LFO3 530..537 (flag di LFO1: sotto LFO2 in testa, sotto ERR) e SY FM4 sulle tracce di altre machine.
         .equ    DESC_FLAGS,     0x400A66E2
         .globl  ids_dest_flags
 ids_dest_flags:
@@ -385,10 +386,53 @@ ids_dest_flags:
         bcs.s   9f
         cmpi.l  #N,%d1
         bcc.s   9f
-        bsr.s   ids_destx_find
-        beq.s   1f
+        moveq   #-1,%d0                         | machine della traccia: -1 = da leggere
+        move.l  %d0,-(%sp)
+        lea     DESTX,%a0
+1:      cmp.w   2(%a0),%d1
+        bne.s   4f
+        mvz.b   (%a0),%d0
+        cmpi.l  #45,%d0                         | FX track: i suoi id ci sono solo li'
+        beq.s   6f
+        tst.l   (%sp)
+        bpl.s   3f
+        lea     -8(%sp),%sp                     | legge la machine una volta
+        movem.l %d1/%a0,(%sp)
+        bsr.s   track_machine
+        move.l  %d0,8(%sp)
+        movem.l (%sp),%d1/%a0
+        lea     8(%sp),%sp
+3:      mvz.b   (%a0),%d0
+        cmp.l   (%sp),%d0
+        beq.s   6f
+4:      addq.l  #4,%a0
+        cmpa.l  #DESTX+4*DESTX_N,%a0
+        bcs.s   1b
+        addq.l  #4,%sp
+        moveq   #0,%d0
+        rts
+6:      addq.l  #4,%sp
         move.l  #0xE00,%d0
         rts
-1:      moveq   #0,%d0
-        rts
 9:      jmp     DESC_FLAGS
+
+| machine della traccia del modello in a5 (Sound +0xA2, 0..255), 256 se non si legge
+track_machine:
+        move.l  #256,%d0
+        move.l  %a5,%d1
+        beq.s   9f
+        movea.l 16(%a5),%a0
+        move.l  %a0,%d1
+        beq.s   9f
+        movea.l (%a0),%a1
+        move.l  %a0,-(%sp)
+        movea.l 40(%a1),%a1
+        jsr     (%a1)
+        addq.l  #4,%sp
+        tst.l   %d0
+        beq.s   8f
+        movea.l %d0,%a0
+        mvz.b   162(%a0),%d0
+        rts
+8:      move.l  #256,%d0
+9:      rts
