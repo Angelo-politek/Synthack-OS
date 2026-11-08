@@ -48,6 +48,7 @@ DEST_SITES = [
     (0x4004_E55E, "47f9400a5ce42d58fcf0", "ids_destnext", "ciclo delle voci: voce da 16 bit, fine riga"),
     (0x4004_E66A, "7021", "7042", "ciclo delle voci: al massimo 66"),
     (0x4004_E090, "28330c04", "ids_op_e090", "testo della voce: id da 16 bit"),
+    (0x4004_E096, "4eb9400a5ce4", "ids_dest_type", "testo della voce: gruppo (id delle mod senza gruppo: machine DESTX)"),
     (0x4004_E8A8, "2f320c044eb9400a5ce4", "ids_dest_e8a8", "gruppo della voce: id da 16 bit"),
     (0x4004_EC0A, "41f60c002f28ff7c4eb9400a5ce4", "ids_dest_ec0a", "encoder: gruppo della voce, id da 16 bit")]
 CODE_END = I.EXT
@@ -137,7 +138,7 @@ def main() -> None:
             "generated_by": "mods/idspace/make_patch.py",
             "layout": {"table": f"{I.TABLE:#010x}", "n": I.N, "first": I.FIRST},
             "symbols": {k: f"{syms[k]:#010x}" for k in ("ids_boot", "ids_obj32", "ids_obj52", "ids_page", "ids_destcopy",
-                                                         "ids_destiid", "ids_dest_boot", "ids_destnext", "ids_dest_first")},
+                                                         "ids_destiid", "ids_dest_boot", "ids_destnext", "ids_dest_first", "ids_dest_type")},
             "patches": patches}
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     n_lim = sum(1 for s in found if s[3].startswith("limite"))

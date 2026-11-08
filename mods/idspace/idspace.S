@@ -292,7 +292,7 @@ ids_destiid:
 | lista impacchettata; alla fine della riga esce dal ciclo
         .globl  ids_destnext
 ids_destnext:
-        lea     TYPE_OF,%a3
+        lea     ids_dest_type,%a3
         mvz.w   (%a0)+,%d0
         cmpi.l  #0xFFFF,%d0
         beq.s   1f
@@ -308,7 +308,7 @@ ids_dest_e8a8:
         mvz.w   4(%a2,%d0.l*2),%d0
         move.l  %d0,-(%sp)
         move.l  %a1,-(%sp)
-        jmp     TYPE_OF
+        bra.w   ids_dest_type
 
 | ---- 0x4004EC0A (al posto di lea (a6,d0.l*4),a0 ; move.l -$84(a0),-(sp) ; jsr TYPE_OF): la voce d0 della lista
         .globl  ids_dest_ec0a
@@ -318,7 +318,7 @@ ids_dest_ec0a:
         mvz.w   -0x84(%a0),%d0
         move.l  %d0,-(%sp)
         move.l  %a1,-(%sp)
-        jmp     TYPE_OF
+        bra.w   ids_dest_type
 
 | ---- istruzione per 0x4004E090 (closure del testo della voce): mvz.w 4(a3,d0.l*2),d4 al posto di move.l
         .globl  ids_op_e090
@@ -333,4 +333,32 @@ ids_dest_first:
         swap    %d0
         ext.l   %d0                             | 0xFFFF (riga vuota) -> -1, come l'OS
         move.l  %d0,4(%sp)
-        jmp     TYPE_OF
+        bra.w   ids_dest_type
+
+| ---- gruppo di una voce nel menu DEST (al posto di TYPE_OF, solo nel menu): come l'OS; un id delle mod senza
+| gruppo (descrittore +0 = -1, es. SY FM4 521..528, fuori dalle tabelle per machine dell'OS) prende la machine
+| della sua voce DESTX, cosi' sta nel gruppo della machine invece che sotto ERR
+        .globl  ids_dest_type
+ids_dest_type:
+        move.l  4(%sp),%d1
+        cmpi.l  #FIRST,%d1
+        bcs.s   9f
+        cmpi.l  #N,%d1
+        bcc.s   9f
+        move.l  %d1,%d0
+        mulu.w  #52,%d0
+        lea     TABLE,%a0
+        moveq   #-1,%d1
+        cmp.l   (%a0,%d0.l),%d1
+        bne.s   9f                              | ha un gruppo: come l'OS
+        move.l  4(%sp),%d1
+        lea     DESTX,%a0
+        moveq   #DESTX_N,%d0
+1:      cmp.w   2(%a0),%d1
+        beq.s   2f
+        addq.l  #4,%a0
+        subq.l  #1,%d0
+        bne.s   1b
+9:      jmp     TYPE_OF
+2:      mvz.b   (%a0),%d0                       | la machine della voce
+        rts

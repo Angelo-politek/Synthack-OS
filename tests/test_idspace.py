@@ -143,3 +143,18 @@ def test_dest_menu_starts_from_the_group_of_the_first_item(uis):
     assert ui.call(first, [0xFFFF_FFFF]) == stock.call(0x400A_5CE4, [0xFFFF_FFFF])
     site = next(p for p in SPEC["patches"] if p.get("addr", "").upper() == "0X4004E542")
     assert site["hex"] == f"4eb9{first:08x}"
+
+
+def test_dest_menu_groups_mod_ids_without_a_group_under_their_machine():
+    """Nel menu DEST le voci 521..528 di SY FM4 (descrittore senza gruppo, -1) stanno nel gruppo della machine 4
+    come la pagina 1 (sulla macchina finivano sotto ERR); le altre come l'OS."""
+    import screens
+    ui = screens.UI(["sy-fm4", "sampler", "fx3", "idspace"])
+    group = SYM["ids_dest_type"]
+    assert [ui.call(0x400A_5CE4, [i]) for i in range(521, 529)] == [0xFFFF_FFFF] * 8
+    assert [ui.call(group, [i]) for i in range(521, 529)] == [4] * 8
+    for i in (19, 86, 190, 497, 506, 529, 600, 0xFFFF_FFFF):
+        assert ui.call(group, [i]) == ui.call(0x400A_5CE4, [i]), i
+    for m in range(I.DEST_ROWS):                                          # nessuna voce di una riga sotto ERR
+        row = struct.unpack(f">{I.DEST_N}H", bytes(ui.uc.mem_read(I.ROWS + 2 * I.DEST_N * m, 2 * I.DEST_N)))
+        assert all(ui.call(group, [x]) != 0xFFFF_FFFF for x in row if x != 0xFFFF), m
