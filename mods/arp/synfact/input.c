@@ -17,8 +17,10 @@ int arp_trig_tap(struct arp_double_tap *s,arp_u32 key,arp_u32 flags,
     }
     if(s->down || flags&8)return s->consume_release?ARP_TAP_CONSUME:ARP_TAP_PASS;
     s->down=1;
-    if(!main_screen || track>=12 || flags&2){s->pending=0;return ARP_TAP_PASS;}
-    open=s->pending && s->track==track && blocks-s->at<=525u;
+    if(!main_screen || track>=12){s->pending=0;return ARP_TAP_PASS;}
+    /* SyntHack: bit 1 (2) is the OS's own double press (0x400f9820), not FUNC: on TRIG the main screen opens
+     * NoteSetupMenuView with it (0x400343a4). A quick double tap carries it, so it opens the arp too. */
+    open=(flags&2) || (s->pending && s->track==track && blocks-s->at<=525u);
     s->pending=!open;s->track=track;s->at=blocks;
     if(open){s->consume_release=1;return ARP_TAP_OPEN;}
     return ARP_TAP_PASS;

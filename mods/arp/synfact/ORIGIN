@@ -11,6 +11,8 @@ Changes for SyntHack on OS 1.42:
   56 of its 128 values.
 - module.c: no SOUND_META (Sound lifecycle) subscription; MAIN blocks counted in arp_frame stand for the host's
   machine telemetry; the view's memory comes from the OS heap. Lines marked "SyntHack:".
+- input.c: flag bit 1 is the OS's double press, not FUNC; a quick double TRIG carries it and now opens the view
+  (upstream passed it to the OS, which shows its own TRIG action).
 
 sha256 of the upstream files (LF line ends), before the changes:
 arp.h        c610f2342d20152c683499196254e10693295a8da320efb6ef3ecb3d6e87ed9c

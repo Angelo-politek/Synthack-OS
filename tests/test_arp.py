@@ -205,6 +205,11 @@ def test_double_trig_and_clock():
     clear(); key(1, 0); key(16, 1); assert key(1, 10, main=0) == 0                  # noqa: E702
     clear(); key(1, 0, t=11); key(16, 1, t=11); assert key(1, 300, t=11) == 2       # noqa: E702
     clear(); assert key(1, 0, t=12) == 0; key(16, 1, t=12); assert key(1, 300, t=12) == 0  # noqa: E702
+    # doppio tocco segnato dall'OS (bit 1, 0x400F9820): apre anche oltre la finestra, non sulla FX track o fuori
+    # dalla schermata principale (sulla macchina il doppio TRIG rapido arrivava con il bit 1 e passava all'OS)
+    clear(); key(1, 0); key(16, 1); assert key(3, 10) == 2; assert key(18, 11) == 1  # noqa: E702
+    clear(); assert key(3, 5000, t=3) == 2                                           # noqa: E702
+    clear(); assert key(3, 0, t=12) == 0; clear(); assert key(3, 0, main=0) == 0     # noqa: E702
     state, due = Lab.OWN + 0x31000, Lab.SETTINGS + 0x300
     den = [1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24, 32, 40, 48, 64, 80, 96]
     for speed, d in enumerate(den):
