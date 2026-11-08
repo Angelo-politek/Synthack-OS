@@ -43,6 +43,7 @@ HOOKS = [(0x4007_BA2A, "222f00040c81", "ids_obj32", "oggetto per parametro"),
          (0x400A_65D2, "2f02740c222f", "ids_destiid", "menu DEST: voce -> id interno")]
 # menu DEST degli LFO (funzione 0x4004DF.., chiamata a 0x4004E47E): (indirizzo, byte stock, nuovi o simbolo da chiamare)
 DEST_SITES = [
+    (0x4004_E542, "4eb9400a5ce4", "ids_dest_first", "gruppo iniziale: prima voce da 16 bit"),
     (0x4004_E55A, "58aefcf8", "54aefcf8", "ciclo delle voci: puntatore della lista +2 (id da 16 bit)"),
     (0x4004_E55E, "47f9400a5ce42d58fcf0", "ids_destnext", "ciclo delle voci: voce da 16 bit, fine riga"),
     (0x4004_E66A, "7021", "7042", "ciclo delle voci: al massimo 66"),
@@ -136,7 +137,7 @@ def main() -> None:
             "generated_by": "mods/idspace/make_patch.py",
             "layout": {"table": f"{I.TABLE:#010x}", "n": I.N, "first": I.FIRST},
             "symbols": {k: f"{syms[k]:#010x}" for k in ("ids_boot", "ids_obj32", "ids_obj52", "ids_page", "ids_destcopy",
-                                                         "ids_destiid", "ids_dest_boot", "ids_destnext")},
+                                                         "ids_destiid", "ids_dest_boot", "ids_destnext", "ids_dest_first")},
             "patches": patches}
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     n_lim = sum(1 for s in found if s[3].startswith("limite"))

@@ -324,3 +324,13 @@ ids_dest_ec0a:
         .globl  ids_op_e090
 ids_op_e090:
         mvz.w   4(%a3,%d0.l*2),%d4
+
+| ---- 0x4004E542 (al posto di jsr TYPE_OF): gruppo iniziale del ciclo dalla prima voce da 16 bit (l'OS passa la
+| prima parola lunga, che ora contiene due id: senza questo il menu si apriva con un gruppo ERR)
+        .globl  ids_dest_first
+ids_dest_first:
+        move.l  4(%sp),%d0
+        swap    %d0
+        ext.l   %d0                             | 0xFFFF (riga vuota) -> -1, come l'OS
+        move.l  %d0,4(%sp)
+        jmp     TYPE_OF

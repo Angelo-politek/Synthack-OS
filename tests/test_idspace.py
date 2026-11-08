@@ -129,3 +129,17 @@ def test_dest_copy_writes_the_packed_row(uis):
         assert ui.call(DEST_COPY, [m]) == buf
         r = m if m <= 0x2C else 0x22
         assert bytes(ui.uc.mem_read(buf, 132)) == bytes(ui.uc.mem_read(I.ROWS + 132 * r, 132))
+
+
+def test_dest_menu_starts_from_the_group_of_the_first_item(uis):
+    """Gruppo iniziale del menu (0x4004E542): dalla prima voce da 16 bit della riga, come l'OS dalla prima parola
+    lunga della riga stock (con la parola intera il menu si apriva con un gruppo ERR, segnalato sulla macchina)."""
+    stock, ui = uis
+    first = SYM["ids_dest_first"]
+    for m in range(I.DEST_ROWS):
+        packed = struct.unpack(">I", bytes(ui.uc.mem_read(I.ROWS + 2 * I.DEST_N * m, 4)))[0]
+        want = stock.call(0x400A_5CE4, [struct.unpack(">I", bytes(stock.uc.mem_read(DEST_STOCK + 132 * m, 4)))[0]])
+        assert ui.call(first, [packed]) == want, m
+    assert ui.call(first, [0xFFFF_FFFF]) == stock.call(0x400A_5CE4, [0xFFFF_FFFF])
+    site = next(p for p in SPEC["patches"] if p.get("addr", "").upper() == "0X4004E542")
+    assert site["hex"] == f"4eb9{first:08x}"
