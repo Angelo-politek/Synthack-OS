@@ -40,10 +40,12 @@ HOOKS = [(0x4007_BA2A, "222f00040c81", "ids_obj32", "oggetto per parametro"),
          (0x4007_BBE2, "222f00040c81", "ids_obj52", "oggetto per parametro: chiamata del testo (+20)"),
          (0x4007_BA48, "7224202f0004", "ids_page", "elemento di pagina dall'indice"),
          (0x400A_6598, "2f02702c2408", "ids_destcopy", "menu DEST: riga della machine (impacchettata)"),
-         (0x400A_65D2, "2f02740c222f", "ids_destiid", "menu DEST: voce -> id interno")]
+         (0x400A_65D2, "2f02740c222f", "ids_destiid", "menu DEST: voce -> id interno"),
+         (0x400A_5CE4, "222f00040c81", "ids_dest_type", "gruppo di un id (id delle mod senza gruppo: machine DESTX)")]
 # menu DEST degli LFO (funzione 0x4004DF.., chiamata a 0x4004E47E): (indirizzo, byte stock, nuovi o simbolo da chiamare)
 DEST_SITES = [
     (0x4004_E542, "4eb9400a5ce4", "ids_dest_first", "gruppo iniziale: prima voce da 16 bit"),
+    (0x4001_476E, "45f9400a66e2", "lea:ids_dest_flags", "lista della manopola DEST: filtro dei flag (id delle mod: voci DESTX)"),
     (0x4004_E55A, "58aefcf8", "54aefcf8", "ciclo delle voci: puntatore della lista +2 (id da 16 bit)"),
     (0x4004_E55E, "47f9400a5ce42d58fcf0", "ids_destnext", "ciclo delle voci: voce da 16 bit, fine riga"),
     (0x4004_E66A, "7021", "7042", "ciclo delle voci: al massimo 66"),
@@ -121,6 +123,8 @@ def main() -> None:
             raise SystemExit(f"{addr:#x}: byte inattesi {old.hex()}")
         if new == "ids_op_e090":
             code = blob[syms[new] - I.CODE:syms[new] - I.CODE + 4]
+        elif new.startswith("lea:"):
+            code = bytes.fromhex(orig[:4]) + struct.pack(">I", syms[new[4:]])
         elif new.startswith("ids_"):
             code = struct.pack(">HI", 0x4EB9, syms[new]) + NOP * ((len(old) - 6) // 2)
         else:
@@ -138,7 +142,7 @@ def main() -> None:
             "generated_by": "mods/idspace/make_patch.py",
             "layout": {"table": f"{I.TABLE:#010x}", "n": I.N, "first": I.FIRST},
             "symbols": {k: f"{syms[k]:#010x}" for k in ("ids_boot", "ids_obj32", "ids_obj52", "ids_page", "ids_destcopy",
-                                                         "ids_destiid", "ids_dest_boot", "ids_destnext", "ids_dest_first", "ids_dest_type")},
+                                                         "ids_destiid", "ids_dest_boot", "ids_destnext", "ids_dest_first", "ids_dest_type", "ids_dest_flags")},
             "patches": patches}
     (HERE / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     n_lim = sum(1 for s in found if s[3].startswith("limite"))

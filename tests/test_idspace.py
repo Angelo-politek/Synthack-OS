@@ -145,16 +145,27 @@ def test_dest_menu_starts_from_the_group_of_the_first_item(uis):
     assert site["hex"] == f"4eb9{first:08x}"
 
 
-def test_dest_menu_groups_mod_ids_without_a_group_under_their_machine():
-    """Nel menu DEST le voci 521..528 di SY FM4 (descrittore senza gruppo, -1) stanno nel gruppo della machine 4
-    come la pagina 1 (sulla macchina finivano sotto ERR); le altre come l'OS."""
+def test_dest_groups_and_knob_list_with_the_mod_ids(uis):
+    """Gruppo di un id (0x400A5CE4, tutto l'OS) e filtro della lista della manopola DEST (0x4001476E).
+    Sulla macchina: sotto LFO2 una sezione ERR in testa con i nomi di LFO1 (gli id 530..537 di LFO3, flag di LFO1,
+    gruppo -1) e niente pagine 2/3 e 3/3 di SY FM4 (521..528, flag 0)."""
     import screens
-    ui = screens.UI(["sy-fm4", "sampler", "fx3", "idspace"])
-    group = SYM["ids_dest_type"]
-    assert [ui.call(0x400A_5CE4, [i]) for i in range(521, 529)] == [0xFFFF_FFFF] * 8
-    assert [ui.call(group, [i]) for i in range(521, 529)] == [4] * 8
-    for i in (19, 86, 190, 497, 506, 529, 600, 0xFFFF_FFFF):
-        assert ui.call(group, [i]) == ui.call(0x400A_5CE4, [i]), i
-    for m in range(I.DEST_ROWS):                                          # nessuna voce di una riga sotto ERR
+    stock, _ = uis
+    ui = screens.UI(["sy-fm4", "sampler", "fx3", "lfo3", "idspace"])
+    T, F = 0x400A_5CE4, SYM["ids_dest_flags"]
+    assert [ui.call(T, [i]) for i in range(521, 529)] == [4] * 8                 # con la machine 4, come 190..197
+    for i in (0, 19, 86, 99, 190, 497, 504, 600, 0xFFFF_FFFF):
+        assert ui.call(T, [i]) == stock.call(T, [i]), i                          # id dell'OS e sconosciuti: come l'OS
+    assert ui.call(T, [529]) == 44 and ui.call(T, [530]) == 0xFFFF_FFFF
+    for i in (19, 86, 96, 190, 197, 300, 504):
+        assert ui.call(F, [i]) == stock.call(0x400A_66E2, [i]), i
+    def listed(dest):                                                           # come 0x400149F0..0x4001479E
+        x = ui.long(I.TABLE + 52 * dest + 36)
+        m = 0xE00 if x >> 17 & 1 else 0x600 if x >> 16 & 1 else 0
+        return {i for i in range(505, 569) if (~ui.call(F, [i])) & m == 0}
+    for dest in (89, 99, 533):                                                  # LFO1, LFO2, LFO3
+        got = listed(dest)
+        assert set(range(521, 530)) <= got and not got & set(range(530, 538)), (dest, sorted(got))
+    for m in range(I.DEST_ROWS):                                                # menu: nessuna voce sotto ERR
         row = struct.unpack(f">{I.DEST_N}H", bytes(ui.uc.mem_read(I.ROWS + 2 * I.DEST_N * m, 2 * I.DEST_N)))
-        assert all(ui.call(group, [x]) != 0xFFFF_FFFF for x in row if x != 0xFFFF), m
+        assert all(ui.call(T, [x]) != 0xFFFF_FFFF for x in row if x != 0xFFFF), m

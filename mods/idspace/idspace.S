@@ -335,23 +335,33 @@ ids_dest_first:
         move.l  %d0,4(%sp)
         bra.w   ids_dest_type
 
-| ---- gruppo di una voce nel menu DEST (al posto di TYPE_OF, solo nel menu): come l'OS; un id delle mod senza
-| gruppo (descrittore +0 = -1, es. SY FM4 521..528, fuori dalle tabelle per machine dell'OS) prende la machine
-| della sua voce DESTX, cosi' sta nel gruppo della machine invece che sotto ERR
+| ---- 0x400A5CE4 (jmp, tutto l'OS): gruppo di un id. Come l'OS (id oltre la tabella: quello dell'id 0); un id delle
+| mod senza gruppo (descrittore +0 = -1, es. SY FM4 521..528, fuori dalle tabelle per machine dell'OS) prende la
+| machine della sua voce DESTX: nel menu DEST e nella lista della manopola DEST (ordinata per gruppo, 0x4001427C)
+| sta con la sua machine invece che sotto ERR
         .globl  ids_dest_type
 ids_dest_type:
         move.l  4(%sp),%d1
-        cmpi.l  #FIRST,%d1
-        bcs.s   9f
         cmpi.l  #N,%d1
-        bcc.s   9f
-        move.l  %d1,%d0
+        bcs.s   1f
+        moveq   #0,%d1
+1:      move.l  %d1,%d0
         mulu.w  #52,%d0
         lea     TABLE,%a0
-        moveq   #-1,%d1
-        cmp.l   (%a0,%d0.l),%d1
-        bne.s   9f                              | ha un gruppo: come l'OS
-        move.l  4(%sp),%d1
+        move.l  (%a0,%d0.l),%d0
+        cmpi.l  #FIRST,%d1
+        bcs.s   9f
+        cmpi.l  #-1,%d0
+        bne.s   9f
+        bsr.s   ids_destx_find
+        beq.s   8f
+        mvz.b   (%a0),%d0                       | la machine della voce
+        rts
+8:      moveq   #-1,%d0
+9:      rts
+
+| id d1 tra le voci DESTX? Z = 0 e a0 = la voce se c'e'; usa d0/a0
+ids_destx_find:
         lea     DESTX,%a0
         moveq   #DESTX_N,%d0
 1:      cmp.w   2(%a0),%d1
@@ -359,6 +369,26 @@ ids_dest_type:
         addq.l  #4,%a0
         subq.l  #1,%d0
         bne.s   1b
-9:      jmp     TYPE_OF
-2:      mvz.b   (%a0),%d0                       | la machine della voce
+        rts                                     | Z = 1: non c'e'
+2:      moveq   #1,%d0                          | Z = 0
         rts
+
+| ---- 0x4001476E (lea dell'OS 0x400A66E2 nella lista della manopola DEST, filtro coi flag del descrittore +24):
+| come l'OS per i suoi id; degli id delle mod passano solo quelli registrati come voci DESTX (SY FM4, SAMPLER,
+| fx3), come i parametri di una machine (0xE00); gli altri no (LFO3 530..537 hanno i flag di LFO1: sotto LFO2
+| comparivano in testa, sotto ERR, con i nomi di LFO1)
+        .equ    DESC_FLAGS,     0x400A66E2
+        .globl  ids_dest_flags
+ids_dest_flags:
+        move.l  4(%sp),%d1
+        cmpi.l  #FIRST,%d1
+        bcs.s   9f
+        cmpi.l  #N,%d1
+        bcc.s   9f
+        bsr.s   ids_destx_find
+        beq.s   1f
+        move.l  #0xE00,%d0
+        rts
+1:      moveq   #0,%d0
+        rts
+9:      jmp     DESC_FLAGS
