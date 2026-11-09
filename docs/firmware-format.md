@@ -33,7 +33,8 @@ The bootstrap (`0x80000210`, runs in SRAM) loads the **compressed** section 3 at
 
 - Rule: *decompressed − compressed* must stay below ~`0x1FFC00` at every point of the stream.
 - Margins: stock 1.41 +99 938 B · v0.5.0 +16 220 B · a build padded with zeros to `0x40350000`: −8 751 B → **did not boot** (tested twice).
-- Zero padding is the worst case (compresses to nothing). Already-compressed data *raises* the margin: the mod area is stored compressed for this reason.
+- Zero padding is the worst case (compresses to nothing). Data that aPLib cannot shrink costs no margin: the mod area is stored compressed and whitened for this reason (`tools/build/lz.py`). A plain SHLZ stream still shrank: 6 375 B of margin with every mod, 17 727 B whitened, whatever the size of the mod code (OS 1.42, 2026-11-09).
+- The ceiling with our packer is ~17.7 KB on OS 1.42, mods or not: it packs the stock part tighter than Elektron's (stock file: +96 356 B).
 - `tools/build/bootcheck.py` replays the unpacking; `build.py` refuses images below 4 KB of margin.
 - Repacking recompresses changed sections; compressed bytes differ, decompressed content is what we verify.
 - The Syntakt accepts rebuilt images (recompressed section 3, recomputed MAC) via USB and MIDI DIN.

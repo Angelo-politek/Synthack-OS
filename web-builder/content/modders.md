@@ -31,7 +31,7 @@ stock .syx (user's own)          mods/<name>/patch.json (ours)
 | Section 3 | Main OS, CPU #1: UI, sequencer, mixer, delay, reverb. Almost every mod patches it. |
 | Section 7 | Voice engine, CPU #2 (digital machines). In-place patches allowed. Appended code goes to the `modarea7` engine area. |
 | Sections 2, 6 | Bootstrap and boot. Never touched: they hold the recovery path. |
-| [`modarea`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/modarea/README.md) | 64 KB reserved from the OS heap at boot, stored compressed. Large code goes here, at a claimed offset. |
+| [`modarea`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/modarea/README.md) | 512 KB reserved from the OS heap at boot: code stored compressed, and runtime RAM. Mod code goes here, at a claimed offset. |
 | Boot list | 8 function pointers at mod area `+0x7400`, called once after unpacking. For tables the OS reads early. Claim a slot in `BOOT_SLOTS`. |
 | Section 3 free fill | `0x40339740–0x4033A000`. Nearly full. |
 | [`vparams`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/vparams/README.md) | Virtual parameters. Register `{id, get, set}` in a slot; the OS kit-parameter functions call your code. |
@@ -40,7 +40,7 @@ stock .syx (user's own)          mods/<name>/patch.json (ours)
 | [`modarea7`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/modarea7/README.md) | Engine area on CPU #2 for machine code, `0x47000000`. Section 7 travels compressed to make room. |
 | [`syn-pages`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/syn-pages/README.md) | SYN pages of its own for a machine: up to 4 pages, page names, drawing. |
 | Shared RAM | RAM both CPUs see: `0x10000000 + offset` on CPU #1, `offset` on CPU #2. Machines pass page values, tempo and waveforms through it. Map: [memory-map.md](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/memory-map.md#shared-ram). |
-| [Registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md) | Generated from `tools/build/registry.py`: mod-area offsets, boot-list slots, engine area, shared RAM, free fill, zero-but-read zones, vparams slots, parameter ids, pages, kit and project storage. `tests/test_registry.py` checks every `patch.json` against it. |
+| [Registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md) | Generated from `tools/build/registry.py` and each mod's `claims.json`: mod-area offsets, boot-list slots, engine area, shared RAM, free fill, zero-but-read zones, vparams slots, parameter ids, pages, kit and project storage. `tests/test_registry.py` checks every `patch.json` against it. |
 | `mod.json` | Card in the web builder: `{"title", "kind", "status", "summary"}`. Status: `experimental`, `beta` or `stable` ([CONTRIBUTING.md](https://github.com/Angelo-politek/Synthack-OS/blob/dev/CONTRIBUTING.md)). |
 
 | `kind` | Meaning |
@@ -68,8 +68,8 @@ stock .syx (user's own)          mods/<name>/patch.json (ours)
    cd web-builder && npm ci && cd ..
    ```
 4. Put the stock OS in `firmware/` (git-ignored, see [`firmware/README.md`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/firmware/README.md)). Check it: `python tools/unpack/eft.py info firmware/<file>.syx` must say Syntakt, `checksums : ok`.
-5. Claim resources in `tools/build/registry.py`: mod-area range, boot-list slot, engine area, shared RAM, section 3 bytes, vparams slots, parameter ids, pages. Kit and project slices: `tools/build/kitstore_layout.py`, `projstore_layout.py`. Run `python tools/build/registry.py`.
-6. Write `mods/<name>/`: sources (`.S` or `.c`) and `make_patch.py`. It compiles (`m68k-linux-gnu-as` / `-gcc`, `-mcpu=54418`) and writes `patch.json`. Hand-written `patch.json` only for text patches like `mod-zero`. Add `"requires": ["modarea", ...]` for shared infrastructure. Start from the [modding guide](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/modding-guide.md); `fx3` and `master-comp` are the fullest examples; for machines, `sy-fm4` and `sampler`.
+5. Create the mod: `python tools/new_mod.py <name>`. It writes `mods/<name>/` (C source, `make_patch.py`, `mod.json`, `README.md`, `claims.json`) and `tests/test_<name>.py`, and claims 2 KB of the mod area. It compiles and passes its test as it is. More resources (parameter ids, pages, boot-list slot, vparams slots): add them to `claims.json`. Kit and project slices: `tools/build/kitstore_layout.py`, `projstore_layout.py`. Run `python tools/build/registry.py`.
+6. Write the code and the hooks in `make_patch.py` (`tools/build/modkit.py`: `compile`, `area`, `hook`, `replace`, `write`). C sources include `sdk/synthack.h`. Run `python mods/<name>/make_patch.py`: it writes `patch.json`. Hand-written `patch.json` only for text patches like `mod-zero`. Start from the [modding guide](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/modding-guide.md) and the [UI guide](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/ui-guide.md); `fx3` and `master-comp` are the fullest examples; for machines, `sy-fm4` and `sampler`.
 7. Write `tests/test_<name>.py`. Load the stock section, apply the patch, run the **original** OS code around it in Unicorn (`tools/emu`), compare with stock. Round-trip stored data through the OS writer and reader. Load old files without your data.
 8. Measure the audio cost if your code runs in the audio interrupt. See [CPU budget](#cpu-budget).
 9. Build with every other mod:

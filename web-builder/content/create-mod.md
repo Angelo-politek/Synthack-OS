@@ -12,9 +12,9 @@ A merged mod is checked against all the others and reaches every user of this si
 
 1. Fork the repository. Branch from `dev`.
 2. Install the toolchain. Put the stock OS in `firmware/`. Never commit it.
-3. Claim resources in `tools/build/registry.py`. Run `python tools/build/registry.py`.
-4. Write `mods/<name>/` with a `make_patch.py` that compiles the code and writes `patch.json`.
-5. Write `tests/test_<name>.py`: run the original OS code in the emulator, with and without your patch.
+3. `python tools/new_mod.py <name>`: a mod that compiles and passes its test, with 2 KB of the mod area claimed in `mods/<name>/claims.json`.
+4. Write your code and your hooks. `python mods/<name>/make_patch.py` writes `patch.json`.
+5. Extend `tests/test_<name>.py`: run the original OS code in the emulator, with and without your patch.
 6. Audio code: count the instructions it adds per block.
 7. Add `mod.json` and `README.md`.
 
@@ -65,7 +65,7 @@ Pull request against **`dev`**, one mod per PR. Include:
 - [ ] `mods/<name>/mod.json`: exactly `title`, `kind`, `status`, `summary` (ASCII English). A new mod is `"status": "experimental"`.
 - [ ] `mods/<name>/README.md`: use on the device (keys, pages, where saved), how it works, tests, credits.
 - [ ] `tests/test_<name>.py`: original OS code in the emulator; save → reload for stored data.
-- [ ] Claims in `tools/build/registry.py` (and kitstore / projstore layout files).
+- [ ] `mods/<name>/claims.json` (and kitstore / projstore layout files).
 - [ ] `docs/registry.md` regenerated.
 - [ ] CI green: no firmware, `python -m pytest`, web-builder tests and build, registry up to date.
 - [ ] No firmware files: no `.syx`, no extracted sections, no disassembly dumps.
@@ -107,7 +107,7 @@ Start from [`sy-fm4`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mod
 
 1. Open a [machine proposal](https://github.com/Angelo-politek/Synthack-OS/issues/new?template=machine_proposal.md): sound, parameters, storage, CPU #2 cost, hardware status.
 2. Settle these early:
-   - Parameter ids: stay inside the 505-entry descriptor table. Check the [registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md): free-looking ids are often aliases or carry MIDI CCs.
+   - Parameter ids: new parameters take ids 505–568 from `idspace`. Ids below 505 are all in use by the OS: free-looking ones are aliases or carry MIDI CCs.
    - P-locks and held-trig editing: don't route sound parameters through vparams. It sends edits to the kit path.
    - Files: a kit or pattern saved with the machine must load on the stock OS, and on builds without the mod, without crashing.
    - CPU #2 cost per block: count it with 8 voices, against the stock engine you replace.

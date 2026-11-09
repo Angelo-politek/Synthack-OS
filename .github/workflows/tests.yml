@@ -32,5 +32,7 @@ jobs:
       - name: Web builder (unit tests, types, page build)
         working-directory: web-builder
         run: npm test && npm run build
-      - name: docs/registry.md up to date
+      - name: docs/registry.md up to date (claims of every mod, conflicts fail here)
         run: python tools/build/registry.py && git diff --exit-code docs/registry.md
+      - name: web-builder/src/budget.json up to date
+        run: python tools/build/budget.py && git diff --exit-code web-builder/src/budget.json
