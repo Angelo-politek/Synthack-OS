@@ -6,9 +6,14 @@ import { STOCK_SHA256, type ModSpec } from "./build.ts";
 export type Kind = "base" | "feature" | "machine" | "infra" | "test";
 export const KINDS: readonly Kind[] = ["base", "feature", "machine", "infra", "test"];
 
+/** Quanto la mod e' stata provata sulla macchina; una mod non e' piu' provata di cio' che richiede. */
+export type Status = "stable" | "beta" | "experimental";
+export const STATUSES: readonly Status[] = ["stable", "beta", "experimental"];
+
 export interface Card {
   title: string;
   kind: Kind;
+  status: Status;
   summary: string;
 }
 
@@ -60,6 +65,7 @@ export function parseModFile(text: string, known: Record<string, ModSpec>): { sp
   const card: Card = {
     title: typeof c.title === "string" && c.title.trim() ? c.title.trim().slice(0, 60) : name,
     kind,
+    status: "experimental",                 // una mod locale non l'ha ancora provata nessun altro
     summary: typeof c.summary === "string" ? c.summary.trim().slice(0, 300) : typeof o.description === "string" ? o.description.slice(0, 300) : "",
   };
   const { card: _drop, ...spec } = o;

@@ -1,5 +1,6 @@
 {
   "title": "Parameter ids above 504",
   "kind": "infra",
+  "status": "beta",
   "summary": "More parameter ids for the mods, so they never reuse the ids of OS parameters."
 }

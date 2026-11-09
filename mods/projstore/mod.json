@@ -1,5 +1,6 @@
 {
   "title": "Project storage",
   "kind": "infra",
+  "status": "stable",
   "summary": "256 bytes of mod settings, saved with the project."
 }

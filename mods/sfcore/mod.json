@@ -1,5 +1,6 @@
 {
   "title": "Synfact core",
   "kind": "infra",
+  "status": "beta",
   "summary": "Synfact core subset for its ported modules: event bus, native transactions, host API. Adapters only for the mods that use them."
 }

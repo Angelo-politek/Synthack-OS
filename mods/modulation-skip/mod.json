@@ -1,5 +1,6 @@
 {
   "title": "Modulation skip",
   "kind": "feature",
+  "status": "beta",
   "summary": "Skips the stock modulation matrix in audio blocks where its output would not change. Same sound, about 4 % more CPU free."
 }

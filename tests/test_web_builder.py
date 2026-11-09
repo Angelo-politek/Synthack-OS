@@ -25,6 +25,7 @@ import lz  # noqa: E402
 NODE = shutil.which("node")
 needs_node = pytest.mark.skipif(not NODE, reason="Node.js assente")
 KINDS = {"base", "feature", "machine", "infra", "test"}
+STATUS = ["experimental", "beta", "stable"]          # dal meno al piu' provato sulla macchina
 # funzioni che ne usano altre (il builder le aggiunge, build.ts): il registratore salva tra i campioni lunghi e assegna
 # il SAMPLER
 FEATURE_DEPS = {("recorder", "long-samples"), ("recorder", "sampler")}
@@ -33,12 +34,15 @@ FEATURE_DEPS = {("recorder", "long-samples"), ("recorder", "sampler")}
 def test_every_mod_has_a_card():
     for d in sorted(p.parent for p in ROOT.glob("mods/*/patch.json")):
         card = json.loads((d / "mod.json").read_text(encoding="utf-8"))
-        assert set(card) == {"title", "kind", "summary"}, d.name
+        assert set(card) == {"title", "kind", "status", "summary"}, d.name
         assert card["kind"] in KINDS and card["title"] and card["summary"].isascii(), d.name
+        assert card["status"] in STATUS, d.name
         spec = json.loads((d / "patch.json").read_text(encoding="utf-8"))
         for req in spec.get("requires", []):                # le dipendenze sono infrastruttura, tranne quelle
-            kind = json.loads((ROOT / "mods" / req / "mod.json").read_text(encoding="utf-8"))["kind"]
-            assert kind == "infra" or (d.name, req) in FEATURE_DEPS, (d.name, req)
+            other = json.loads((ROOT / "mods" / req / "mod.json").read_text(encoding="utf-8"))
+            assert other["kind"] == "infra" or (d.name, req) in FEATURE_DEPS, (d.name, req)
+            # una mod non e' piu' provata di cio' che richiede
+            assert STATUS.index(card["status"]) <= STATUS.index(other["status"]), (d.name, req)
 
 
 def node(*args, **kw):

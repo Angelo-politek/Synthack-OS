@@ -1,5 +1,6 @@
 {
   "title": "Virtual parameters",
   "kind": "infra",
+  "status": "stable",
   "summary": "Virtual parameters: mods add their own parameters to OS pages."
 }

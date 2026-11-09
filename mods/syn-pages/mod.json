@@ -1,5 +1,6 @@
 {
   "title": "SYN pages",
   "kind": "infra",
+  "status": "beta",
   "summary": "Lets a machine have SYN pages of its own: more than one page, its own titles and graphics. Used by SY FM4 and SAMPLER."
 }

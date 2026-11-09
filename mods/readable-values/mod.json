@@ -1,5 +1,6 @@
 {
   "title": "Readable values",
   "kind": "feature",
+  "status": "stable",
   "summary": "Set envelopes in ms, filters in Hz, levels in dB. Real units instead of 0-127."
 }

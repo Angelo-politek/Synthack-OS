@@ -1,5 +1,6 @@
 {
   "title": "Build test",
   "kind": "test",
+  "status": "stable",
   "summary": "Changes one menu label. Tests the build and flash chain."
 }

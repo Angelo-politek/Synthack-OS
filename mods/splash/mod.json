@@ -1,5 +1,6 @@
 {
   "title": "Boot splash",
   "kind": "base",
+  "status": "stable",
   "summary": "SyntHack logo, version and optional name after the official intro. In every build. Boot time unchanged."
 }

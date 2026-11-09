@@ -39,7 +39,8 @@ The canonical rules list. Guides: [modders](web-builder/content/modders.md), [cr
 - Start from [docs/modding-guide.md](docs/modding-guide.md): hooks, parameters, pages, icons, saving, audio cost.
 - `mods/<name>/make_patch.py` compiles (`m68k-linux-gnu-as` or `-gcc`, `-mcpu=54418`) and writes `patch.json`.
 - Code over a few hundred bytes goes in the mod area: link at `tools/build/modarea_layout.py` RAM + your offset, add `"requires": ["modarea"]`. The section 3 free fill is nearly full.
-- `mods/<name>/mod.json`: exactly `{"title", "kind", "summary"}`. Summary: ASCII English, ≤ 140 characters. `kind`: `feature` (users pick it), `machine` (synth machine on CPU #2), `infra` (required by other mods).
+- `mods/<name>/mod.json`: exactly `{"title", "kind", "status", "summary"}`. Summary: ASCII English, ≤ 140 characters. `kind`: `feature` (users pick it), `machine` (synth machine on CPU #2), `infra` (required by other mods).
+- `status`: `experimental` (first device tests; every new mod starts here), `beta` (works on the device, tested by more than one person or in more than one session), `stable` (in a release candidate for two sessions with no open bug). Never above the status of a mod it requires. The site selects the stable mods by default. A maintainer promotes it.
 - New machines put their CPU #2 code in `modarea7` and their own SYN pages in `syn-pages`. Examples: `mods/sy-fm4`, `mods/sampler`. See [docs/modding-guide.md](docs/modding-guide.md#7-machines).
 - ColdFire: no `exg`. `movem` only with `(An)` / `d16(An)`. `muls.l` takes no absolute address. Short branches: ±127 B. No `.bss`, no libgcc.
 - New findings go in [docs/](docs), briefly.

@@ -41,7 +41,7 @@ stock .syx (user's own)          mods/<name>/patch.json (ours)
 | [`syn-pages`](https://github.com/Angelo-politek/Synthack-OS/blob/dev/mods/syn-pages/README.md) | SYN pages of its own for a machine: up to 4 pages, page names, drawing. |
 | Shared RAM | RAM both CPUs see: `0x10000000 + offset` on CPU #1, `offset` on CPU #2. Machines pass page values, tempo and waveforms through it. Map: [memory-map.md](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/memory-map.md#shared-ram). |
 | [Registry](https://github.com/Angelo-politek/Synthack-OS/blob/dev/docs/registry.md) | Generated from `tools/build/registry.py`: mod-area offsets, boot-list slots, engine area, shared RAM, free fill, zero-but-read zones, vparams slots, parameter ids, pages, kit and project storage. `tests/test_registry.py` checks every `patch.json` against it. |
-| `mod.json` | Card in the web builder: `{"title", "kind", "summary"}`. |
+| `mod.json` | Card in the web builder: `{"title", "kind", "status", "summary"}`. Status: `experimental`, `beta` or `stable` ([CONTRIBUTING.md](https://github.com/Angelo-politek/Synthack-OS/blob/dev/CONTRIBUTING.md)). |
 
 | `kind` | Meaning |
 |---|---|
@@ -77,7 +77,7 @@ stock .syx (user's own)          mods/<name>/patch.json (ours)
    python tools/build/build.py --stock firmware/<file>.syx mods/<name> mods/splash mods/dual-mono \
        mods/master-comp mods/readable-values mods/perf-fx mods/fx3 mods/sy-fm4 mods/sampler -o out/test.syx
    ```
-10. Add `mod.json` (exactly `title`, `kind`, `summary`; ASCII English) and `README.md` (use on the device, how it works, tests, credits).
+10. Add `mod.json` (exactly `title`, `kind`, `status`, `summary`; ASCII English; a new mod is `experimental`) and `README.md` (use on the device, how it works, tests, credits).
 11. Load `patch.json` in **Create your mod**. Build an OS with it next to the other mods. It stays in your browser.
 12. Flash. Check save/reload, pattern change and power cycle for anything you store.
 13. Run the CI checks:

@@ -1,5 +1,6 @@
 {
   "title": "Faster mixing",
   "kind": "infra",
+  "status": "stable",
   "summary": "OS audio routines rewritten to do the same work in fewer instructions: same sound, more CPU left for the UI."
 }

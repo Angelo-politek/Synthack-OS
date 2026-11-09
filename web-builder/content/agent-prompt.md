@@ -54,7 +54,7 @@ https://github.com/Angelo-politek/Synthack-OS. Target: Syntakt OS 1.42. Follow t
    case, as counted() in tests/test_cpu_budget.py. Add a cost regression test. The stock OS uses
    ~89 % of that interrupt: do nothing when idle. Report the numbers to me.
 
-8. Add mods/<name>/mod.json: exactly {"title", "kind", "summary"}; kind "feature" ("machine" for
+8. Add mods/<name>/mod.json: exactly {"title", "kind", "status", "summary"}, status "experimental"; kind "feature" ("machine" for
    a synth machine); summary one sentence, ASCII English. Add mods/<name>/README.md: use on the
    device, how it works (hooks, addresses), tests, credits. Follow docs/writing-style.md.
 

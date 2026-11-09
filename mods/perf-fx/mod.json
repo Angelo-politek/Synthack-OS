@@ -1,5 +1,6 @@
 {
   "title": "Performance FX",
   "kind": "feature",
+  "status": "stable",
   "summary": "Live repeat, reverse and half speed on keys 13-16 (Mod A, FUNC+15). Quantized retrig stays in time."
 }

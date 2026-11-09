@@ -1,5 +1,6 @@
 {
   "title": "Bus compressor",
   "kind": "feature",
+  "status": "beta",
   "summary": "More level from the analog output: compressor on the FX track bus, makeup up to +24 dB."
 }

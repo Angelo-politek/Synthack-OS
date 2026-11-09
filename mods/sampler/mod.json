@@ -1,5 +1,6 @@
 {
   "title": "SAMPLER",
   "kind": "machine",
+  "status": "beta",
   "summary": "SP TWINSHOT becomes the Digitakt's sample machines: ONESHOT, WERP, REPITCH, SLICE. Page 1 as the Digitakt's, page 2 the sample's waveform."
 }

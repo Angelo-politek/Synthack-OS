@@ -1,5 +1,6 @@
 {
   "title": "Extra track parameters",
   "kind": "infra",
+  "status": "beta",
   "summary": "Eight more parameters per track for the machines that need them: saved with the sound, p-lockable, sent to the voice CPU. Used by SY FM4 and SAMPLER."
 }

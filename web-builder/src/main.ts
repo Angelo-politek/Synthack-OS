@@ -7,6 +7,7 @@ import { reveal } from "./logo.ts";
 import { info, modUrl, specs as repoSpecs, type Card } from "./mods.ts";
 import { previewFor } from "./previews/index.ts";
 import { mount, type Screen } from "./screen.ts";
+import type { Status } from "./core/modfile.ts";
 import type { Reply, Request } from "./worker.ts";
 
 const OUT = "synthack.syx";
@@ -26,6 +27,48 @@ let locals: LocalMod[] = [];
 let screens: Screen[] = [];
 const chosen = new Set<string>();
 const seen = new Set<string>();             // mod gia' mostrate: la scelta iniziale vale una volta sola
+
+// ---- preset: le mod del repo per quanto sono state provate sulla macchina (mod.json, "status")
+
+const PRESETS: { id: string; label: string; note: string; has: (s: Status) => boolean }[] = [
+  { id: "stable", label: "Stable", note: "Tested on the device over many sessions.", has: (s) => s === "stable" },
+  { id: "beta", label: "Stable + beta", note: "Adds the mods that work on the device but are newer.", has: (s) => s !== "experimental" },
+  { id: "all", label: "Everything", note: "Adds the experimental mods: first device tests only.", has: () => true },
+];
+const STATUS_NOTE: Record<Status, string> = {
+  stable: "Tested on the device over many sessions.",
+  beta: "Works on the device. Newer: report what you find.",
+  experimental: "First device tests only. Back up your projects.",
+};
+const pickable = (n: string): boolean => info[n]?.kind === "feature" || info[n]?.kind === "machine";
+
+function applyPreset(id: string): void {
+  const p = PRESETS.find((x) => x.id === id);
+  if (!p) return;
+  for (const n of Object.keys(info)) {
+    if (!pickable(n)) continue;
+    if (p.has(info[n].status)) chosen.add(n);
+    else chosen.delete(n);
+  }
+  renderTiles();
+}
+
+function currentPreset(): string {
+  const mine = [...chosen].filter(pickable).sort().join();
+  return PRESETS.find((p) => Object.keys(info).filter((n) => pickable(n) && p.has(info[n].status)).sort().join() === mine)?.id ?? "";
+}
+
+function renderPresets(): void {
+  const box = $("presets"), now = currentPreset();
+  box.replaceChildren(...PRESETS.map((p) => {
+    const b = el("button", "preset" + (p.id === now ? " on" : ""), p.label);
+    b.type = "button";
+    b.title = p.note;
+    b.setAttribute("aria-pressed", String(p.id === now));
+    b.addEventListener("click", () => applyPreset(p.id));
+    return b;
+  }), el("span", "preset-note", now ? PRESETS.find((p) => p.id === now)!.note : "Custom selection."));
+}
 
 const allSpecs = (): Record<string, ModSpec> => ({ ...repoSpecs, ...Object.fromEntries(locals.map((m) => [m.name, m.spec])) });
 const cardOf = (n: string): Card | undefined => info[n] ?? locals.find((m) => m.name === n)?.card;
@@ -61,6 +104,11 @@ function tile(e: Entry, i: number): HTMLElement {
   h.id = `t-${e.name}`;
   body.append(h);
   if (e.local) body.append(el("span", "badge", "local — not in the official list"));
+  else if (e.card.status !== "stable") {
+    const b = el("span", `badge ${e.card.status}`, e.card.status);
+    b.title = STATUS_NOTE[e.card.status];
+    body.append(b);
+  }
   const sum = el("p", "tile-sum", e.card.summary);
   sum.title = e.card.summary;
   body.append(sum);
@@ -73,7 +121,7 @@ function tile(e: Entry, i: number): HTMLElement {
   cb.setAttribute("aria-describedby", h.id);
   if (!seen.has(e.name)) {
     seen.add(e.name);
-    if (!e.local) chosen.add(e.name);           // le mod del repo partono incluse, quelle locali no
+    if (!e.local && e.card.status === "stable") chosen.add(e.name);   // in partenza il preset Stable; le locali no
   }
   cb.checked = chosen.has(e.name);
   art.classList.toggle("on", cb.checked);
@@ -160,6 +208,7 @@ function update(): void {
   }
   updateLoad($("load"), order, order.filter((n) => !measured(n)).map(titleOf), titleOf);
   $("deps").textContent = deps;
+  renderPresets();
   const list = mods.map(titleOf);
   $("summary").textContent = `Boot splash${list.length ? " + " + list.join(", ") : " only (no mods selected)"}.`;
   $<HTMLButtonElement>("build").disabled = busy || !stock;

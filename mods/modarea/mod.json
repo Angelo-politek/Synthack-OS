@@ -1,5 +1,6 @@
 {
   "title": "Mod area",
   "kind": "infra",
-  "summary": "64 KB for mod code. Stored compressed, unpacked at boot into a reserved block of the OS heap."
+  "status": "stable",
+  "summary": "RAM for mod code and data. Stored compressed, unpacked at boot into a reserved block of the OS heap."
 }

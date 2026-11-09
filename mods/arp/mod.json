@@ -1,5 +1,6 @@
 {
   "title": "Arpeggiator",
   "kind": "feature",
+  "status": "experimental",
   "summary": "Arpeggiate trigs and held keys on any audio track: mode, speed, range, note length and a 16-step offset sequence, p-lockable."
 }

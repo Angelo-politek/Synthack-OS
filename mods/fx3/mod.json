@@ -1,5 +1,6 @@
 {
   "title": "Third send FX",
   "kind": "feature",
+  "status": "beta",
   "summary": "A third send: chorus, flanger, phaser or crusher on every track and the input. CPU-heavy with many tracks sent."
 }

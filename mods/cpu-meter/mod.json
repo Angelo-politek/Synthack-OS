@@ -1,5 +1,6 @@
 {
   "title": "CPU meter",
   "kind": "test",
+  "status": "beta",
   "summary": "Diagnostic: audio interrupt load measured on the device, average and peak, top right of the parameter pages."
 }

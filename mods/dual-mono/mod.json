@@ -1,5 +1,6 @@
 {
   "title": "Dual mono input",
   "kind": "feature",
+  "status": "beta",
   "summary": "Two mono instruments on the inputs, each with its own level and DEL, REV, FX3 sends. EXTERNAL IN set to mono."
 }
