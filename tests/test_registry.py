@@ -189,3 +189,36 @@ def test_zero_bytes_are_not_free_space():
         old = sec3[a - LOAD:a - LOAD + n]
         if not any(old):
             assert lo <= a and a + n <= hi, f"{name}: {a:#x} ({n} B a zero) non e' una zona libera registrata"
+
+
+def test_claims_of_new_mods(tmp_path):
+    """mods/<nome>/claims.json: le prenotazioni delle mod nuove entrano nelle tabelle; una risorsa gia' presa,
+    o spazio fuori dalle zone per le mod nuove, e' un errore con il nome di chi la tiene."""
+    import copy
+    assert set(R.CLAIMS) <= set(specs()), "claims.json senza patch.json"
+    names = ("MODAREA", "ENGINE", "SHARED_RAM", "BOOT_SLOTS", "IDS", "PAGES", "VPARAMS_SLOTS", "DESTX_SLOTS")
+    saved = {k: copy.deepcopy(getattr(R, k)) for k in names}
+
+    def claim(c, name="zz-new"):
+        for k, v in saved.items():
+            setattr(R, k, copy.deepcopy(v))
+        d = tmp_path / name
+        d.mkdir(exist_ok=True)
+        (d / "claims.json").write_text(json.dumps(c), encoding="utf-8")
+        R.merge_claims(R.read_claims(tmp_path))
+
+    try:
+        lo = R.COMMUNITY[1] - 0x800
+        claim({"modarea": [[hex(lo), hex(lo + 0x800), "code"]], "ids": {"568": "X"}, "boot_slot": 7, "vparams": {"31": 568}})
+        assert R.modarea_owner(lo) == "zz-new" and R.IDS[568][0] == "zz-new" and R.BOOT_SLOTS[7] == "zz-new"
+        for bad, word in (({"modarea": [["0x0", "0x100", "code"]]}, "outside"),
+                          ({"ids": {"505": "X"}}, "fx3"),
+                          ({"boot_slot": 0}, "sy-fm4"),
+                          ({"vparams": {"0": 600}}, "master-comp"),
+                          ({"engine": [["0x0", "0x10", "x"]]}, "sy-fm4"),
+                          ({"nope": 1}, "chiavi")):
+            with pytest.raises(R.ClaimError, match=word):
+                claim(bad)
+    finally:
+        for k, v in saved.items():
+            setattr(R, k, v)

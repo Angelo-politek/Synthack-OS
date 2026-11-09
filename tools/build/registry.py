@@ -6,10 +6,14 @@ patch.json rispettino il registro e docs/registry.md ne e' la copia leggibile:
     python tools/build/registry.py            # rigenera docs/registry.md
 
 Indirizzi: offset nell'area mod (RAM a modarea_layout.RAM), indirizzi assoluti per la sezione 3.
+
+Le mod nuove non toccano questo file: prenotano in mods/<nome>/claims.json (vedi CLAIMS piu' sotto), cosi' due
+richieste di mod diverse non modificano lo stesso file. Qui restano le mod che c'erano prima del 2026-11-09.
 """
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -44,7 +48,6 @@ MODAREA = [
     # 256 KB area from 2026-11-05: the Synfact ports, claimed before their code exists (port plan)
     (0x20000, 0x26000, "recorder", "Synfact recorder port: code and data (PCM in the OS heap)"),
     (0x26000, 0x2A000, "lfo3", "third LFO (Synfact port): engine (source of the SRAM copy), page, actions"),
-    (0x2A000, 0x32000, "xstore", "planned: Sound shadow and pattern locks of LFO3, shared with arp (codec, matrix, events, banks)"),
     (0x32000, 0x38000, "arp", "arpeggiator (Synfact port): code and data"),
     (0x38000, 0x3E000, "poly", "POLY (Synfact port): groups, voice allocation, TRIG page 3 (GPL-2.0-or-later)"),
     (0x3E000, 0x3FFF0, "idspace", "code; descriptors, object definitions and pages the mods write (idspace_layout)"),
@@ -57,11 +60,11 @@ MODAREA = [
 ]
 
 # ---- mod con spazio prenotato ma non ancora scritte (port di Synfact, piano 2026-11-05): ammesse come proprietarie
-PLANNED = {"xstore"}
+PLANNED: set[str] = set()
 
 # ---- tabella dei moduli di sfcore (area mod + SFCORE_TABLE): posto -> mod. sfcore li inizializza in quest'ordine.
 SFCORE_TABLE, SFCORE_N = 0x1B000, 8
-SFCORE_SLOTS = {0: "modulation-skip", 1: "xstore", 2: "recorder", 3: "lfo3", 4: "arp", 5: "poly"}
+SFCORE_SLOTS = {0: "modulation-skip", 2: "recorder", 3: "lfo3", 4: "arp", 5: "poly"}
 
 # ---- SRAM interna della CPU #1 (0x80000000): code che l'avvio stock azzera (0x4000045C) e che nessun operando
 # assoluto della 1.42 usa (tests/test_sfcore.py controlla che l'OS non le legga ne' scriva). Dati e codice qui non
@@ -158,6 +161,76 @@ PAGES = {25: ("fx3", "REVERB page 2 (was OB8)"), 37: ("dual-mono", "IN R in the 
          38: ("lfo3", "third page of the LFO tab (idspace page)")}
 
 
+# ---- prenotazioni per mod: mods/<nome>/claims.json, tutte le chiavi facoltative
+#   "modarea":    [["0x2A000", "0x2A800", "code and data"], ...]   offset nell'area mod, dentro COMMUNITY (codice e
+#                                                                  dati nell'immagine) o COMMUNITY_RAM (solo RAM)
+#   "engine":     [["0x21000", "0x22000", "voice engine"], ...]    offset nell'area dei motori (CPU #2)
+#   "shared_ram": [["0x7C8", "0x7D0", "..."], ...]                 offset nella RAM condivisa tra le CPU
+#   "boot_slot":  5                                                posto nella lista di avvio
+#   "ids":        {"540": "CUT (idspace)"}                         id dei parametri (505..568 per quelli nuovi)
+#   "pages":      {"39": "..."}                                    pagine
+#   "vparams":    {"19": 540}                                      posto di vparams -> id
+#   "destx":      [20, 21]                                         voci in piu' del menu DEST degli LFO
+COMMUNITY = (0x2A000, 0x32000)
+COMMUNITY_RAM = (0x5C000, 0x7FFF0)
+CLAIM_KEYS = {"modarea", "engine", "shared_ram", "boot_slot", "ids", "pages", "vparams", "destx"}
+
+
+class ClaimError(ValueError):
+    pass
+
+
+def read_claims(mods_dir: Path) -> dict[str, dict]:
+    out = {}
+    for f in sorted(Path(mods_dir).glob("*/claims.json")):
+        c = json.loads(f.read_text(encoding="utf-8"))
+        if not isinstance(c, dict) or set(c) - CLAIM_KEYS:
+            raise ClaimError(f"{f}: chiavi ammesse {sorted(CLAIM_KEYS)}")
+        out[f.parent.name] = c
+    return out
+
+
+def merge_claims(claims: dict[str, dict]) -> None:
+    """Aggiunge le prenotazioni delle mod alle tabelle; ClaimError se una risorsa e' gia' presa."""
+    def take(table: dict, key, value, who: str, what: str) -> None:
+        if key in table:
+            other = table[key][0] if isinstance(table[key], tuple) else table[key]
+            raise ClaimError(f"{who}: {what} {key} is taken by {other}")
+        table[key] = value
+
+    def ranges(table: list, rows, who: str, what: str, zones=None) -> None:
+        for lo, hi, use in rows:
+            a, b = int(lo, 16), int(hi, 16)
+            if not a < b:
+                raise ClaimError(f"{who}: {what} {lo}..{hi} is empty")
+            if zones and not any(z0 <= a and b <= z1 for z0, z1 in zones):
+                raise ClaimError(f"{who}: {what} {lo}..{hi} is outside the zones for new mods "
+                                 + ", ".join(f"{z0:#x}..{z1:#x}" for z0, z1 in zones))
+            for x, y, other, _ in table:
+                if a < y and x < b:
+                    raise ClaimError(f"{who}: {what} {lo}..{hi} overlaps {other} ({x:#x}..{y:#x})")
+            table.append((a, b, who, use))
+
+    for who, c in claims.items():
+        ranges(MODAREA, c.get("modarea", []), who, "mod area", (COMMUNITY, COMMUNITY_RAM))
+        ranges(ENGINE, c.get("engine", []), who, "engine area")
+        ranges(SHARED_RAM, c.get("shared_ram", []), who, "shared RAM")
+        if "boot_slot" in c:
+            take(BOOT_SLOTS, int(c["boot_slot"]), who, who, "boot slot")
+        for pid, use in c.get("ids", {}).items():
+            take(IDS, int(pid), (who, use), who, "parameter id")
+        for page, use in c.get("pages", {}).items():
+            take(PAGES, int(page), (who, use), who, "page")
+        for slot, pid in c.get("vparams", {}).items():
+            take(VPARAMS_SLOTS, int(slot), (who, int(pid)), who, "vparams slot")
+        for k in c.get("destx", []):
+            take(DESTX_SLOTS, int(k), who, who, "DEST entry")
+
+
+CLAIMS = read_claims(Path(__file__).resolve().parents[2] / "mods")
+merge_claims(CLAIMS)
+
+
 def modarea_owner(off: int) -> str | None:
     for a, b, who, _ in MODAREA:
         if a <= off < b:
@@ -187,13 +260,16 @@ def markdown() -> str:
          f"## Mod area (RAM `{modarea_layout.RAM:#010x}`, offsets)",
          "",
          "| From | To | Mod | Use |", "|---|---|---|---|"]
-    rows = [(a, b, who, use) for a, b, who, use in MODAREA] + [(a, b, "**free**", "") for a, b in free_modarea()]
+    zone = lambda a, b: ("for new mods: code and data" if COMMUNITY[0] <= a and b <= COMMUNITY[1] else
+                         "for new mods: runtime RAM only" if COMMUNITY_RAM[0] <= a and b <= COMMUNITY_RAM[1] else "")
+    rows = [(a, b, who, use) for a, b, who, use in MODAREA] + [(a, b, "**free**", zone(a, b)) for a, b in free_modarea()]
     L += [f"| {h(a)} | {h(b)} | {who} | {use} |" for a, b, who, use in sorted(rows)]
     L += ["", f"Boot list (`+{modarea_layout.BOOT_LIST:#06x}`, {modarea_layout.BOOT_N} pointers called after unpacking): "
           + ", ".join(f"slot {s} {who}" for s, who in sorted(BOOT_SLOTS.items())) + ".",
           "", f"sfcore module table (`+{SFCORE_TABLE:#06x}`, {SFCORE_N} pointers, initialized in this order): "
           + ", ".join(f"slot {s} {who}" for s, who in sorted(SFCORE_SLOTS.items())) + ".",
-          "", "Planned (space claimed, code not written yet): " + ", ".join(sorted(PLANNED)) + ".",
+          "", "New mods claim in `mods/<name>/claims.json` (keys: " + ", ".join(f"`{k}`" for k in sorted(CLAIM_KEYS))
+          + "), inside the free zones marked for new mods. `python tools/new_mod.py <name>` writes it.",
           "", "## SRAM (CPU #1, internal: never a cache miss)", "",
           "Free tails that the stock boot zeroes: " + ", ".join(f"`{a:#010x}–{b:#010x}`" for a, b in SRAM_FREE) + ".",
           "", "| From | To | Mod | Use |", "|---|---|---|---|"]
