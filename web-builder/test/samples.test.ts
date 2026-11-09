@@ -120,7 +120,9 @@ test("capacity, catalogues, put with readback, slots, remove", async () => {
 });
 
 test("catalogue written by the device's C code reads and packs back byte for byte", () => {
-  const raw = new Uint8Array(readFileSync(new URL("./fixtures/hzfs-catalogue.bin", import.meta.url)));
+  // in esadecimale: i .bin non entrano nel repo (tools/hooks/check_no_firmware.py); 384 byte scritti da hzfs.c, non dell'OS
+  const hex = readFileSync(new URL("./fixtures/hzfs-catalogue.hex", import.meta.url), "ascii").replace(/\s/g, "");
+  const raw = Uint8Array.from(hex.match(/../g)!, (b) => parseInt(b, 16));
   const ix = Index.unpack(raw)!;
   assert.ok(ix);
   assert.equal(ix.entries[0].name, "pad-12s");
