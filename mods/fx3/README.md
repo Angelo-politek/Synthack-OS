@@ -80,7 +80,7 @@ Instructions are not the time: the audio interrupt doesn't fit the 8 KB instruct
 
 Same output as the C version, bit for bit: `test_same_output_as_the_c_version` runs both (`tests/data/fx3_c.json`) on random blocks.
 
-`[!]` With fx3, master-comp and dual-mono together the interrupt is still above ~95 %: the UI may lag. To measure on the device ([docs/status.md](../../docs/status.md#fx3-cpu)).
+`[!]` With fx3, master-comp and dual-mono together the interrupt is still above ~95 %: the UI may lag. To measure on the device ([docs/status.md](../../docs/status.md#audio-cpu)).
 
 ## Build and test
 

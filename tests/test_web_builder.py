@@ -37,6 +37,7 @@ def test_every_mod_has_a_card():
         assert set(card) == {"title", "kind", "status", "summary"}, d.name
         assert card["kind"] in KINDS and card["title"] and card["summary"].isascii(), d.name
         assert card["status"] in STATUS, d.name
+        assert (d / "README.md").exists(), f"{d.name}: manca il README (il sito lo collega dalla tessera)"
         spec = json.loads((d / "patch.json").read_text(encoding="utf-8"))
         for req in spec.get("requires", []):                # le dipendenze sono infrastruttura, tranne quelle
             other = json.loads((ROOT / "mods" / req / "mod.json").read_text(encoding="utf-8"))

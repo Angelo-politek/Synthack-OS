@@ -28,7 +28,9 @@ Code from other projects
                                  Bierling (https://github.com/mischa85/elektron-firmware-tool),
                                  MIT, see web-builder/public/THIRD-PARTY-NOTICES.txt
   mods/long-samples, mods/sfcore, from Synfact by GSM1980 and contributors
-  mods/modulation-skip
+  mods/modulation-skip,
+  mods/lfo3, mods/arp, mods/poly,
+  mods/recorder
                                  (https://github.com/GSM1980/synfact-dev),
                                  GPL-2.0-or-later, built on elekloader by
                                  irpina and contributors
