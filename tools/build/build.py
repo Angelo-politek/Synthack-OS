@@ -28,8 +28,9 @@ Servizi: una patch con "service": "sfcore:native" si applica solo se una mod del
 Dipendenze: una mod dichiara "requires": ["modarea", ...]. Le mod richieste e non indicate vengono
 aggiunte da sole (cercate tra le cartelle indicate, poi in mods/), prima di chi le richiede.
 
-Area mod compressa: se modarea dichiara "compress": "shlz", i byte accodati (da "img" in poi)
-vengono sostituiti dal loro flusso SHLZ (lz.py), che il rilocatore decomprime in RAM all'avvio.
+Area mod compressa: se modarea dichiara "compress": "shlw" (o "shlz"), i byte accodati (da "img" in poi)
+vengono sostituiti dal loro flusso SHLZ (lz.py), che il rilocatore decomprime in RAM all'avvio. "shlw": il
+flusso e' sbiancato (lz.whiten), cosi' aPLib non lo comprime ancora e il margine d'avvio non dipende dalle mod.
 
 Sezione 7 compressa: se modarea7 dichiara "layout7", la sezione 7 (stock + patch) e l'area dei motori
 (i byte accodati da "img" in poi) diventano due flussi SHLZ dietro al suo stub, che li decomprime sulla
@@ -194,8 +195,8 @@ def mod_area(moddirs: list[Path]) -> dict | None:
     """Disposizione dell'area mod compressa, se una delle mod (modarea) la dichiara."""
     for d in moddirs:
         lay = json.loads((Path(d) / "patch.json").read_text(encoding="utf-8")).get("layout", {})
-        if lay.get("compress") == "shlz":
-            return {"img": int(lay["img"], 16), "size": int(lay["size"], 16)}
+        if lay.get("compress") in ("shlz", "shlw"):
+            return {"img": int(lay["img"], 16), "size": int(lay["size"], 16), "white": lay["compress"] == "shlw"}
     return None
 
 
@@ -312,7 +313,8 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print, splash_name: s
             if len(image) > area["size"]:
                 raise BuildError(f"area mod: {len(image)} B, piu' dei {area['size']} B in RAM")
             del sec[off:]
-            sec.extend(lz.compress(image))
+            z = lz.compress(image)
+            sec.extend(lz.whiten(z) if area["white"] else z)
         if lay7 and 7 in sections:
             sections[7] = bytearray(pack_section7(bytes(sections[7]), len(original[7]), lay7))
         replaced = {}
@@ -364,7 +366,8 @@ def build(stock: Path, moddirs: list[Path], out: Path, log=print, splash_name: s
             diff = [i for i in range(len(old)) if i >= len(new) or old[i] != new[i]]
             if image is not None and sid == 3:              # area compressa: confronto dopo la decompressione
                 off = area["img"] - LOAD_ADDR
-                if lz.decompress(bytes(new[off:])) != expected_area(mine, area):
+                z = bytes(new[off:])
+                if lz.decompress(lz.unwhiten(z) if area["white"] else z) != expected_area(mine, area):
                     raise BuildError("area mod: il flusso compresso non riproduce le patch accodate")
                 tail = [i for i in range(len(old), off) if new[i]]
             else:

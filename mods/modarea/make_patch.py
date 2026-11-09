@@ -87,11 +87,11 @@ def main() -> None:
                         "hex": new.hex(), "what": what})
     spec = {
         "name": "modarea", "os": "1.42",
-        "description": f"Area mod: all'avvio decomprime (SHLZ) le mod accodate alla sezione 3 ({IMG:#x}) "
+        "description": f"Area mod: all'avvio decomprime (SHLW: SHLZ sbiancato) le mod accodate alla sezione 3 ({IMG:#x}) "
                        f"nel primo blocco dell'heap dell'OS ({RAM:#x}, {SIZE} B, resto azzerato), "
                        "che prenota alla prima allocazione.",
         "generated_by": "mods/modarea/make_patch.py",
-        "layout": {"img": f"{IMG:#010x}", "ram": f"{RAM:#010x}", "size": f"{SIZE:#x}", "compress": "shlz",
+        "layout": {"img": f"{IMG:#010x}", "ram": f"{RAM:#010x}", "size": f"{SIZE:#x}", "compress": "shlw",
                    "heap_block": f"{L.HEAP_BLOCK:#010x}", "boot_list": f"{L.BOOT_LIST:#x}", "boot_n": L.BOOT_N},
         "symbols": {k: f"{syms[k]:#010x}" for k in ("modarea_load", "modarea_reserve", "modarea_block")},
         "patches": patches,

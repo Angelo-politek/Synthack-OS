@@ -75,8 +75,8 @@ def test_section_grows_only_by_the_compressed_area(built):
     assert len(sec3) > len(stock)
     assert not any(sec3[len(stock):IMG - LOAD])                 # riempimento a zero fino all'area
     stream = sec3[IMG - LOAD:]
-    assert stream[:4] == b"SHLZ"
-    assert lz.decompress(stream) == area_image()
+    assert stream[:4] == b"SHLW"                    # sbiancato: il margine d'avvio non dipende dalle mod
+    assert lz.decompress(lz.unwhiten(stream)) == area_image()
     assert len(stream) < len(area_image())
     assert len(area_image()) <= SIZE
 

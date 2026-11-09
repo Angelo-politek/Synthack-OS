@@ -1,29 +1,29 @@
 {
   "name": "modarea",
   "os": "1.42",
-  "description": "Area mod: all'avvio decomprime (SHLZ) le mod accodate alla sezione 3 (0x40349000) nel primo blocco dell'heap dell'OS (0x444e48d0, 524272 B, resto azzerato), che prenota alla prima allocazione.",
+  "description": "Area mod: all'avvio decomprime (SHLW: SHLZ sbiancato) le mod accodate alla sezione 3 (0x40349000) nel primo blocco dell'heap dell'OS (0x444e48d0, 524272 B, resto azzerato), che prenota alla prima allocazione.",
   "generated_by": "mods/modarea/make_patch.py",
   "layout": {
     "img": "0x40349000",
     "ram": "0x444e48d0",
     "size": "0x7fff0",
-    "compress": "shlz",
+    "compress": "shlw",
     "heap_block": "0x444e48c0",
     "boot_list": "0x7400",
     "boot_n": 8
   },
   "symbols": {
     "modarea_load": "0x40339d80",
-    "modarea_reserve": "0x40339e3c",
-    "modarea_block": "0x40339e5c"
+    "modarea_reserve": "0x40339e76",
+    "modarea_block": "0x40339e94"
   },
   "patches": [
     {
       "section": 3,
       "addr": "0X40339D80",
-      "len": 224,
-      "expect_sha256": "6eb69e26de2a26eda48af77d4cec893aa0cf4748a64cbefcfe11a22c1e680ad9",
-      "hex": "4fefffd448d70ff741f94034900043f9444e48d020100c8053484c5a663a2428000441e8000c2449d5c2b3ca642a700010186b0812d853806cfa60ee02800000007f548072001218e1891218264997c112db53806cfa60d245f9445648c0b3ca6404421960f878007a007c007e0041f94033a00045f9444e48d048d000f041e80010b1ca65f441f9445648c045f94556649048d000f041e80010b1ca65f447f9444ebcd07808201b670420404e90538466f44cd70ff74fef002c4e75700123c0402d53242f3c000800004eb9401036d0588f23c040339e5c4e75000000000000",
+      "len": 280,
+      "expect_sha256": "1f6c9de2e555d5d589e1149fed58f9cbcc101739df97d4a4d694a13f1242c5b9",
+      "hex": "4fefffd448d70ff741f94034900043f9444e48d020100c8053484c576632242800085682e48a47e8000c2200780d7a114a8267242001e9a8b1812001eaa8b1812001eb88b1812013b38026c0538260e00c8053484c5a663a2428000441e8000c2449d5c2b3ca642a700010186b0812d853806cfa60ee02800000007f548072001218e1891218264997c112db53806cfa60d245f9445648c0b3ca6404421960f878007a007c007e0041f94033a00045f9444e48d048d000f041e80010b1ca65f441f9445648c045f94556649048d000f041e80010b1ca65f447f9444ebcd07808201b670420404e90538466f44cd70ff74fef002c4e75700123c0402d53242f3c000800004eb9401036d0588f23c040339e944e7500000000",
       "what": "modarea.S: modarea_load (decompressione, BSS), modarea_reserve (heap)"
     },
     {
@@ -39,7 +39,7 @@
       "addr": "0X40103752",
       "len": 8,
       "expect_sha256": "bc3fc7341d68d724fe986e22b3ab9a2382f6213fb9d24e6734a87a81cace2553",
-      "hex": "4eb940339e3c4e71",
+      "hex": "4eb940339e764e71",
       "what": "fine dell'inizializzazione dell'heap: jsr modarea_reserve ; nop (prima allocazione = area mod)"
     }
   ]

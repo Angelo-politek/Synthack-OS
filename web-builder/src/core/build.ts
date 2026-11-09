@@ -123,10 +123,11 @@ function loadMod(spec: ModSpec, os: string, uses: Set<string>): Patch[] {
   });
 }
 
-function modArea(specs: ModSpec[]): { img: number; size: number } | null {
+function modArea(specs: ModSpec[]): { img: number; size: number; white: boolean } | null {
   for (const s of specs) {
     const lay = s.layout ?? {};
-    if (lay.compress === "shlz") return { img: parseInt(lay.img as string, 16), size: parseInt(lay.size as string, 16) };
+    if (lay.compress === "shlz" || lay.compress === "shlw")
+      return { img: parseInt(lay.img as string, 16), size: parseInt(lay.size as string, 16), white: lay.compress === "shlw" };
   }
   return null;
 }
@@ -249,7 +250,7 @@ export function build(stock: Uint8Array, mods: string[], specs: Record<string, M
     const sec = sections.get(3)!, off = area.img - LOAD_ADDR;
     image = sec.slice(off);                                   // area mod come la vedra' la RAM
     if (image.length > area.size) throw new BuildError(`mod area: ${image.length} B, more than the ${area.size} B in RAM`);
-    const z = shlz.compress(image);
+    const z = area.white ? shlz.whiten(shlz.compress(image)) : shlz.compress(image);   // sbiancato: tools/build/lz.py
     const b = new Uint8Array(off + z.length);
     b.set(sec.subarray(0, off));
     b.set(z, off);
@@ -297,7 +298,7 @@ export function build(stock: Uint8Array, mods: string[], specs: Record<string, M
     let tail = false;
     if (image && area && id === 3) {                        // area compressa: confronto dopo la decompressione
       const off = area.img - LOAD_ADDR;
-      const got = shlz.decompress(neu.subarray(off)), want = expectedArea(mine, area.img);
+      const got = shlz.decompress(area.white ? shlz.unwhiten(neu.subarray(off)) : neu.subarray(off)), want = expectedArea(mine, area.img);
       if (got.length !== want.length || got.some((x, i) => x !== want[i]))
         throw new BuildError("mod area: the compressed stream does not reproduce the appended patches");
       for (let i = old.length; i < off; i++) if (neu[i]) tail = true;

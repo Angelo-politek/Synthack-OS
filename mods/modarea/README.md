@@ -5,7 +5,7 @@
 | Item | Value |
 |---|---|
 | Why | The OS image has ~2 KB of free space. Everything after it is zeroed at boot. |
-| Image | appended to section 3 at `0x40349000 + offset` (`"append": true`), compressed by the build (SHLZ, `tools/build/lz.py`) |
+| Image | appended to section 3 at `0x40349000 + offset` (`"append": true`), compressed by the build (SHLZ, then whitened: `tools/build/lz.py`) |
 | RAM | first 256 KB block of the OS heap (buddy allocator `0x401036D0`, 16 MB pool at `0x444E48C0`), from `+0x10` |
 | Layout | `tools/build/modarea_layout.py` |
 | Boot hook | `jmp` at the start of `0x400004B2` (BSS clear, called once) |
@@ -25,6 +25,8 @@ Reservation:
 3. The heap initialization writes 12 bytes at the block start: the area starts at `+0x10`.
 
 Use: declare `"requires": ["modarea"]`, link at `modarea_layout.RAM + offset`, claim the offset in `tools/build/registry.py`.
+
+Whitening (SHLW): the stream is XORed with an xorshift32 sequence and the loader undoes it in place. Section 3 is packed again with aPLib, and a plain SHLZ stream still shrinks there: the boot unpacking margin then drops with every byte of mod code (6 375 B with every mod). Whitened, it is 17 727 B whatever the mods are.
 
 SHLZ format: `"SHLZ"`, unpacked length, stream length, then tokens `0xxxxxxx` (x+1 literals) or `1lllllll hi lo` (copy l+3 bytes from distance hi·256+lo).
 
