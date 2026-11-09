@@ -55,9 +55,23 @@ def wsl(cmd: str) -> str:
 
 
 class Code(dict):
-    """Codice compilato: i simboli come chiavi (code["nome"] = indirizzo), piu' .blob e .base."""
+    """Codice compilato: i simboli come chiavi (code["nome"] = indirizzo), piu' .blob, .base e, se chiesti a
+    compile(emac=True), .emac: gli indirizzi delle istruzioni EMAC (per l'emulatore, tools/emu/emac.py)."""
     blob: bytes
     base: int
+    emac: list[int]
+
+
+def emac_sites(dis: str) -> list[int]:
+    """Indirizzi delle istruzioni EMAC in un disassemblato di objdump (parola di codice Axxx)."""
+    out = []
+    for line in dis.splitlines():
+        parts = line.split("	")
+        if len(parts) >= 3 and parts[0].strip().endswith(":"):
+            word = parts[1].split()[0] if parts[1].split() else ""
+            if len(word) == 4 and word[0] in "aA":
+                out.append(int(parts[0].strip()[:-1], 16))
+    return out
 
 
 class Mod:
@@ -92,9 +106,12 @@ class Mod:
 
     # ---------------------------------------------------------------- compilazione
     def compile(self, sources: list[str], base: int | None = None, end: int | None = None, cflags: str = CFLAGS,
-                defs: dict[str, int] | None = None, entry: str | None = None, sections: str | None = None) -> Code:
+                defs: dict[str, int] | None = None, entry: str | None = None, sections: str | None = None,
+                bss: bool = False, emac: bool = False) -> Code:
         """Compila e collega i sorgenti (.S, .c) a `base` (indirizzo in RAM; senza: lo spazio della mod nell'area
-        mod). defs: simboli per l'assemblatore (--defsym) e macro per il C (-D). Niente .bss, niente libgcc."""
+        mod). defs: simboli per l'assemblatore (--defsym) e macro per il C (-D). Niente libgcc. Niente .bss, a meno
+        di bss=True: allora conta fino a _end per lo spazio (l'area mod e' azzerata oltre il codice).
+        sections: le opzioni -j di objcopy ("" = tutto). emac=True: riempie code.emac."""
         if base is None:
             lo, hi = self.space()
             base, end = modarea_layout.RAM + lo, modarea_layout.RAM + hi
@@ -124,10 +141,10 @@ class Mod:
                 raise ModError(f"{self.name}: simboli esterni (libgcc?) non permessi:\n" + wsl(env + f"{BIN}nm -u m.elf"))
             for line in wsl(env + f"{BIN}size -A m.elf").splitlines():
                 parts = line.split()
-                if len(parts) >= 2 and parts[0] in (".bss", ".sbss") and int(parts[1]):
+                if not bss and len(parts) >= 2 and parts[0] in (".bss", ".sbss") and int(parts[1]):
                     raise ModError(f"{self.name}: {parts[0]} di {parts[1]} B: le variabili vanno in .data "
                                    '(__attribute__((section(".data"))))')
-            keep = sections or ("-j .text -j .rodata -j .data" if c else "-j .text -j .data")
+            keep = sections if sections is not None else "-j .text -j .rodata -j .data" if c else "-j .text -j .data"
             wsl(env + f"{BIN}objcopy -O binary {keep} m.elf m.bin")
             code = Code()
             for line in wsl(env + f"{BIN}nm m.elf").splitlines():
@@ -135,8 +152,10 @@ class Mod:
                 if len(parts) == 3:
                     code[parts[2]] = int(parts[0], 16)
             code.blob, code.base = (tmp / "m.bin").read_bytes(), base
-        if end is not None and base + len(code.blob) > end:
-            raise ModError(f"{self.name}: non ci sta: {len(code.blob)} B in {end - base} B")
+            code.emac = emac_sites(wsl(env + f"{BIN}objdump -d -j .text m.elf")) if emac else []
+        last = max(base + len(code.blob), code.get("_end", 0) if bss else 0)
+        if end is not None and last > end:
+            raise ModError(f"{self.name}: non ci sta: fine a {last:#x}, spazio fino a {end:#x}")
         return code
 
     # ---------------------------------------------------------------- patch
@@ -165,16 +184,21 @@ class Mod:
                      what)
 
     # ---------------------------------------------------------------- uscita
-    def write(self, description: str, requires: list[str] | None = None, symbols: dict[str, int] | None = None,
-              extra: dict | None = None) -> None:
+    def write(self, description: str, requires: list[str] | None = None, uses: list[str] | None = None,
+              license: str | None = None, credits: str | None = None, **fields) -> None:
+        """Scrive patch.json. fields: altre chiavi, nell'ordine dato, dopo "generated_by" (layout=..., symbols=...,
+        emac_sites=...); symbols ed emac_sites prendono indirizzi interi."""
         spec: dict = {"name": self.name, "os": OS}
-        if requires:
-            spec["requires"] = requires
-        spec["description"] = description
-        spec["generated_by"] = f"mods/{self.name}/make_patch.py"
-        if symbols:
-            spec["symbols"] = {k: f"{v:#010x}" for k, v in symbols.items()}
-        spec.update(extra or {})
+        for k, v in (("requires", requires), ("uses", uses), ("description", description), ("license", license),
+                     ("credits", credits), ("generated_by", f"mods/{self.name}/make_patch.py")):
+            if v:
+                spec[k] = v
+        for k, v in fields.items():
+            if k == "symbols":
+                v = {n: f"{a:#010x}" for n, a in v.items()}
+            elif k == "emac_sites":
+                v = [f"{a:#010x}" for a in v]
+            spec[k] = v
         spec["patches"] = self.patches
         (self.here / "patch.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         size = sum(p["len"] for p in self.patches if p.get("append"))
