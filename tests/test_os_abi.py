@@ -16,7 +16,7 @@ PTR_RET = re.compile(r"\(\s*[A-Za-z_][\w\s]*\*+\s*\(\s*\*\s*\)\s*\([^)]*\)\s*\)\
 
 def test_no_os_function_returns_a_pointer():
     found = []
-    for f in sorted((ROOT / "mods").rglob("*.[ch]")):
+    for f in sorted([*(ROOT / "mods").rglob("*.[ch]"), *(ROOT / "sdk").glob("*.h")]):
         for n, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
             if PTR_RET.search(line):
                 found.append(f"{f.relative_to(ROOT)}:{n}: {line.strip()}")
