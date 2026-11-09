@@ -67,6 +67,8 @@ def test_shlz_same_stream_as_python(tmp_path):
         src, dst = tmp_path / f"{k}.bin", tmp_path / f"{k}.shlz"
         src.write_bytes(data)
         node(WB / "scripts" / "codec-cli.ts", "shlz", src, dst)
+        node(WB / "scripts" / "codec-cli.ts", "shlw", src, tmp_path / f"{k}.shlw")
+        assert (tmp_path / f"{k}.shlw").read_bytes() == lz.whiten(lz.compress(src.read_bytes())), k
         assert dst.read_bytes() == lz.compress(data), k
 
 

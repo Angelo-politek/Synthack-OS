@@ -4,6 +4,12 @@ Formato: "SHLZ", lunghezza decompressa (u32 BE), lunghezza del flusso (u32 BE), 
     0xxxxxxx                  -> seguono x+1 byte letterali (1..128)
     1lllllll hi lo            -> copia l+3 byte (3..130) da distanza (hi<<8|lo) (1..65535) all'indietro
 La decompressione si ferma quando ha prodotto la lunghezza dichiarata.
+
+SHLW = SHLZ "sbiancato" (whiten): stessa intestazione con la sigla "SHLW", flusso allungato con zeri a un multiplo
+di 4 e messo in XOR, una parola alla volta, con un xorshift32. Serve all'area mod: la sezione 3 viene poi compressa
+con aPLib, e un flusso SHLZ e' ancora comprimibile; l'uscita della decompressione d'avvio corre allora piu' dell'
+ingresso e il margine (bootcheck.py) cala con ogni byte di codice delle mod (misurato 2026-11-09: 6 375 B con SHLZ,
+17 680 B con una coda incomprimibile, qualunque sia la sua lunghezza).
 """
 
 from __future__ import annotations
@@ -81,3 +87,38 @@ def decompress(blob: bytes) -> bytes:
     if len(out) != n or i != clen:
         raise ValueError("lunghezze incoerenti")
     return bytes(out)
+
+
+MAGIC_W = b"SHLW"
+SEED = 0x53484C57
+
+
+def _keystream(words: int):
+    x = SEED
+    for _ in range(words):
+        x ^= (x << 13) & 0xFFFFFFFF
+        x ^= x >> 17
+        x ^= (x << 5) & 0xFFFFFFFF
+        yield x
+
+
+def whiten(blob: bytes) -> bytes:
+    """Flusso SHLZ -> SHLW (vedi sopra)."""
+    if blob[:4] != MAGIC:
+        raise ValueError("non e' un flusso SHLZ")
+    body = blob[HDR:] + bytes(-(len(blob) - HDR) % 4)
+    words = struct.unpack(f">{len(body) // 4}I", body)
+    return MAGIC_W + blob[4:HDR] + struct.pack(f">{len(words)}I", *(w ^ k for w, k in zip(words, _keystream(len(words)))))
+
+
+def unwhiten(blob: bytes) -> bytes:
+    """Flusso SHLW -> SHLZ, senza gli zeri aggiunti."""
+    if blob[:4] != MAGIC_W:
+        raise ValueError("non e' un flusso SHLW")
+    clen = struct.unpack_from(">I", blob, 8)[0]
+    n = (clen + 3) // 4
+    if len(blob) < HDR + 4 * n:
+        raise ValueError("flusso SHLW troncato")
+    words = struct.unpack_from(f">{n}I", blob, HDR)
+    body = struct.pack(f">{n}I", *(w ^ k for w, k in zip(words, _keystream(n))))
+    return MAGIC + blob[4:HDR] + body[:clen]

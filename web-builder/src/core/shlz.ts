@@ -87,3 +87,42 @@ export function decompress(blob: Uint8Array): Uint8Array {
   if (i !== clen) throw new Error("SHLZ: inconsistent lengths");
   return out;
 }
+
+// SHLW = SHLZ "sbiancato": sigla "SHLW", flusso allungato con zeri a un multiplo di 4 e messo in XOR, una parola
+// alla volta, con un xorshift32 (tools/build/lz.py: perche' serve all'area mod, stessi byte).
+const SEED = 0x53484c57;
+
+function xorBody(src: Uint8Array, words: number): Uint8Array {
+  const out = new Uint8Array(4 * words);
+  out.set(src.subarray(0, Math.min(src.length, out.length)));
+  const dv = new DataView(out.buffer);
+  let x = SEED;
+  for (let k = 0; k < words; k++) {
+    x ^= x << 13;
+    x ^= x >>> 17;
+    x ^= x << 5;
+    dv.setUint32(4 * k, (dv.getUint32(4 * k) ^ x) >>> 0);
+  }
+  return out;
+}
+
+export function whiten(blob: Uint8Array): Uint8Array {
+  if (blob[0] !== 0x53 || blob[1] !== 0x48 || blob[2] !== 0x4c || blob[3] !== 0x5a) throw new Error("not an SHLZ stream");
+  const body = xorBody(blob.subarray(12), Math.ceil((blob.length - 12) / 4));
+  const out = new Uint8Array(12 + body.length);
+  out.set(blob.subarray(0, 12));
+  out[3] = 0x57;
+  out.set(body, 12);
+  return out;
+}
+
+export function unwhiten(blob: Uint8Array): Uint8Array {
+  if (blob[0] !== 0x53 || blob[1] !== 0x48 || blob[2] !== 0x4c || blob[3] !== 0x57) throw new Error("not an SHLW stream");
+  const clen = new DataView(blob.buffer, blob.byteOffset, blob.byteLength).getUint32(8), words = Math.ceil(clen / 4);
+  if (blob.length < 12 + 4 * words) throw new Error("SHLW: truncated stream");
+  const out = new Uint8Array(12 + clen);
+  out.set(blob.subarray(0, 12));
+  out[3] = 0x5a;
+  out.set(xorBody(blob.subarray(12, 12 + 4 * words), words).subarray(0, clen), 12);
+  return out;
+}

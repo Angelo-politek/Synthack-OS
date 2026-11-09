@@ -41,3 +41,24 @@ def test_mod_code_compresses():
     c = lz.compress(total)
     assert lz.decompress(c) == total
     assert len(c) < 0.8 * len(total)
+
+
+@pytest.mark.parametrize("data", [b"", b"a", b"abcd", b"\x00" * 1000, bytes(range(256)) * 20])
+def test_whiten_roundtrip(data):
+    z = lz.compress(data)
+    w = lz.whiten(z)
+    assert w[:4] == b"SHLW" and w[4:12] == z[4:12] and (len(w) - lz.HDR) % 4 == 0
+    assert lz.unwhiten(w) == z
+    with pytest.raises(ValueError):
+        lz.whiten(w)
+
+
+def test_whitened_stream_does_not_compress():
+    """Il motivo di SHLW: quello che resta comprimibile in un flusso SHLZ costa margine d'avvio."""
+    import zlib
+    spec = json.loads((ROOT / "mods" / "fx3" / "patch.json").read_text(encoding="utf-8"))
+    code = b"".join(bytes.fromhex(p["hex"]) for p in spec["patches"] if p.get("append"))
+    z = lz.compress(code)
+    assert len(zlib.compress(z, 9)) < 0.9 * len(z)
+    w = lz.whiten(z)
+    assert len(zlib.compress(w, 9)) > 0.99 * len(w)

@@ -85,6 +85,11 @@ test("aPLib: the boot margin falls when output catches up with input", () => {
 test("SHLZ: compress then decompress gives the input back", () => {
   for (const [name, d] of samples) assert.deepEqual(shlz.decompress(shlz.compress(d)), d, name);
   assert.deepEqual(shlz.decompress(shlz.compress(new Uint8Array(0))), new Uint8Array(0));
+  for (const [name, d] of samples) {
+    const z = shlz.compress(d), w = shlz.whiten(z);
+    assert.equal(w.length, 12 + 4 * Math.ceil((z.length - 12) / 4), name);
+    assert.deepEqual(shlz.unwhiten(w), z, name);
+  }
 });
 
 test("SysEx: encode then decode round trip, every packet checksum valid", () => {

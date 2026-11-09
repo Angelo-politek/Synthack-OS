@@ -9,6 +9,7 @@ import { namedSplash } from "../src/core/splash.ts";
 
 const [cmd, a, b] = process.argv.slice(2);
 if (cmd === "shlz" && a && b) writeFileSync(b, shlz.compress(new Uint8Array(readFileSync(a))));
+else if (cmd === "shlw" && a && b) writeFileSync(b, shlz.whiten(shlz.compress(new Uint8Array(readFileSync(a)))));
 else if (cmd === "splash" && a && b !== undefined)
   process.stdout.write(namedSplash(JSON.parse(readFileSync(a, "utf-8")) as ModSpec, b).patches[0].hex!);
 else {
