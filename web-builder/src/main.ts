@@ -3,8 +3,7 @@ import { sha256hex } from "./core/sha256.ts";
 import { cleanName, NAME_MAX, splashPixels } from "./core/splash.ts";
 import { localMods, removeLocal, type LocalMod } from "./local.ts";
 import { measured, renderLoad, updateLoad } from "./load.ts";
-import { reveal } from "./logo.ts";
-import { info, modUrl, specs as repoSpecs, type Card } from "./mods.ts";
+import { GROUPS, groupOf, info, modUrl, specs as repoSpecs, type Card } from "./mods.ts";
 import { previewFor } from "./previews/index.ts";
 import { mount, type Screen } from "./screen.ts";
 import type { Status } from "./core/modfile.ts";
@@ -100,7 +99,7 @@ function tile(e: Entry, i: number): HTMLElement {
   const box = el("div", "oled");
   screen.append(box);
   const body = el("div", "tile-body");
-  const h = el("h4", "tile-title", e.card.title);
+  const h = el("h5", "tile-title", e.card.title);
   h.id = `t-${e.name}`;
   body.append(h);
   if (e.local) body.append(el("span", "badge", "local — not in the official list"));
@@ -171,9 +170,21 @@ function renderTiles(): void {
   prob.hidden = !r.problems.length;
   prob.textContent = r.problems.join(" ");
 
-  const mods = $("mod-tiles");
-  mods.replaceChildren(plusTile("./create-mod.html", "Create your mod", "Write a mod, try it here, send a pull request."),
-    ...entries("feature").map(tile));
+  const feats = entries("feature"), box = $("mod-tiles");
+  box.replaceChildren();
+  let i = 0;
+  for (const g of GROUPS) {
+    const list = feats.filter((e) => groupOf(e.name) === g.id);
+    const last = g.id === "more";
+    if (!list.length && !last) continue;
+    const head = el("div", "group-head");
+    head.append(el("h4", "group-title", g.title));
+    if (g.note) head.append(el("span", "group-note", g.note));
+    const grid = el("div", "tiles");
+    grid.append(...list.map((e) => tile(e, i++)));
+    if (last) grid.append(plusTile("./create-mod.html", "Create your mod", "Write a mod, try it here, send a pull request."));
+    box.append(head, grid);
+  }
 
   const machines = entries("machine");
   const mt = $("machine-tiles");
@@ -319,6 +330,9 @@ function runBuild(): void {
       j.download = OUT.replace(/\.syx$/, ".json");
       const sha = (r.manifest as { output_sha256?: string }).output_sha256;
       $("sha").textContent = sha ? `SHA-256 ${sha}` : "";
+      const margin = (r.manifest as { boot_margin?: number }).boot_margin;
+      $("margin").textContent = margin === undefined ? ""
+        : `Boot check passed: ${margin.toLocaleString("en-US")} bytes of unpacking margin (minimum 4,096).`;
       $("log").replaceChildren(...r.log.map((l) => el("li", "", l)));
       $("result").hidden = false;
       done();
@@ -335,7 +349,6 @@ function runBuild(): void {
 
 document.querySelectorAll(".os-ver").forEach((e) => (e.textContent = OS_VERS.join(" / ")));
 document.querySelectorAll(".os-file").forEach((e) => (e.textContent = OS_VERS.map((v) => `Syntakt_OS${v}.syx`).join(" or ")));
-reveal($("logo"));
 bootScreen();
 renderLoad($("load"));
 renderTiles();

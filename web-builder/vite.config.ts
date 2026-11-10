@@ -6,7 +6,7 @@ import { escapeHtml, renderMarkdown, tocHtml } from "./src/site/markdown.ts";
 
 const ROOT = fileURLToPath(new URL(".", import.meta.url));
 const CONTENT = resolve(ROOT, "content");
-const PAGES = ["index", "create-mod", "users", "modders", "samples"];
+const PAGES = ["index", "build", "create-mod", "users", "modders", "samples"];
 
 function read(file: string): string | null {
   return existsSync(file) ? readFileSync(file, "utf8") : null;

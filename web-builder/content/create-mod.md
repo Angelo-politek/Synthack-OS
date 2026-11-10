@@ -23,7 +23,7 @@ Commands and details: [Workflow](modders.md#workflow). With an AI coding agent: 
 ## Try it here
 
 1. Load your `patch.json` below.
-2. Open **Create your OS**. Your mod is in the list, marked local.
+2. Open **Build your OS**. Your mod is in the list, marked local.
 3. Build. All checks run: hashes, overlaps with other mods, protected sections, boot margin.
 
 `[!]` The mod stays in this browser. Nothing is uploaded.

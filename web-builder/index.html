@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SyntHack OS</title>
-  <meta name="description" content="Community firmware mods for the Elektron Syntakt. Pick your mods and build your OS in the browser, from your own stock OS file. Nothing is uploaded.">
+  <meta name="description" content="Mods and machines for the Elektron Syntakt. Pick what you want and build your OS in the browser, from your own stock OS file. Nothing is uploaded.">
   <meta name="theme-color" content="#090909">
   <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./src/style.css">
@@ -13,138 +13,88 @@
 <!-- @header -->
 <main id="main">
   <section class="hero" aria-labelledby="pitch">
-    <div class="wrap">
-      <div class="logo-box">
-        <pre class="logo" id="logo" role="img" aria-label="SyntHack">   ____          __  __ __         __
-  / __/_ _____  / /_/ // /__ _____/ /__
- _\ \/ // / _ \/ __/ _  / _ `/ __/  '_/
-/___/\_, /_//_/\__/_//_/\_,_/\__/_/\_\
-    /___/</pre>
+    <div class="wrap hero-grid">
+      <div class="hero-text">
+        <p class="kicker">// mods and machines · Elektron Syntakt · OS <span class="os-ver">1.42</span></p>
+        <h1 id="pitch" class="pitch">Make your Syntakt yours.</h1>
+        <p class="lead">A compressor, a third send effect, a sampler, an FM machine, an arpeggiator and more. Pick what you want and build your OS from your own stock file.</p>
+        <div class="cta">
+          <a class="btn" href="./build.html">Build your OS</a>
+          <a class="btn ghost" href="#mods">See the mods</a>
+        </div>
+        <p class="hero-note">Free and open source. Nothing is uploaded. Not affiliated with Elektron.</p>
       </div>
-      <p class="kicker">// community firmware mods · Elektron Syntakt · OS <span class="os-ver">1.42</span></p>
-      <h1 id="pitch" class="pitch">Make your Syntakt yours.</h1>
-      <p class="lead">Community mods and machines for the Elektron Syntakt. Build your OS in the browser, from your own stock file. Nothing is uploaded.</p>
-      <div class="cta">
-        <a class="btn" href="#create">Create your OS</a>
-        <a class="btn ghost" href="./users.html#why-synthack">Why SyntHack</a>
-      </div>
+      <figure class="hero-screen">
+        <div class="oled-frame"><div class="oled" id="hero-oled"></div></div>
+        <figcaption id="hero-caption">The Syntakt screen with SyntHack</figcaption>
+      </figure>
     </div>
   </section>
 
-  <section class="wrap why" aria-labelledby="why-h">
-    <h2 id="why-h" class="sec-title"><span class="idx">00</span>Why SyntHack</h2>
+  <section class="wrap sec" aria-labelledby="how-h">
+    <h2 id="how-h" class="sec-title"><span class="idx">01</span>How it works</h2>
+    <ol class="how">
+      <li>
+        <h3>Your stock OS</h3>
+        <p>Download the Syntakt OS from elektron.se. The page reads it on your computer and checks that it is the real one.</p>
+      </li>
+      <li>
+        <h3>Your mods</h3>
+        <p>Select what you want. The page shows the audio CPU your selection uses and adds what the mods need.</p>
+      </li>
+      <li>
+        <h3>Your OS</h3>
+        <p>The page patches, verifies and gives you one <code>.syx</code>. Flash it with Elektron Transfer. Go back by flashing the stock OS.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section id="mods" class="wrap sec" aria-labelledby="mods-h">
+    <h2 id="mods-h" class="sec-title"><span class="idx">02</span>The mods</h2>
+    <p class="sec-lead">Each one is a small patch on the stock OS, tested in an emulator against the original code and against the others.</p>
+    <div id="catalog"></div>
+    <p class="legend"><span class="badge stable">stable</span> tested on the device over many sessions
+      <span class="badge beta">beta</span> works on the device, newer
+      <span class="badge experimental">experimental</span> first device tests only</p>
+  </section>
+
+  <section class="wrap sec" aria-labelledby="safe-h">
+    <h2 id="safe-h" class="sec-title"><span class="idx">03</span>Before you flash</h2>
     <ul class="why-grid">
       <li>
-        <h3>Yours</h3>
-        <p>Features shaped around how you play. Pick only what you use. Add your name to the boot screen.</p>
+        <h3>What can go wrong</h3>
+        <p>A modified OS can fail to start. The boot part of the Syntakt is never touched, so the stock OS can be sent again over MIDI DIN.</p>
       </li>
       <li>
-        <h3>Combinable</h3>
-        <p>Every mod is checked against the stock OS and against the others. The builder verifies the result before download.</p>
+        <h3>What the build checks</h3>
+        <p>Your stock file, every patch against the bytes it expects, conflicts between mods, the boot sections and the unpacking margin. It refuses a result it cannot verify.</p>
       </li>
       <li>
-        <h3>Open</h3>
-        <p>Every patch is public on GitHub, GPL-2.0-or-later, tested in an emulator. Share your mod or machine with a pull request.</p>
+        <h3>What you do first</h3>
+        <p>Back up your projects with Elektron Transfer. Read the <a href="https://github.com/Angelo-politek/Synthack-OS/blob/main/RECOVERY.md" rel="noopener">recovery procedure</a>. Have a MIDI DIN interface at hand.</p>
       </li>
     </ul>
-    <p class="more"><a href="./users.html#why-synthack">For users →</a><a href="./modders.html#why-synthack">For modders →</a></p>
+    <p class="more"><a href="./users.html">Users guide →</a></p>
   </section>
 
-  <section id="create" class="wrap create" aria-labelledby="create-h">
-    <h2 id="create-h" class="sec-title"><span class="idx">01</span>Create your OS</h2>
-
-    <aside class="warn" role="note">
-      <p><strong>Not affiliated with Elektron.</strong> Modified firmware can make your device unusable and may void your
-        warranty. Learn the <a href="https://github.com/Angelo-politek/Synthack-OS/blob/main/RECOVERY.md" rel="noopener">recovery procedure</a>
-        before flashing. Use at your own risk.</p>
-    </aside>
-
-    <div class="step" id="step-stock">
-      <h3 class="step-title"><span class="n">1</span>Your stock OS</h3>
-      <p>Download <code class="os-file">Syntakt_OS1.42.syx</code> from
-        <a href="https://www.elektron.se/support-downloads/syntakt" rel="noopener">elektron.se</a>. Choose it here.
-        Only this page reads it: <strong>nothing is uploaded</strong>.</p>
-      <label class="drop" id="drop">
-        <input type="file" id="stock" accept=".syx">
-        <span class="drop-mark" aria-hidden="true">[ .syx ]</span>
-        <span id="drop-text">Choose the file, or drop it here</span>
-      </label>
-      <p id="stock-status" class="status" aria-live="polite"></p>
-    </div>
-
-    <div class="step" id="step-boot">
-      <h3 class="step-title"><span class="n">2</span>Boot screen</h3>
-      <p>The SyntHack logo after the official intro is in every build. Add your name under it.</p>
-      <div class="boot">
-        <div class="field">
-          <label for="name">Your name <span class="opt">optional</span></label>
-          <input id="name" type="text" autocomplete="off" spellcheck="false" aria-describedby="name-note">
-          <p id="name-note" class="hint" aria-live="polite"></p>
-        </div>
-        <figure class="oled-frame">
-          <div class="oled" id="boot-screen"></div>
-          <figcaption>The boot screen as the build writes it: 128 × 64 pixels.</figcaption>
-        </figure>
+  <section class="wrap sec" aria-labelledby="make-h">
+    <h2 id="make-h" class="sec-title"><span class="idx">04</span>Make your own</h2>
+    <div class="make">
+      <div>
+        <p>Every mod here started as one idea for one Syntakt. The tools are in the repository: an emulator that runs the OS code, a registry that keeps mods apart, tests that compare with the original.</p>
+        <p class="more"><a href="./create-mod.html">Make a mod →</a><a href="./modders.html">Modders guide →</a><a href="https://github.com/Angelo-politek/Synthack-OS" rel="noopener">GitHub ↗</a></p>
       </div>
+      <pre class="term"><code>python tools/new_mod.py my-mod
+python mods/my-mod/make_patch.py
+python tools/check_mod.py my-mod</code></pre>
     </div>
+  </section>
 
-    <div class="step" id="step-mods">
-      <h3 class="step-title"><span class="n">3</span>Mods</h3>
-      <p>Select your mods. Each screen shows a page the mod adds or changes.</p>
-      <div class="presets" id="presets" role="group" aria-label="Presets"></div>
-      <div class="tiles" id="mod-tiles"></div>
-      <p id="deps" class="hint" aria-live="polite"></p>
-      <p id="local-problems" class="status bad" hidden></p>
-    </div>
-
-    <div class="step" id="step-machines">
-      <h3 class="step-title"><span class="n">4</span>Machines</h3>
-      <p>Synth machines with their own code on the sound engine (CPU #2).</p>
-      <div class="tiles" id="machine-tiles"></div>
-    </div>
-
-    <div class="load" id="load" role="status" aria-label="Load of the selected mods"></div>
-
-    <div class="step" id="step-build">
-      <h3 class="step-title"><span class="n">5</span>Build</h3>
-      <p id="summary" class="summary" aria-live="polite"></p>
-      <button id="build" class="btn" type="button" disabled>Build my OS</button>
-      <p id="build-hint" class="hint">A build takes 30–60 s and runs on this computer.</p>
-      <div id="progress" class="progress" hidden>
-        <ol class="stages" id="stages">
-          <li data-stage="check">Check the stock OS</li>
-          <li data-stage="patch">Apply the mods</li>
-          <li data-stage="compress">Compress <span class="pct"></span></li>
-          <li data-stage="verify">Verify the result</li>
-        </ol>
-        <div class="bar" aria-hidden="true"><div id="bar-fill"></div></div>
-        <p id="stage" class="sr-only" aria-live="polite"></p>
-      </div>
-      <div id="result" class="result" hidden>
-        <p class="ok">Built and verified.</p>
-        <div class="dl">
-          <a id="dl-syx" class="btn" download>Download synthack.syx</a>
-          <a id="dl-json" class="btn ghost" download>Build report (.json)</a>
-        </div>
-        <p id="sha" class="sha"></p>
-        <details class="log-box">
-          <summary>Build log</summary>
-          <ul id="log" class="log"></ul>
-        </details>
-        <h4>Flash it</h4>
-        <ol class="flash">
-          <li>Back up your projects and sounds with Elektron Transfer.</li>
-          <li>Connect the Syntakt over USB. Open <strong>Elektron Transfer</strong>. Go to the <strong>Drop</strong> page.</li>
-          <li>Drop <code>synthack.syx</code>. Wait until the update is finished. Don't power off.</li>
-          <li>To go back, flash the stock <code class="os-file">Syntakt_OS1.42.syx</code> the same way. OS doesn't start: follow
-            <a href="https://github.com/Angelo-politek/Synthack-OS/blob/main/RECOVERY.md" rel="noopener">RECOVERY.md</a>.</li>
-        </ol>
-      </div>
-      <p id="error" class="error" role="alert" hidden></p>
-    </div>
+  <section class="wrap sec final" aria-label="Build">
+    <a class="btn" href="./build.html">Build your OS</a>
   </section>
 </main>
 <!-- @footer -->
-<script type="module" src="./src/main.ts"></script>
+<script type="module" src="./src/home.ts"></script>
 </body>
 </html>

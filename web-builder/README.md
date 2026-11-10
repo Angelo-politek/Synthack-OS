@@ -41,7 +41,8 @@ A `patch.json` loaded in **Create your mod** can carry the same card as a `"card
 
 | Page | Text |
 |---|---|
-| `index.html` | home, Create your OS |
+| `index.html` | home: what SyntHack is, the mods, how it works |
+| `build.html` | Build your OS |
 | `users.html` | `content/users.md` |
 | `modders.html` | `content/modders.md` |
 | `create-mod.html` | `content/create-mod.md`, `content/agent-prompt.md` |

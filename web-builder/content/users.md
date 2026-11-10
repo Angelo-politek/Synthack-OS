@@ -30,7 +30,7 @@ One idea changed the sound of the Syntakt. The next ideas come from the communit
 ## Build
 
 1. Download the stock OS from elektron.se.
-2. Open **Create your OS** on the home page.
+2. Open **Build your OS**.
 3. Choose or drop the `.syx` file. The page checks its SHA-256 and refuses any other file.
 4. Optional: type your name for the boot screen.
 5. Select your mods. Required mods are added automatically.
@@ -339,7 +339,7 @@ The SyntHack logo, version and your name after the official intro. Part of every
 
 <!-- @screen:splash/boot -->
 
-1. Type your name in **Create your OS**, step 2. Up to 20 characters: letters, digits, space, `.` and `-`. Shown in capitals.
+1. Type your name in **Build your OS**, step 2. Up to 20 characters: letters, digits, space, `.` and `-`. Shown in capitals.
 2. Build and flash.
 
 `[!]` Boot time is unchanged.

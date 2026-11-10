@@ -5,8 +5,8 @@ import "./shots.ts";
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string): T => document.getElementById(id) as T;
 const KIND_NOTE: Record<string, string> = {
-  feature: "in Create your OS → Mods",
-  machine: "in Create your OS → Machines",
+  feature: "in Build your OS → Mods",
+  machine: "in Build your OS → Machines",
   infra: "not shown as a tile: added automatically when another mod requires it",
   test: "hidden from the list (test mod)",
 };
@@ -93,8 +93,8 @@ async function load(f: File): Promise<void> {
     status.replaceChildren(`✓ ${m.card.title} (${m.name}) loaded. It is shown ${KIND_NOTE[m.card.kind]}, only in this browser. `);
     if (m.card.kind === "feature" || m.card.kind === "machine") {
       const a = document.createElement("a");
-      a.href = `./index.html#step-${m.card.kind === "machine" ? "machines" : "mods"}`;
-      a.textContent = "Open Create your OS →";
+      a.href = `./build.html#step-${m.card.kind === "machine" ? "machines" : "mods"}`;
+      a.textContent = "Open Build your OS →";
       status.append(a);
     }
   } catch (e) {
