@@ -178,6 +178,14 @@ class Mod:
                              "append": True, "hex": struct.pack(">I", target).hex(), "ram": f"{ram:#010x}",
                              "what": f"(area mod) lista di avvio: {what}"})
 
+    def word(self, offset: int, value: int, what: str) -> None:
+        """Una parola lunga accodata all'area mod, all'offset dato (una voce di una tabella di un'altra mod: il
+        registro dice di chi e' il posto)."""
+        ram = modarea_layout.RAM + offset
+        self.patches.append({"section": 3, "addr": f"{modarea_layout.IMG + offset:#010X}", "len": 4, "append": True,
+                             "hex": struct.pack(">I", value).hex(), "ram": f"{ram:#010x}",
+                             "what": f"(area mod) {what}"})
+
     def replace(self, addr: int, orig: str | None, new: bytes, what: str) -> None:
         """Sostituisce len(new) byte dell'OS; orig: i byte attesi, in esadecimale (None: solo l'impronta nel
         patch.json, per i dati che il make_patch calcola da quelli dell'OS)."""

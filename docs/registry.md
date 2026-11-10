@@ -31,7 +31,8 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x0001fff0` | `0x00020000` | **free** |  |
 | `0x00020000` | `0x00026000` | recorder | Synfact recorder port: code and data (PCM in the OS heap) |
 | `0x00026000` | `0x0002a000` | lfo3 | third LFO (Synfact port): engine (source of the SRAM copy), page, actions |
-| `0x0002a000` | `0x00032000` | **free** | for new mods: code and data |
+| `0x0002a000` | `0x0002b800` | about | code and data |
+| `0x0002b800` | `0x00032000` | **free** | for new mods: code and data |
 | `0x00032000` | `0x00038000` | arp | arpeggiator (Synfact port): code and data |
 | `0x00038000` | `0x0003e000` | poly | POLY (Synfact port): groups, voice allocation, TRIG page 3 (GPL-2.0-or-later) |
 | `0x0003e000` | `0x0003fff0` | idspace | code; descriptors, object definitions and pages the mods write (idspace_layout) |
@@ -44,7 +45,7 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 
 Boot list (`+0x7400`, 8 pointers called after unpacking): slot 0 sy-fm4, slot 1 sampler, slot 2 xparams, slot 3 sfcore, slot 4 idspace.
 
-sfcore module table (`+0x1b000`, 8 pointers, initialized in this order): slot 0 modulation-skip, slot 2 recorder, slot 3 lfo3, slot 4 arp, slot 5 poly.
+sfcore module table (`+0x1b000`, 8 pointers, initialized in this order): slot 0 modulation-skip, slot 1 about, slot 2 recorder, slot 3 lfo3, slot 4 arp, slot 5 poly.
 
 New mods claim in `mods/<name>/claims.json` (keys: `boot_slot`, `destx`, `engine`, `ids`, `modarea`, `pages`, `shared_ram`, `vparams`), inside the free zones marked for new mods. `python tools/new_mod.py <name>` writes it.
 

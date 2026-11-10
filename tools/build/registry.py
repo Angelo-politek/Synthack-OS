@@ -64,7 +64,7 @@ PLANNED: set[str] = set()
 
 # ---- tabella dei moduli di sfcore (area mod + SFCORE_TABLE): posto -> mod. sfcore li inizializza in quest'ordine.
 SFCORE_TABLE, SFCORE_N = 0x1B000, 8
-SFCORE_SLOTS = {0: "modulation-skip", 2: "recorder", 3: "lfo3", 4: "arp", 5: "poly"}
+SFCORE_SLOTS = {0: "modulation-skip", 1: "about", 2: "recorder", 3: "lfo3", 4: "arp", 5: "poly"}
 
 # ---- SRAM interna della CPU #1 (0x80000000): code che l'avvio stock azzera (0x4000045C) e che nessun operando
 # assoluto della 1.42 usa (tests/test_sfcore.py controlla che l'OS non le legga ne' scriva). Dati e codice qui non

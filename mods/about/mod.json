@@ -1,0 +1,6 @@
+{
+  "title": "About SyntHack",
+  "kind": "feature",
+  "status": "beta",
+  "summary": "A SYNTHACK row in the settings menu: version, the mods in your build and their status, credits."
+}
