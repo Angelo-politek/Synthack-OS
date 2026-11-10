@@ -231,3 +231,32 @@ def test_os_never_touches_the_sram_tails():
         m.scene(scene)
         m.run()
     assert not seen, seen[:10]
+
+
+def test_modal_key_rule(tmp_path):
+    """syntakt/modal.h (viste di ARP e registratore): in primo piano i tasti che la vista non usa sono suoi, tranne il
+    trasporto (9, 10, 11) e quelli lasciati passare; il rilascio segue chi ha preso la pressione, anche a vista chiusa.
+    Sulla macchina (RC1): FUNC+BANK e un secondo SYN agivano sotto la vista dell'arpeggiatore."""
+    import shutil
+    import subprocess
+    calls = [((3, 1, 1, 0, 0), 1), ((3, 0, 1, 0, 0), 1),             # preso alla pressione e al rilascio
+             ((9, 1, 1, 0, 0), 0), ((10, 1, 1, 0, 0), 0), ((11, 1, 1, 0, 0), 0),   # trasporto all'OS
+             ((3, 0, 1, 0, 0), 0),                                    # rilascio di un tasto premuto prima: all'OS
+             ((4, 1, 1, 0, 0), 1), ((4, 0, 0, 0, 0), 1),              # rilascio dopo la chiusura: ancora nostro
+             ((4, 1, 0, 0, 0), 0),                                    # vista chiusa: niente
+             ((30, 1, 1, 0, 1), 0), ((30, 1, 1, 0, 0), 1),            # trig lasciati passare o no
+             ((6, 1, 1, 1 << 6, 0), 0), ((70, 1, 1, 0, 0), 0)]
+    body = "".join(f'printf("%d ",st_modal_key({",".join(map(str, a))}));' for a, _ in calls)
+    (tmp_path / "m.c").write_text('#include <stdio.h>' + chr(10) + '#include "modal.h"' + chr(10)
+                                  + "int main(void){" + body + "return 0;}" + chr(10))
+    shutil.copy(ROOT / "mods" / "sfcore" / "include" / "syntakt" / "modal.h", tmp_path / "modal.h")
+    if sys.platform == "win32":
+        sys.path.insert(0, str(ROOT / "tools" / "unpack"))
+        import eft
+        cmd = ["wsl.exe", "-e", "bash", "-lc", f"cd {eft.to_wsl_path(tmp_path)} && gcc -I. m.c -o m && ./m"]
+    else:
+        cmd = ["bash", "-c", f"cd {tmp_path} && cc -I. m.c -o m && ./m"]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:
+        pytest.skip("nessun compilatore C dell'host")
+    assert r.stdout.split() == [str(w) for _, w in calls]

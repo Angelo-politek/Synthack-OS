@@ -5,6 +5,7 @@
 #include "ui.h"
 #include "length.h"
 #include <syntakt/pattern.h>
+#include <syntakt/modal.h>
 typedef unsigned char arp_u8;
 #define UI_CALL(a,t) ((t)(a))
 #define ARP_DIRTY UI_CALL(0x400ffe22u,void (*)(void *))
@@ -408,7 +409,7 @@ static int arp_view_key(void *app,const void *event)
         arp_taps.consume_release=0;return 0;
     }
     if(action==ARP_TAP_CONSUME)return 1;
-    if(!arp_foreground())return 0;
+    if(!arp_foreground())return st_modal_key(key,flags,0,0,0);   /* SyntHack: releases of keys taken while open */
     if(key>=24 && key<=39)return arp_step_key(key,flags);
     arp_lock_sync();
     if(key==13){if(flags&1)ARP_CLOSE(arp_view);return 1;}
@@ -432,6 +433,6 @@ static int arp_view_key(void *app,const void *event)
         }
         return 1;
     }
-    /* Transport and track selection keep their native app handling. */
-    return 0;
+    /* Transport keeps its native app handling. SyntHack: every other key is the view's (syntakt/modal.h). */
+    return st_modal_key(key,flags,1,0,0);
 }

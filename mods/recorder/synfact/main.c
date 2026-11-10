@@ -5,6 +5,7 @@
 #include <syntakt/modules.h>
 #include <syntakt/host.h>
 #include <syntakt/mix.h>
+#include <syntakt/modal.h>
 typedef st_u32 u32;typedef int s32;typedef unsigned short u16;typedef unsigned char u8;
 #define DATA
 static const struct st_machine_host_api *host;
@@ -85,7 +86,13 @@ static int recorder_key(void *brain,void *event)
 {
     int taken=sampler_pre_event(brain,event);
     if(taken || be32((u8 *)event+12)==11)return taken; /* native STOP, also while SAVING */
-    return sam_foreground() && sam_tail_is_recorder()?sampler_key(sam_view,event):0;
+    /* SyntHack: on top, the recorder owns the keys it does not use too (syntakt/modal.h), but not the trig keys:
+     * they play the sounds to record. Under its naming and track popups the keys are the popup's. */
+    if(sam_foreground() && sam_tail_is_recorder()){
+        if(sampler_key(sam_view,event))return 1;
+        return st_modal_key(be32((u8 *)event+12),be32((u8 *)event+16),1,0,1);
+    }
+    return st_modal_key(be32((u8 *)event+12),be32((u8 *)event+16),0,0,0);
 }
 static int recorder_encoder(void *brain,void *event)
 {(void)brain;return sam_foreground() && sam_tail_is_recorder()?sampler_encoder(sam_view+4,event):0;}
