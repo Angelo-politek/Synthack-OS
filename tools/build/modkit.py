@@ -166,10 +166,23 @@ class Mod:
                              "append": True, "hex": code.blob.hex(), "ram": f"{code.base:#010x}",
                              "what": f"(area mod) {what}"})
 
-    def replace(self, addr: int, orig: str, new: bytes, what: str) -> None:
-        """Sostituisce len(new) byte dell'OS; orig: i byte attesi, in esadecimale."""
+    def boot(self, target: int, what: str) -> None:
+        """Mette target nel posto della lista di avvio prenotato dalla mod ("boot_slot" in claims.json): una
+        funzione C senza argomenti, chiamata a ogni avvio dopo la decompressione dell'area mod, prima dei
+        costruttori dell'OS (docs/memory-map.md). Niente oggetti dell'OS a quel punto: solo tabelle proprie."""
+        slots = [n for n, who in registry.BOOT_SLOTS.items() if who == self.name]
+        if len(slots) != 1:
+            raise ModError(f'{self.name}: serve un posto nella lista di avvio: "boot_slot" in claims.json')
+        ram = modarea_layout.RAM + modarea_layout.BOOT_LIST + 4 * slots[0]
+        self.patches.append({"section": 3, "addr": f"{modarea_layout.boot_slot(slots[0]):#010X}", "len": 4,
+                             "append": True, "hex": struct.pack(">I", target).hex(), "ram": f"{ram:#010x}",
+                             "what": f"(area mod) lista di avvio: {what}"})
+
+    def replace(self, addr: int, orig: str | None, new: bytes, what: str) -> None:
+        """Sostituisce len(new) byte dell'OS; orig: i byte attesi, in esadecimale (None: solo l'impronta nel
+        patch.json, per i dati che il make_patch calcola da quelli dell'OS)."""
         old = self.stock(addr, len(new))
-        if old.hex() != orig.lower():
+        if orig is not None and old.hex() != orig.lower():
             raise ModError(f"{self.name}: {addr:#x}: byte inattesi {old.hex()} (attesi {orig})")
         self.patches.append({"section": 3, "addr": f"{addr:#010X}", "len": len(new), "expect_sha256": sha(old),
                              "hex": new.hex(), "what": what})

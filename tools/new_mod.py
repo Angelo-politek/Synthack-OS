@@ -80,6 +80,7 @@ def main() -> None:
     #   m.hook(0x400A6EE6, "2f0b2f0a246f000c", code["{sym}_target"], "what the hook does")
     #   m.hook(addr, orig, code["{sym}_target"], "what", call=True)     # jsr invece di jmp
     #   m.replace(addr, orig, new_bytes, "what")                        # dati: un puntatore, un testo
+    #   m.boot(code["{sym}_boot"], "what")       # a ogni avvio; "boot_slot" in claims.json (docs/registry.md)
     m.write(description="TODO: cosa fa la mod e dove si aggancia.",
             requires=["modarea"], symbols={{k: v for k, v in sorted(code.items()) if k.startswith("{sym}_")}})
 

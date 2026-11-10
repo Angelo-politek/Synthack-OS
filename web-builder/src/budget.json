@@ -12,7 +12,7 @@
   },
   "mods": {
     "arp": {
-      "cpu": 400,
+      "cpu": 1300,
       "modarea": 40448,
       "kit": 0,
       "project": 288,
@@ -103,7 +103,7 @@
       "sec7": 0
     },
     "modulation-skip": {
-      "cpu": -5000,
+      "cpu": -6000,
       "modarea": 7808,
       "kit": 0,
       "project": 0,
@@ -117,7 +117,7 @@
       "sec7": 0
     },
     "poly": {
-      "cpu": 0,
+      "cpu": 2000,
       "modarea": 24576,
       "kit": 0,
       "project": 0,
@@ -138,7 +138,7 @@
       "sec7": 0
     },
     "recorder": {
-      "cpu": 0,
+      "cpu": 1400,
       "modarea": 73728,
       "kit": 0,
       "project": 0,

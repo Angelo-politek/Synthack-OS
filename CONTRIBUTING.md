@@ -56,7 +56,7 @@ python tools/build/registry.py && git diff --exit-code docs/registry.md
 python tools/build/budget.py && git diff --exit-code web-builder/src/budget.json
 ```
 
-One mod, with the stock OS: `python tools/check_mod.py <name>` (patch reproducible, its tests, registry, build with every other mod, boot margin).
+While you work: `python -m pytest -m "not slow"` (~6 minutes with the stock OS; the whole suite takes ~55). One mod, with the stock OS: `python tools/check_mod.py <name>` (patch reproducible, its tests, registry, build with every other mod, boot margin).
 
 - CI runs the same checks without the stock OS. Run the skipped tests locally. Say so in the pull request.
 - Fill in the [pull request template](.github/PULL_REQUEST_TEMPLATE.md).

@@ -63,10 +63,15 @@ AUDIO_CYCLES["cpu-meter"] = 800
 # 14 956. Qui un credito prudente: nei blocchi con ingressi cambiati (nota con altra velocity, LFO/parametri mossi,
 # 1 su 64 di controllo) gira lo stock piu' la registrazione (tests/test_modulation_skip.py).
 # sfcore: solo interfaccia (0); gli adattatori audio e nativi si contano nella mod che li usa ("uses").
-AUDIO_CYCLES["modulation-skip"] = -5000
+# 2026-11-10: -6000 (misurato -6 175 sopra fx3 + master-comp + dual-mono: 12 647 -> 6 472)
+AUDIO_CYCLES["modulation-skip"] = -6000
 # arp (2026-11-07, scena "max"): a riposo +357 cicli (render_in: conta il blocco ed esce); 12 arp in corsa +4 277
 # (tests/test_arp.py; Synfact ricalcolava la velocita' a ogni blocco: +11 747). Qui il costo a riposo.
 AUDIO_CYCLES["arp"] = 400
+# 2026-11-10: i port di Synfact a riposo dentro la build completa (righe di cache degli adattatori di sfcore; misure
+# del 2026-11-07: registratore +1 363, POLY +1 953, ARP +1 295). Senza, il sito mostrava "tutte le mod" sotto il
+# misurato (12 775). lfo3: niente a riposo (nessuna destinazione).
+AUDIO_CYCLES.update({"arp": 1300, "recorder": 1400, "poly": 2000})
 AUDIO_CPU["arp"] = 40
 AUDIO_CPU["modulation-skip"] = -5500
 
@@ -91,6 +96,14 @@ PROFILES = {
         "cpu-meter", "dual-mono", "fastmix", "fx3", "kitstore", "long-samples", "master-comp", "modarea", "modarea7",
         "modulation-skip", "perf-fx", "projstore", "readable-values", "sampler", "sfcore", "splash", "sy-fm4",
         "syn-pages", "vparams", "xparams"], "cycles": 9891},   # 2026-11-07: LFO sui parametri delle mod
+    # 2026-11-10 (dev 724bc86), i preset del sito. Le mod della v0.9: 96,6 % del blocco
+    "v0.9 set": {"mods": ["dual-mono", "master-comp", "fx3", "readable-values", "perf-fx"], "cycles": 12647},
+    # stable + beta: 94,4 %
+    "stable and beta": {"mods": ["dual-mono", "master-comp", "fx3", "readable-values", "perf-fx", "sampler", "sy-fm4",
+                                 "long-samples", "modulation-skip"], "cycles": 8991},
+    # tutto, con i port di Synfact a riposo: 96,7 %
+    "everything": {"mods": ["dual-mono", "master-comp", "fx3", "readable-values", "perf-fx", "sampler", "sy-fm4",
+                            "long-samples", "modulation-skip", "lfo3", "recorder", "poly", "arp"], "cycles": 12775},
 }
 
 LIMITS = {
