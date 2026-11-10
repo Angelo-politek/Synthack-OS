@@ -24,6 +24,7 @@ extern int ls_file_add(u32 id, u32 ptr, u32 frames, u32 pages, u32 mmc, const ch
 extern int ls_file_index(u32 id);
 extern void ls_file_rename(u32 index, const char *name);
 extern u32 ls_loaded;
+extern u32 ls_cpu2[];                               /* 'SHLS', count, {pointer, frames} of the loaded files */
 
 static u32 seq;
 u32 ls_up_fault;                                    /* a request went unanswered: no more until reboot */
@@ -87,8 +88,20 @@ int ls_hot_add(u32 id, u32 frames, const char *name, u32 bytes, reader rd, void 
     buf[2] = (u8)((at + 64) >> 8);
     buf[3] = (u8)(at + 64);
     if (send(3, (u32)k, frames, buf, 4) != 1)
-        return -5;                                  /* the entry stays empty on the voice CPU */
+        return -5;                                  /* the entry stays empty on the voice CPU: ls_refresh repairs it */
     return k;
+}
+
+/* The voice CPU's table entry of loaded file k again, from ours. The same entry twice changes nothing there. */
+static int entry_again(u32 k)
+{
+    u8 b[4];
+    u32 p = ls_cpu2[2 + 2 * k];
+    b[0] = (u8)(p >> 24);
+    b[1] = (u8)(p >> 16);
+    b[2] = (u8)(p >> 8);
+    b[3] = (u8)p;
+    return send(3, k, ls_cpu2[3 + 2 * k], b, 4);
 }
 
 /* a file of the eMMC: whole 512-byte sectors through a 2 KB page */
@@ -143,5 +156,10 @@ u32 ls_refresh(void)
         sent++;
     }
     core_hzfs_close(&fs);
+    /* The table on the voice CPU is written one entry at a time and never read back. On the device a recorded take
+     * was listed but silent until the next take was saved: every refresh sends all the entries again, so a lost
+     * one is repaired by the next save, upload or rename at the latest, and a new one is sent twice. */
+    for (i = 0; i < ls_loaded && !ls_up_fault; i++)
+        entry_again(i);
     return sent;
 }
