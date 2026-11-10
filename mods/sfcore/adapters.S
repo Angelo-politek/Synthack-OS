@@ -217,8 +217,24 @@ core_stock_\name:
 | ENQUEUE: jsr at 0x4008D03C (1.41 0x4008CFC4), was jsr 0x4011A80C
         ENTRY   enqueue,1
         jmp     0x4011A80C
-| HEADER_LOAD 0x400A7A44 (1.41 0x400A79CC)
-        ENTRY   header_load,5
+| HEADER_LOAD 0x400A7A44 (1.41 0x400A79CC). SyntHack: at power-on the OS loads the project (one header a pattern)
+| before the first UI tick, where the modules were bound: POLY missed its bytes of the header and the group was
+| gone after a reboot (device, RC1). The first header load binds the modules too. At that point the OS is up
+| (static constructors done, project objects built); module inits only set their own data.
+        .globl  core_native_header_load,core_stock_header_load
+core_native_header_load:
+        tst.l   sfcore_bound
+        bne.s   0f
+        jsr     sfcore_bind
+0:      tst.b   core_native_interest+5
+        beq.w   core_stock_header_load
+        lea     4(%sp),%a0
+        move.l  %a0,-(%sp)
+        pea     5
+        jsr     core_native
+        addq.l  #8,%sp
+        rts
+core_stock_header_load:
         lea     -12(%sp),%sp
         movem.l %d2/%a2-%a3,(%sp)
         jmp     0x400A7A4C

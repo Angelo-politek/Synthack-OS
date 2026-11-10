@@ -519,3 +519,32 @@ def test_pattern_settings_bytes_are_free_on_1_42():
     m.run()
     print("accessi stock:", [hex(p) for p in sorted(seen)])
     assert not seen
+
+
+@needs_os()
+def test_pattern_loaded_before_the_first_tick_keeps_poly():
+    """All'accensione l'OS carica il progetto (un'intestazione per pattern, 0x400A7A44) prima del primo tick
+    dell'interfaccia, dove sfcore legava i moduli: POLY non c'era ancora e i suoi 7 byte dell'intestazione (+0x21)
+    non venivano copiati. Sulla macchina (RC1): riaperto il progetto, la traccia non era piu' POLY."""
+    u = boot()
+    v = Trig(u)
+    v.ids(2)                                             # terza pagina TRIG
+    v.turn("A", 4)                                       # POLY ON: record valido nell'intestazione del pattern
+    v.turn("B", 4)                                       # VOICES 3
+    rec = record(u)
+    assert rec[:2] == b"PQ" and crc16(rec) == rec[5] << 8 | rec[6]
+    app = u.long(v.t + 0x68)
+    model = u.call(0x4001_9000, [app]) + 0x2C
+    header = u.call(u.long(u.long(model) + 0x28), [model])
+    saved = bytes(u.uc.mem_read(header, 0x40))
+    assert saved[0x21:0x28] == rec
+
+    import screens
+    cold = screens.UI(["poly"])                          # appena avviata: nessun tick ancora, ma l'avvio
+    assert cold.long(cold.sym["sfcore_bound"]) == 1      # (progetto nuovo) ha gia' caricato intestazioni: moduli legati
+    src, dst = 0x4FE0_6000, 0x4FE0_6100
+    cold.uc.mem_write(src, saved)
+    cold.uc.mem_write(dst, bytes(0x40))
+    assert cold.call(0x400A_7A44, [dst, src]) & 255
+    assert bytes(cold.uc.mem_read(dst + 0x21, 7)) == rec
+    assert cold.long(cold.sym["sfcore_bound"]) == 1 and cold.long(cold.sym["sfcore_status"] + 4 * 5) == 1

@@ -236,8 +236,9 @@ static u32 bind(const struct st_smz_module *m)
     }
     return 1;
 }
-/* At the first ev_tick (UI task, OS up: heap, views). Before it every list is empty and every adapter replays
- * stock. Called by core_tick (adapters.S). */
+/* At the first ev_tick (UI task, OS up: heap, views), or at the first pattern header load if that comes first
+ * (the project loaded at power-on: adapters.S, HEADER_LOAD). Before it every list is empty and every adapter
+ * replays stock. */
 void sfcore_bind(void)
 {
     u32 i;
