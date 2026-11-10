@@ -37,7 +37,7 @@ PEA_SITES = [(0x4008_7F08, 0x4029_AB14), (0x4008_7F1C, 0x4029_AB04), (0x4008_7F3
 SPLASH_FRAMES = 57                                  # ~2 s
 # Orientamento dello schermo durante l'intro (v0.1 appariva capovolto): "none" | "v" | "h" | "vh"
 FLIP = "v"
-FIGLET_FONT, VERSION = "smslant", "v0.9.0"
+FIGLET_FONT, VERSION = "smslant", "v0.99.1"
 WSL_BINUTILS = "~/tools/m68k/root"
 
 
