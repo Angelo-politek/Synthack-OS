@@ -12,7 +12,8 @@ Not released yet. This list follows `dev`.
 - **Long samples** (from Synfact): samples longer than 5 s, sent from the site's Samples page, one list per project, playable without a reboot.
 - **Third LFO**, **Arpeggiator**, **POLY**, **Audio recorder** (ported from Synfact): experimental.
 - **Modulation skip** (from Synfact): same sound, about 4 % more CPU free.
-- **LFO destinations for mod parameters**: SY FM4, the SAMPLER's knob H, FX3.
+- **LFO destinations for mod parameters**: SY FM4, the SAMPLER's knob H, FX3 (on the FX track's LFOs).
+- **About SyntHack**: a SYNTHACK row in the settings menu lists the version, the mods in the build and the credits.
 - **FX3 send on the FX track**: AMP page, next to DEL and REV.
 - **Web builder**: build your OS in the browser, same bytes as `build.py`. Presets, load meter, a status on every mod (stable, beta, experimental).
 
@@ -22,6 +23,10 @@ Not released yet. This list follows `dev`.
 - **Dual mono**: the other input leaked into a channel set to zero. Fixed in the emulator, to confirm on the device.
 - **UI lag** with FX3: the audio code of FX3, the mixer sums and the extra parameters were rewritten. Estimated worst case with every mod 96.7 % of the audio block (was over 107 %); stock is 89 %.
 - **Boot margin**: no longer shrinks with every byte of mod code.
+- **POLY** kept losing its group after a power cycle.
+- **Arpeggiator, recorder**: other keys acted under their views. The recorder closes after a save.
+- **Input page**: DEL, REV and FX3 side by side, in stereo too.
+- **Third LFO**: its page shows the waveform, as LFO1 and LFO2.
 
 ### For modders
 

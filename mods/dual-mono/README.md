@@ -12,7 +12,7 @@
 - Dry signal: **IN L on the left output, IN R on the right**, each with its own level. The inputs never mix.
 - Each input reaches delay, reverb, FX3 and the FX track (ROUTING: FUNC+FX, trig 16) centered, with its own sends.
 - FX3 sits next to REV on both pages. In stereo it returns to knob C, with BAL in G.
-- In stereo everything is **identical to stock** (verified in emulation). The MIXER tab has 3 pages.
+- In stereo the sound is **identical to stock** (verified in emulation). The MIXER tab has 3 pages. With fx3 the External Mixer page is `IN LR · BAL · – · –` / `DEL · REV · FX3 · FX`; without it, as stock.
 
 `[!]` Kits from older versions start with the IN R sends at 0.
 

@@ -153,7 +153,7 @@ A third send effect next to delay and reverb: chorus, flanger, phaser or crusher
 | Control | Where | Saved |
 |---|---|---|
 | Track send `FX3` | AMP page 1, knob G | per track, in the kit; p-lockable; LFO destination |
-| External input send `FX3` | External Mixer page | kit |
+| External input send `FX3` | External Mixer page, knob `G`, next to `DEL` and `REV`. `BAL` is on knob `B` | kit |
 | FX3 page | REVERB tab, page 2 | kit (pattern) |
 | Return to FX track | ROUTING, trig 13 | kit |
 
@@ -353,6 +353,7 @@ A third LFO on every audio track.
 
 - Saved with the Sound. P-locks work on the eight parameters.
 - The FX track has no LFO3.
+- The page shows the waveform as LFO1 and LFO2 do.
 - A Sound made without the mod has `DEST` at none.
 
 `[!]` Not there yet: copy, paste and randomize of the LFO3 page.
@@ -367,7 +368,10 @@ A third LFO on every audio track.
 4. A trig on that track starts the arp for the trig's length. Held keys (keyboard, MIDI) play it live.
 5. P-locks: `REC` on, hold a trig, turn `A`–`D`. Press `A`–`D` while holding it to clear that lock.
 
+While the view is open the other keys do nothing. PLAY, STOP and REC work as always.
+
 - Settings are saved per track with the project.
+- A track that is part of a POLY group has no arpeggiator: the view does not open there.
 
 `[!]` Opened on a stock OS, a project loses its ARP locks. ARP settings are ignored.
 
@@ -396,7 +400,7 @@ A third LFO on every audio track.
 4. `FUNC` + `YES` plays the take. `FUNC` + `NO` clears it. Trim: `A` / `C` start, `B` / `D` end.
 5. `YES`, `YES`: name it, choose a track. The track gets the SAMPLER with the take, which plays at once.
 
-Mono, 48 kHz, up to 60 s.
+Mono, 48 kHz, up to 60 s. After `SAVED` the recorder closes. While it is open the trig keys still play, the other keys do nothing; PLAY, STOP and REC work as always.
 
 | Source | What you record |
 |---|---|
@@ -415,6 +419,14 @@ No controls. The OS recomputes its modulations in every audio block, also when n
 
 - Add it when you use FX3, the compressor and dual mono together.
 - It checks itself: on the first difference it turns off until the next boot.
+
+## About SyntHack
+
+1. Open the settings menu. The last row is **SYNTHACK**. Press `YES`.
+2. The list shows the SyntHack version, the mods in your build with their status, the repository and the credits.
+3. `UP` / `DOWN` or an encoder scroll. `NO` closes.
+
+Write down the version and the mods when you report a bug.
 
 ## Boot splash
 

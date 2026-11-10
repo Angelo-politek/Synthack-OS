@@ -7,6 +7,8 @@ The arpeggiator of [Synfact](https://github.com/GSM1980/synfact-dev) (`mods/arp-
 - Press TRIG twice on an audio track (main screen): the ARPEGGIATOR view opens. NO closes it.
 - A MODE (OFF, TRUE, UP, DOWN, CYCL), B SPEED (1/1 … 1/96), C RANGE (1–4 octaves), D LEN (note length), E OFS (note offset of the selected step), F number of steps.
 - The 16 trig keys are the arp's steps: press to select, release to mute or unmute; turn any encoder while holding steps to set their offsets. LEFT/RIGHT select, UP/DOWN change the offset, YES mutes.
+- A track in a POLY group has no arpeggiator: the view does not open on it.
+- While the view is open it owns the keys it does not use; transport still works.
 - A trig with ARP on starts the arp, which runs as long as the trig's length. Held keys (keyboard, MIDI) play it live.
 - p-locks: with REC on, hold trigs and turn A..D. Press A..D while holding them to clear that lock.
 

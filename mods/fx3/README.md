@@ -7,7 +7,7 @@ Third send effect next to delay and reverb: **chorus**, **flanger**, **phaser** 
 | Control | Where | Saved |
 |---|---|---|
 | SND3 (shown `FX3`) | every audio track, **AMP page 1**, knob G, next to DEL and REV. PAN moves to page 2, knob E | per track, with the kit; p-lockable; LFO destination |
-| External input FX3 send | External Mixer page, knob C. With dual-mono in mono: next to REV | kit: low byte of FX-track word 0x37 |
+| External input FX3 send | External Mixer page, knob G, next to DEL and REV. BAL moves to knob B, next to the level | kit: low byte of FX-track word 0x37 |
 | FX track FX3 send | FX track **AMP page 1**, knob G, next to DEL and REV. PAN moves to page 2, knob E | kit (kitstore word) |
 | FX3 page | FX track → **REVERB** tab, press again for page 2 | kit (pattern) |
 | LFO | The FX track's LFO1/LFO2 DEST menu lists SPD, DEP, TIME, FDBK, DEL, REV of the FX3 page (WID not: no free slot) | — |
