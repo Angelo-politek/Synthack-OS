@@ -19,7 +19,7 @@ Not released yet. This list follows `dev`.
 ### Fixed
 
 - **MIDI machine**: its SRC, VAL and SEL pages moved mod parameters (v0.9.0). Mods now have parameter ids of their own.
-- **Dual mono**: the other input no longer leaks into a channel set to zero.
+- **Dual mono**: the other input leaked into a channel set to zero. Fixed in the emulator, to confirm on the device.
 - **UI lag** with FX3: the audio code of FX3, the mixer sums and the extra parameters were rewritten. Estimated worst case with every mod 96.7 % of the audio block (was over 107 %); stock is 89 %.
 - **Boot margin**: no longer shrinks with every byte of mod code.
 
