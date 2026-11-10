@@ -33,6 +33,6 @@ const GROUP_OF: Record<string, string> = {
   "master-comp": "sound", fx3: "sound", "dual-mono": "sound", lfo3: "sound",
   "perf-fx": "sequencer", arp: "sequencer", poly: "sequencer",
   "long-samples": "samples", recorder: "samples",
-  "readable-values": "system", "modulation-skip": "system",
+  "readable-values": "system", "modulation-skip": "system", about: "system",
 };
 export const groupOf = (name: string): string => GROUP_OF[name] ?? "more";
