@@ -18,13 +18,17 @@ static void sam_redraw(void);
 /* SyntHack: the SAMPLER (mods/sampler, SP TWINSHOT's machine slot) and its SAMP (id 504, storage id from the
  * descriptor); raw = position in the sample list << 8 (glue.c, rec_publish) */
 #define ASSIGN_TYPE 44u
+/* SyntHack: the machine menu's value for the SAMPLER's ONESHOT (mods/sampler: 45..48 = the four types). Set this
+ * way the track gets machine 44 with the type and the type's start values, as when it is picked in the menu;
+ * machine 44 set raw kept the old machine's word as the type. */
+#define ASSIGN_MENU 45u
 extern u32 rec_samp_engine(void);
 extern int rec_publish(u32 id);
 #define ASSIGN_SAMP rec_samp_engine()
 enum { SAM_ASSIGN_IDLE, SAM_ASSIGN_OPEN, SAM_ASSIGN_SHOWN, SAM_ASSIGN_DONE };
 static u32 sam_assign_phase DATA=0,sam_assign_mask DATA=0,sam_yes_down DATA=0,sam_assign_at DATA=0;
 static s32 sam_assign_answer DATA=-1,sam_assign_track DATA=-1;
-static char sam_assign_text[17] DATA={0};
+static char sam_assign_text[25] DATA={0};
 /* UI task, after the pool add. Machine menu path 4000f7be (defaults, notifications,
  * POLY slave guard), then SAMP through the native Sound setter 40013304. */
 static const char *sam_assign_apply(u32 slot)
@@ -33,10 +37,16 @@ static const char *sam_assign_apply(u32 slot)
     sam_assign_track=-1;
     if(track<0 || track>7)return "SAVED + IN POOL";
     kit=BRAIN()+0x130;
-    REC_SET_MACHINE(kit,(u32)track,ASSIGN_TYPE,1,1);
+    REC_SET_MACHINE(kit,(u32)track,ASSIGN_MENU,1,1);
     model=REC_TRACK_MODEL(kit,(u32)track);
     sound=(u8 *)((u32 (*)(void *))(*(u32 **)model)[0x28/4])(model);   /* SyntHack: the pointer comes back in d0 */
-    if(!sound || sound[0xa2]!=ASSIGN_TYPE)return "SAVED / NOT ASSIGNED";
+    if(!sound || sound[0xa2]!=ASSIGN_TYPE) {
+        /* SyntHack: say what the track has instead (99: no Sound), for bug reports */
+        u32 m=sound?sound[0xa2]:99u;
+        text_set(sam_assign_text,"SAVED / TRACK HAS M00",24);
+        sam_assign_text[19]=(char)('0'+m/10u%10u);sam_assign_text[20]=(char)('0'+m%10u);
+        return sam_assign_text;
+    }
     /* SoundParameterSet (vtable 401c3aac) borrowing the track model at +10. */
     proxy[0]=0x401c3d4cu;proxy[1]=0;proxy[2]=0;proxy[3]=0;proxy[4]=(u32)model;
     REC_SET_PARAM(proxy,ASSIGN_SAMP,slot<<8,(u32)track,0,1);
