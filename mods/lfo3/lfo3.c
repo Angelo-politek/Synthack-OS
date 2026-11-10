@@ -107,6 +107,8 @@ void lfo3_update(void)
 /* ---- the LFO3 page (idspace page 38, third page of the LFO tab, ids 530..537). The LFO tab is the same for every
  * track: on the FX track the page is empty (its indices 0x3e..0x45 are the FX amp block). UI task only. */
 #define PAGE38_SLOTS ((volatile u32 *)(IDS_PAGE38 + 8))
+#define XSTR_(x) #x
+#define XSTR(x) XSTR_(x)
 #define PROJECT ((u32 (*)(void))0x4016E9C8u)
 #define ACTIVE_TRACK ((u32 (*)(u32))0x4001FF74u)
 struct rep { u32 len, cap; int ref; char s[8]; };      /* static COW std::string: -1 = leaked, never freed */
@@ -119,6 +121,53 @@ void lfo3_page_slots(void)
     if((PAGE38_SLOTS[0]==0)==fx)return;
     for(k=0;k<8;k++)PAGE38_SLOTS[k]=fx?0:530u+k;
 }
+/* The LFO tab's draw (0x400F3824) draws the waveform box of LFO1 on page 0 of the tab and of LFO2 on page 1, from
+ * the values of WAVE, SPH, MODE, SPD and DEP (ids 90 92 93 86 94, +10 for LFO2), with 0x400F33F2; any other page got
+ * none, so LFO3 looked like a plain eight-knob page (device, RC1). Its page test at 0x400F3A0C (moveq #1,d1 ;
+ * cmp.l d0,d1 ; bne.s 0x400F3A84, d0 = page of the tab) comes here: page 2 with LFO3's parameters on it (not the
+ * FX track, where the page is empty) reads 534 535 536 530 537 the same way and joins the OS code at 0x400F3A5A. */
+__asm__(
+    "        .text\n"
+    "        .globl  lfo3_wave_hook\n"
+    "lfo3_wave_hook:\n"
+    "        moveq   #1,%d1\n"
+    "        cmp.l   %d0,%d1\n"
+    "        bne.s   1f\n"
+    "        jmp     0x400F3A12\n"                      /* LFO2, as the OS */
+    "1:      moveq   #2,%d1\n"
+    "        cmp.l   %d0,%d1\n"
+    "        bne.s   9f\n"
+    "        tst.l   " XSTR(IDS_PAGE38_E) "\n"       /* slot E of page 38: empty on the FX track */
+    "        beq.s   9f\n"
+    "        move.l  %sp,%d3\n"
+    "        addi.l  #75,%d3\n"
+    "        move.l  %d3,-(%sp)\n"
+    "        pea     534\n"                             /* WAVE */
+    "        move.l  %a2,-(%sp)\n"
+    "        lea     0x40039160,%a3\n"
+    "        jsr     (%a3)\n"
+    "        move.l  %d3,-(%sp)\n"
+    "        pea     535\n"                             /* SPH */
+    "        move.l  %a2,-(%sp)\n"
+    "        move.l  %d0,%d4\n"
+    "        jsr     (%a3)\n"
+    "        move.l  %d3,-(%sp)\n"
+    "        pea     536\n"                             /* MODE */
+    "        move.l  %a2,-(%sp)\n"
+    "        move.l  %d0,%d5\n"
+    "        jsr     (%a3)\n"
+    "        lea     32(%sp),%sp\n"
+    "        move.l  %d3,(%sp)\n"
+    "        pea     530\n"                             /* SPD */
+    "        move.l  %a2,-(%sp)\n"
+    "        move.l  %d0,%d6\n"
+    "        jsr     (%a3)\n"
+    "        move.l  %d3,-(%sp)\n"
+    "        pea     537\n"                             /* DEP */
+    "        move.l  %d0,%d7\n"
+    "        jmp     0x400F3A5A\n"
+    "9:      jmp     0x400F3A84\n");
+
 /* LFO3's DEST (id 533) is a DEST like LFO1's (89) and LFO2's (99) where the OS tells them apart by id: popup
  * (0x4003B11A, id in d3), randomize (0x400149E2, d2), relative step (0x40014C5E / 0x40014E48, d0). Each site's
  * compare chain becomes jsr here: Z = 1 for 89, 99, 533; the site's own bne follows. Only flags change. */

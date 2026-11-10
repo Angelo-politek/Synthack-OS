@@ -42,13 +42,14 @@ DEST_SITES = [(0x4003_B11A, "7059b0836708103c0063b083", "lfo3_dest_d3", "menu de
               (0x4001_4E48, "b4806708143c0063b480", "lfo3_dest_d0", "passo relativo della DEST (FX): anche LFO3")]
 PAGE = 38                                      # pagina di idspace: terza della scheda LFO
 TAB_COUNT, TAB_ARRAY = 0x4003_57D2, 0x4003_57D8   # scheda LFO: moveq #2,d1 ; operando di move.l #0x401C8250 ({4, 5}),d0
-CFLAGS = (f"-DIDS_PAGE38={IDS.page(PAGE):#x}u " "-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -fno-jump-tables "
+CFLAGS = (f"-DIDS_PAGE38={IDS.page(PAGE):#x}u -DIDS_PAGE38_E={IDS.page(PAGE) + 8 + 16:#x} " "-mcpu=54418 -Os -ffreestanding -fno-builtin -nostdlib -fno-pic -fno-common -fno-jump-tables "
           "-fno-tree-loop-distribute-patterns -I. -Iinclude -Wall -Wextra")
 C_SOURCES = ["lfo3.c"]
 S_SOURCES = ["synfact/render.s", "synfact/sram.s"]
 NOP = b"\x4e\x71"
 # (indirizzo 1.42, byte stock, simbolo, descrizione): siti dell'OS (pagina, memoria, lock: passi successivi)
-SITES: list[tuple[int, str, str, str]] = []
+SITES: list[tuple[int, str, str, str]] = [
+    (0x400F_3A0C, "7201b2806672", "lfo3_wave_hook", "disegno della scheda LFO: il riquadro della forma d'onda anche per LFO3")]
 SRAM = {"code": 0x8000_7340, "bank": 0x8000_F870}
 
 
