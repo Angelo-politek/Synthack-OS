@@ -621,8 +621,35 @@ static void menu_draw(void *bm, s32 t) {
         SP_DRAW_TEXT(bm, SP_FONT, MENU_X + 2, 63 - 13 - 5, 0, 0, "XXXXXXXXXXXXXXXXXXXXX", "%s", " NO SAMPLES");
         return;
     }
+#ifdef SM_DIAG
+    /* build di diagnosi (make_patch.py con SM_DIAG=1): al posto dell'ultima riga, per il sample scelto
+     * "Cn Pn Jn Lxxxxx Dn" = file nella lista del progetto, posizione nella lista, file caricato a cui punta
+     * (RAM condivisa, come lo legge la CPU delle voci), lunghezza che la CPU delle voci gli trova (esadecimale,
+     * 0 = non lo vede) e colonne della forma d'onda gia' calcolate. */
+    for (int r = 0; r < MENU_ROWS - 1 && first + r < n; r++)
+        menu_line(bm, r, (u32)(first + r), first + r == cur);
+    {
+        u32 c;
+        const char *nm;
+        long_table(&c, &nm);
+        s32 p = cur - (s32)stock.n;
+        u32 j = p >= 0 && p < 64 ? *(volatile const uint8_t *)(0x10000788u + (u32)p) : 0xEEu;
+        u32 len = WAVE_SLOT == (u32)cur + 1 ? WAVE_LEN : 0xFFFFFu;
+        char d[24], *b = d;
+        *b++ = 'C'; b = put_u(b, c);
+        *b++ = ' '; *b++ = 'P'; if (p < 0) { *b++ = '-'; b = put_u(b, (u32)-p); } else b = put_u(b, (u32)p);
+        *b++ = ' '; *b++ = 'J'; b = put_u(b, j);
+        *b++ = ' '; *b++ = 'L';
+        for (int s = 16; s >= 0; s -= 4)
+            *b++ = "0123456789ABCDEF"[(len >> s) & 15];
+        *b++ = ' '; *b++ = 'D'; b = put_u(b, (u32)WAVE_DONE);
+        *b = 0;
+        SP_DRAW_TEXT(bm, SP_FONT, MENU_X + 2, 63 - 13 - 6 * (MENU_ROWS - 1) - 5, 0, 0, "XXXXXXXXXXXXXXXXXXXXX", "%s", d);
+    }
+#else
     for (int r = 0; r < MENU_ROWS && first + r < n; r++)
         menu_line(bm, r, (u32)(first + r), first + r == cur);
+#endif
     if (cur < n && wave_ready((u32)cur)) {
         part_t all = {0, 0x7800, -1, 0, 0};
         draw_wave(bm, MENU_X + 3, 44, 102, 17, &all, 0);

@@ -40,6 +40,8 @@ LS_HDR = __import__("modarea_layout").RAM + next(a for a, b, who, _ in __import_
 XPAR_ID, DESTX_SLOT = 529, 13             # id e posto DESTX (registro)
 CFLAGS = (f"-DDESC={IDL.TABLE:#x}u -DSP_TABLE={SP.TABLE:#x} -DLS_HDR={LS_HDR:#x}u -mcpu=54418 -O2 -ffreestanding -fno-builtin -fno-common -Wall -Wextra -fomit-frame-pointer "
           "--param=min-pagesize=0")             # la RAM condivisa della CPU #2 parte da 0
+if __import__("os").environ.get("SM_DIAG"):     # build di diagnosi: una riga di stato nel menu dei sample (smp_main.c)
+    CFLAGS += " -DSM_DIAG"
 
 # sezione 3 (OS 1.42)
 DESC = 0x4022_D83C                      # descrittori, 52 B per id
