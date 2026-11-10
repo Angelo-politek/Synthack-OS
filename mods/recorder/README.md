@@ -9,6 +9,7 @@ Synfact's audio recorder ([recorder-st](https://github.com/GSM1980/synfact-dev),
 | E / F / G / H | Length / threshold / source / input monitor |
 | YES / FUNC+YES | Arm on threshold / record now |
 | YES while recording | Stop, then normalize (-1 dBFS) |
+| FUNC+YES with a take / FUNC+NO | Play the take / clear it |
 | A / C, B / D | Trim start / end, zoom and loupe |
 | YES, YES | Confirm the trim, name it, choose a track |
 

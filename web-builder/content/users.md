@@ -16,6 +16,14 @@ One idea changed the sound of the Syntakt. The next ideas come from the communit
 - Build the OS in your browser, from your own stock file. Nothing is uploaded.
 - To undo it, flash the stock OS.
 
+## Safety
+
+- **What can go wrong:** a modified OS can fail to start. The device then stays on the logo.
+- **Why it can be undone:** the bootstrap and boot parts of the Syntakt are never touched. With `FUNC` held at power-on the Syntakt takes the stock OS over MIDI DIN ([RECOVERY.md](https://github.com/Angelo-politek/Synthack-OS/blob/main/RECOVERY.md)).
+- **What the build checks:** your stock file, every patch against the bytes it expects, conflicts between mods, the unpacking margin at boot. It refuses a result it cannot verify.
+- **Your data:** projects, sounds and samples stay on the device. Back them up with Transfer first. Mods marked *experimental* have had first device tests only.
+- **Status of a mod:** *stable* = tested on the device over many sessions; *beta* = works on the device, newer; *experimental* = first device tests only. **Build your OS** starts from the stable ones.
+
 ## What you need
 
 - Elektron Syntakt.
@@ -333,6 +341,81 @@ Each project keeps its own list of long samples, saved with the project. A proje
 | Length | up to ~5.8 min per file, ~31 MB in all with the stock samples |
 | Files | the first 64 of the order |
 
+## Third LFO
+
+`[wip]` Experimental: first device tests only.
+
+A third LFO on every audio track.
+
+1. Press the LFO key until page 3: **LFO3**.
+2. Set it like LFO1: `SPD`, `MULT`, `FADE`, `DEST`, `WAVE`, `SPH`, `MODE`, `DEP`.
+3. `DEST` lists the same destinations as LFO1, the parameters of the mods included.
+
+- Saved with the Sound. P-locks work on the eight parameters.
+- The FX track has no LFO3.
+- A Sound made without the mod has `DEST` at none.
+
+`[!]` Not there yet: copy, paste and randomize of the LFO3 page.
+
+## Arpeggiator
+
+`[wip]` Experimental: first device tests only.
+
+1. On an audio track, main screen: press `TRIG` twice. The **ARPEGGIATOR** view opens. `NO` closes it.
+2. Turn `A` MODE (OFF, TRUE, UP, DOWN, CYCL), `B` SPEED (1/1 to 1/96), `C` RANGE (1–4 octaves), `D` LEN (note length).
+3. The 16 trig keys are the arp's steps. Press to select, release to mute or unmute. Hold steps and turn an encoder: note offset.
+4. A trig on that track starts the arp for the trig's length. Held keys (keyboard, MIDI) play it live.
+5. P-locks: `REC` on, hold a trig, turn `A`–`D`. Press `A`–`D` while holding it to clear that lock.
+
+- Settings are saved per track with the project.
+
+`[!]` Opened on a stock OS, a project loses its ARP locks. ARP settings are ignored.
+
+## POLY
+
+`[wip]` Experimental: first device tests only.
+
+2 to 4 tracks played as one polyphonic instrument.
+
+1. On a digital track, press `TRIG` until page 3.
+2. `A` POLY on. `B` VOICES: 2, 3 or 4. The track is the master, the next ones are its voices.
+3. `C` PLAY. POLY: each voice has its own LFOs. M.LFO: the master's modulation on every voice.
+4. Play chords from the keyboard or MIDI: one voice per held note, the oldest is taken first. `E` NOTE and `F`–`H` NOT2–NOT4 set a chord on a trig.
+
+- Saved with the pattern.
+- The voice tracks follow the master's Sound and can't be edited while POLY is on.
+- A group stays inside the digital tracks (1–8) or the analog ones.
+
+## Audio recorder
+
+`[wip]` Experimental: first device tests only. Needs **Long samples** and **SAMPLER** (added automatically).
+
+1. Press `SOUND` twice. The recorder opens.
+2. `G` source, `E` length, `F` threshold, `H` input monitor. `A` PRE / POST FX.
+3. `YES` arms on the threshold. `FUNC` + `YES` records now. `YES` stops. The take is normalized.
+4. `FUNC` + `YES` plays the take. `FUNC` + `NO` clears it. Trim: `A` / `C` start, `B` / `D` end.
+5. `YES`, `YES`: name it, choose a track. The track gets the SAMPLER with the take, which plays at once.
+
+Mono, 48 kHz, up to 60 s.
+
+| Source | What you record |
+|---|---|
+| `TRK 1`–`8` | The digital track after its filter and amp |
+| `TRK 9`–`12` | The analog voice before its level and pan |
+| `MAIN` | Only what goes through the FX track, before its drive and filter |
+| `IN L`, `IN R`, `IN L+R` | The inputs |
+
+`[!]` The Syntakt sums its tracks in analog: no source holds exactly what you hear. To record the real output, run a cable from MAIN OUT to the inputs, set the EXTERNAL IN level to 0 and record `IN L+R`.
+
+`[!]` The chosen track keeps its filter, amp and LFO settings: open the filter if the take sounds dull.
+
+## Modulation skip
+
+No controls. The OS recomputes its modulations in every audio block, also when nothing changed. This mod skips the blocks where the result would be the same. Same sound, bit for bit, about 4 % more CPU free for the UI.
+
+- Add it when you use FX3, the compressor and dual mono together.
+- It checks itself: on the first difference it turns off until the next boot.
+
 ## Boot splash
 
 The SyntHack logo, version and your name after the official intro. Part of every build.
@@ -348,7 +431,8 @@ The SyntHack logo, version and your name after the official intro. Part of every
 
 | Issue | Workaround | Status |
 |---|---|---|
-| UI lag with FX3 together with the compressor, dual mono and the machines | Leave one of them out (the load meter on the site shows it) | `[wip]` being optimized |
+| UI lag with FX3 together with the compressor and dual mono | Add **Modulation skip**, or leave one of them out. The load meter on the site shows your selection | Estimated worst case ~97 % of the audio block without it, ~93 % with it (stock: 89 %) |
+| Recorder: an analog track or MAIN does not sound like the output | Cable from MAIN OUT to the inputs, record `IN L+R` | The Syntakt sums in analog |
 | Bus compressor: toggling *global* for the external input mixer also copies the compressor settings | — | known |
 
 ## Support
