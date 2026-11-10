@@ -1129,10 +1129,11 @@ def test_fx_track_amp_pages():
 
 
 def test_input_snd3_on_the_external_mixer_page(m):
-    m.uc.mem_write(0x41BA_07F8, struct.pack(">I", 0))
+    m.uc.mem_write(0x41BA_07F0, struct.pack(">8I", 126, 0, 77, 0, 129, 130, 128, 132))
     m.uc.reg_write(UC_M68K_REG_D0, 0x1234)
     m.call(m.sym["fx3_in_page"])
-    assert struct.unpack(">I", m.uc.mem_read(0x41BA_07F8, 4))[0] == IN_ID
+    # le tre mandate affiancate: E DEL, F REV, G FX3; BAL sale in B, C vuota
+    assert list(struct.unpack(">8I", m.uc.mem_read(0x41BA_07F0, 32))) == [126, 128, 0, 0, 129, 130, IN_ID, 132]
     assert m.uc.reg_read(UC_M68K_REG_D0) == 0x1234
 
 

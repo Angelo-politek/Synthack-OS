@@ -1744,10 +1744,16 @@ __asm__(
      * interni 0x1A e 0x46 e rilegge nella 0 il valore della 0x1A. Le tre parole di fx3 vanno nei byte
      * +148..+155 del blocco nel file, che l'OS azzera e non legge: marcatore "SH" e le tre parole. */
     "        .globl  fx3_in_page\n"
-    "fx3_in_page:\n"                                     /* al posto di clr.l 0x41BA07F8 (External Mixer, casella C) */
+    /* External Mixer (pagina 24), al posto di clr.l 0x41BA07F8 (casella C; la B e' gia' azzerata, E F G H scritte):
+     * le tre mandate affiancate nella riga bassa come sulle tracce, E DEL, F REV, G FX3; BAL, che era in G, sale in
+     * B accanto al livello. Fino alla RC1 FX3 stava da sola in C (asimmetria segnalata sulla macchina). */
+    "fx3_in_page:\n"
+    "        clr.l   0x41BA07F8\n"
     "        move.l  %d0,-(%sp)\n"
     "        move.l  #513,%d0\n"
-    "        move.l  %d0,0x41BA07F8\n"
+    "        move.l  %d0,0x41BA0808\n"
+    "        move.l  #128,%d0\n"
+    "        move.l  %d0,0x41BA07F4\n"
     "        move.l  (%sp)+,%d0\n"
     "        rts\n"
     "        .globl  fx3_kser_hook\n"

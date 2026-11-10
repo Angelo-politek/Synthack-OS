@@ -113,7 +113,7 @@ ui_mono:
         bsr.s   page_ok
         bne.s   6f
         | (il ColdFire non ammette move.l #imm verso memoria indirizzata: passiamo da d0/a1)
-        clr.l   4(%a0)                          | manopola B: vuota (IN R ha la sua pagina, v2)
+        | le caselle B e G le dispone dualmono2.c (dm_update): qui solo i nomi
         lea     str_inl,%a1
         move.l  %a1,NAME_INLR
         lea     str_inr,%a1
@@ -127,9 +127,6 @@ ui_mono:
 ui_stereo:
         bsr.s   page_ok
         bne.s   7f
-        clr.l   4(%a0)                          | disposizione originale
-        move.l  #ID_BAL,%d0
-        move.l  %d0,24(%a0)
         move.l  #ORIG_INLR,%d0
         move.l  %d0,NAME_INLR
         move.l  #ORIG_IN,%d0

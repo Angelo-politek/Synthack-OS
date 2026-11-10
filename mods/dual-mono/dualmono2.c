@@ -74,9 +74,11 @@ u32 dm_page_r(void)                                                     /* pagin
     return i >= 0 && i < n && b[i] == PAGE_R;
 }
 
-/* External Mixer (pagina 24): in mono FX3 in G accanto a DEL e REV (BAL non serve), in stereo in C con
- * BAL in G come prima. dm_fx3 = casella C all'avvio (513 con fx3, 0 senza), letta da dm_page_stub. */
-#define MIX_C     (*(volatile s32 *)0x41BA07F8u)
+/* External Mixer (pagina 24), caselle B e G (dualmono.S non le tocca piu'): le mandate stanno nella riga bassa,
+ * E DEL, F REV, G FX3 se c'e' fx3. Stereo: BAL in B accanto al livello (senza fx3 resta in G, come lo stock).
+ * Mono: B vuota (IN R ha la sua pagina), BAL non serve. dm_fx3 = l'id in G all'avvio se non e' BAL (513 con fx3),
+ * 0 senza fx3; letto da dm_page_stub. */
+#define MIX_B     (*(volatile s32 *)0x41BA07F4u)
 #define MIX_G     (*(volatile s32 *)0x41BA0808u)
 #define ID_BAL    128
 s32 dm_fx3 DATA = -1;
@@ -87,8 +89,8 @@ void dm_update(void)                                                    /* 4 pag
     s32 *b, n;
 
     if (dm_fx3 >= 0) {
-        MIX_C = MONO() ? 0 : dm_fx3;
-        MIX_G = MONO() ? dm_fx3 : ID_BAL;
+        MIX_B = !MONO() && dm_fx3 ? ID_BAL : 0;
+        MIX_G = dm_fx3 ? dm_fx3 : ID_BAL;
     }
     if (!v)
         return;
@@ -239,12 +241,15 @@ __asm__(
     "        lea     16(%sp),%sp\n"
     "        rts\n"
     /* ---- 0x401950DE (inizializzazione delle pagine, dopo la 24): al posto di clr.l 0x41BA0894. La pagina IN R
-     * e' la 37 di idspace (PAGE_G = sua casella G): FX3 accanto al riverbero, come la casella C della pagina
-     * IN L (513 con fx3, altrimenti vuota) */
+     * e' la 37 di idspace (PAGE_G = sua casella G): FX3 accanto al riverbero, come la casella G della pagina
+     * IN L (513 con fx3; senza, li' c'e' BAL e la casella resta vuota) */
     "        .globl  dm_page_stub\n"
     "dm_page_stub:\n"
     "        clr.l   0x41BA0894\n"
-    "        move.l  0x41BA07F8,%d0\n"
-    "        move.l  %d0," XS(PAGE_G) "\n"
+    "        move.l  0x41BA0808,%d0\n"
+    "        cmpi.l  #128,%d0\n"
+    "        bne.s   1f\n"
+    "        moveq   #0,%d0\n"
+    "1:      move.l  %d0," XS(PAGE_G) "\n"
     "        move.l  %d0,dm_fx3\n"
     "        rts\n");
