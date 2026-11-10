@@ -106,15 +106,12 @@ def test_ensure_put_plan_and_pages(m):
     r = m.call(s["core_hzfs_put"], [io, SCRATCH, len(m.body), 0, STREAM, 0, SCRATCH + 64], count=2_000_000_000)
     assert r == 1, r
     # il catalogo scritto dal codice C, come lo legge il caricatore del web builder (web-builder/test/samples.test.ts)
-    fixture = ROOT.parent / "web-builder" / "test" / "fixtures" / "hzfs-catalogue.bin"
+    fixture = ROOT.parent / "web-builder" / "test" / "fixtures" / "hzfs-catalogue.hex"   # testo: i .bin non entrano nel repo
     cats = [m.disk.read(k * 0x80000 // 512, 0x200) for k in (0x600, 0x601)]
     cat = next(c for c in cats if c[:4] == b"HZFS" and struct.unpack(">I", c[12:16])[0] == 1)
     size = struct.unpack(">I", cat[36:40])[0]
     want = cat[:size]
-    if not fixture.exists():
-        fixture.parent.mkdir(parents=True, exist_ok=True)
-        fixture.write_bytes(want)
-    assert fixture.read_bytes() == want
+    assert bytes.fromhex(fixture.read_text(encoding="ascii")) == want
     # immagine stock: un solo campione da 4800 nello slot 1
     stock = 4 * 64 + 2 * 4800
     m.uc.mem_write(TOTAL, struct.pack(">I", stock))
@@ -439,3 +436,55 @@ def test_hot_upload_plays_without_reboot(m, voice):
     tail = out[256:]
     zc = sum(1 for i in range(1, len(tail)) if (tail[i - 1] < 0) != (tail[i] < 0))
     assert abs(zc / 2 / (len(tail) / 48000) - 1000) < 60              # the new sample, 1 kHz
+
+
+def test_hot_upload_after_a_boot_with_long_samples(m, voice):
+    """Come sulla macchina dell'utente: un campione lungo gia' caricato all'avvio e nella lista del progetto, poi un
+    take del registratore (file nuovo, ls_refresh). Il nuovo deve suonare alla sua posizione, il vecchio alla sua.
+    RC1 sulla macchina: il take compariva col nome ma vuoto; salvandone un altro suonavano tutti e due."""
+    import math
+    s, e = m.sym, voice
+    io = s["core_hzfs_native_io"]
+    m.put(s["ls_up_fault"], ">I", 0)
+    m.disk.s.clear()
+    assert m.call(s["core_hzfs_ensure"], [io], count=400_000_000) == 1
+    m.uc.mem_write(TOTAL, struct.pack(">I", 256))
+    e.uc.mem_write(0x4404_F754, bytes(512))
+
+    def put(name, freq, frames):
+        pcm = [int(12000 * math.sin(2 * math.pi * freq * i / 48000)) for i in range(frames)]
+        head = bytearray(64)
+        head[0:4] = b"SAMP"
+        head[12:12 + len(name)] = name
+        struct.pack_into(">I", head, 8, frames)
+        m.body = bytes(head) + struct.pack(f">{frames}h", *pcm)
+        m.uc.mem_write(SCRATCH, name + b"\0")
+        assert m.call(s["core_hzfs_put"], [io, SCRATCH, len(m.body), 0, STREAM, 0, SCRATCH + 64],
+                      count=2_000_000_000) == 1
+        return m.body[64:]
+    old = put(b"boot1", 500, 20000)
+    m.call(s["ls_plan"], count=400_000_000)                          # avvio: un file
+    m.call(s["ls_project_new"])
+    assert m.long(s["ls_loaded"]) == 1
+    for n in range(m.call(s["ls_count"]) // 2048):                   # l'invio dell'avvio, pagina per pagina
+        m.put(PAGE_NOW, ">I", n)
+        off = m.call(s["ls_map"])
+        e.uc.mem_write(CPU2_POOL + n * 2048, bytes(m.uc.mem_read((IMAGE + off) & 0xFFFF_FFFF, 2048)))
+    takes = [put(b"take1", 1000, 24000)]
+    h = link(m, e)
+    try:
+        assert m.call(s["ls_refresh"], count=2_000_000_000) == 1
+        takes.append(put(b"take2", 2000, 16000))
+        assert m.call(s["ls_refresh"], count=2_000_000_000) == 1
+    finally:
+        m.uc.hook_del(h)
+    assert m.long(s["ls_up_fault"]) == 0 and m.long(s["ls_table"] + 4) == 3
+    e.uc.mem_write(0x780, bytes(m.uc.mem_read(0x1000_0780, 0x48)))
+    table = CPU2_POOL + 2048
+    magic, n = struct.unpack(">2I", e.uc.mem_read(table, 8))
+    assert (magic, n) == (0x5348_4C53, 3)
+    for pos, want in enumerate([old, *takes]):                       # posizione della lista -> file -> PCM sulla CPU #2
+        k = m.uc.mem_read(0x1000_0788 + pos, 1)[0]
+        ptr, frames = struct.unpack(">2I", e.uc.mem_read(table + 8 + 8 * k, 8))
+        assert (ptr, frames) == struct.unpack(">2I", m.uc.mem_read(s["ls_table"] + 8 + 8 * pos, 8)), pos
+        assert frames == len(want) // 2 and bytes(e.uc.mem_read(ptr, len(want))) == want, pos
