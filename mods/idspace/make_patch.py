@@ -41,7 +41,8 @@ HOOKS = [(0x4007_BA2A, "222f00040c81", "ids_obj32", "oggetto per parametro"),
          (0x4007_BA48, "7224202f0004", "ids_page", "elemento di pagina dall'indice"),
          (0x400A_6598, "2f02702c2408", "ids_destcopy", "menu DEST: riga della machine (impacchettata)"),
          (0x400A_65D2, "2f02740c222f", "ids_destiid", "menu DEST: voce -> id interno"),
-         (0x400A_5CE4, "222f00040c81", "ids_dest_type", "gruppo di un id (id delle mod senza gruppo: machine DESTX)")]
+         (0x400A_5CE4, "222f00040c81", "ids_dest_type", "gruppo di un id (id delle mod senza gruppo: machine DESTX)"),
+         (0x4001_1F96, "4ef9400a6464", "ids_lix_id", "indice logico -> id per la machine: voci DESTX della FX track")]
 # menu DEST degli LFO (funzione 0x4004DF.., chiamata a 0x4004E47E): (indirizzo, byte stock, nuovi o simbolo da chiamare)
 DEST_SITES = [
     (0x4004_E542, "4eb9400a5ce4", "ids_dest_first", "gruppo iniziale: prima voce da 16 bit"),

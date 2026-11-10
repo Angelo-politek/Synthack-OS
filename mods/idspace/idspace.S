@@ -436,3 +436,31 @@ track_machine:
         rts
 8:      move.l  #256,%d0
 9:      rts
+
+| ---- 0x40011F96 (fine di 0x40011F6C, vt[80] del modello della traccia: jmp 0x400A6464): id del parametro
+| all'indice logico 4(sp) per la machine 8(sp). La lista della manopola DEST (0x4001471C) lo chiede per gli indici
+| 0..70. Le tabelle dell'OS sono per tipo di traccia e la FX track (machine 45) usa quella delle tracce analogiche:
+| i parametri delle mod che stanno in parole libere del kit FX (pagina FX3) non c'erano. Per la machine 45:
+| l'id della voce DESTX della FX track il cui descrittore ha quell'indice (+4); senno' come l'OS.
+        .equ    LIX_ID,         0x400A6464
+        .globl  ids_lix_id
+ids_lix_id:
+        moveq   #45,%d0
+        cmp.l   8(%sp),%d0
+        bne.s   9f
+        lea     DESTX,%a0
+1:      cmp.b   (%a0),%d0                       | voce della FX track?
+        bne.s   2f
+        mvz.w   2(%a0),%d1
+        beq.s   2f
+        mulu.w  #52,%d1
+        lea     TABLE,%a1
+        move.l  4(%a1,%d1.l),%d1                | indice logico del suo descrittore
+        cmp.l   4(%sp),%d1
+        bne.s   2f
+        mvz.w   2(%a0),%d0
+        rts
+2:      addq.l  #4,%a0
+        cmpa.l  #DESTX+4*DESTX_N,%a0
+        bcs.s   1b
+9:      jmp     LIX_ID

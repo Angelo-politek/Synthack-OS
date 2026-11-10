@@ -185,3 +185,37 @@ def test_dest_groups_and_knob_list_with_the_mod_ids(uis):
     for m in range(I.DEST_ROWS):                                                # menu: nessuna voce sotto ERR
         row = struct.unpack(f">{I.DEST_N}H", bytes(ui.uc.mem_read(I.ROWS + 2 * I.DEST_N * m, 2 * I.DEST_N)))
         assert all(ui.call(T, [x]) != 0xFFFF_FFFF for x in row if x != 0xFFFF), m
+
+
+def test_fx_track_dest_list_has_the_mod_parameters():
+    """Lista della manopola DEST (0x4001471C): per ogni indice 0..70 chiede l'id al modello della traccia
+    (vt[80] = 0x40011F6C -> 0x400A6464(indice, machine)). Le tabelle dell'OS sono per tipo di traccia, e la FX track
+    (machine 45) usa quella delle tracce analogiche: i parametri della pagina FX3 (parole libere del kit FX) non
+    c'erano. Sulla macchina (RC1): nessun parametro di FX3 tra le destinazioni dell'LFO della FX track."""
+    import screens
+    from unicorn.m68k_const import UC_M68K_REG_A5
+    stock = screens.UI([])
+    ui = screens.UI(["fx3", "sy-fm4", "idspace"])
+    obj, inner, vt, stub, sound = 0x4FE0_6000, 0x4FE0_6040, 0x4FE0_6080, 0x4FE0_6100, 0x4FE0_6200
+    for u in (stock, ui):
+        u.put(obj + 16, ">I", inner)
+        u.put(inner, ">I", vt)
+        u.put(vt + 40, ">I", stub)
+        u.uc.mem_write(stub, bytes.fromhex("203c") + sound.to_bytes(4, "big") + bytes.fromhex("4e75"))
+
+    def ids(u, machine):
+        u.uc.mem_write(sound + 162, bytes([machine]))
+        return [u.call(0x4001_1F6C, [obj, k]) for k in range(71)]
+    fx = ids(ui, 45)
+    want = {struct.unpack(">I", bytes(ui.uc.mem_read(I.TABLE + 52 * pid + 4, 4)))[0]: pid
+            for k in range(I.DESTX_N)
+            for m, _, pid in [struct.unpack(">BBH", bytes(ui.uc.mem_read(I.DESTX + 4 * k, 4)))] if m == 45 and pid}
+    assert len(want) == 6 and set(want.values()) == {506, 507, 508, 509, 510, 512}
+    assert {k: v for k, v in enumerate(fx) if v >= I.FIRST} == want
+    base = ids(stock, 45)
+    assert [v for k, v in enumerate(fx) if k not in want] == [v for k, v in enumerate(base) if k not in want]
+    for machine in (0, 4, 20, 44):                           # le altre tracce: come l'OS
+        assert ids(ui, machine) == ids(stock, machine), machine
+    for pid in want.values():                                # e passano il filtro della lista
+        ui.uc.reg_write(UC_M68K_REG_A5, obj)
+        assert ui.call(SYM["ids_dest_flags"], [pid]) == 0xE00
