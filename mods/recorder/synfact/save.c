@@ -8,6 +8,7 @@ static u32 sam_save_first DATA=0,sam_save_id DATA=0,sam_saved_id DATA=0;
 static u32 sam_save_start DATA=0,sam_save_frames DATA=0;
 static u32 sam_save_index_len DATA=0,sam_save_target DATA=0,sam_save_crc DATA=0;
 static char sam_save_name[17] DATA={0},sam_save_message[25] DATA={0};
+static u32 sam_done_at DATA=0;
 static u8 *sam_name_view DATA=0;
 static void sam_redraw(void);
 /* CHORUS_INTEGRATED: between naming and saving, the native TrackSelect popup (SoundMenuView's
@@ -73,6 +74,7 @@ static void sam_save_cleanup(const char *message)
      * Failed writes remain in TRIMMED so naming/save can be retried. */
     if(message[0]=='S' && message[1]=='A' && message[2]=='V' && message[3]=='E' && message[4]=='D') {
         sam_trimmed=0;sam_loupe_side=0;sam_play_length=0;
+        sam_done_at=sam_clock|1u;   /* SyntHack: the result stays 1.5 s, then the recorder closes (recorder_ui_tick) */
     }
     recorder_save_release();text_set(sam_save_message,message,24);sam_redraw();
 }

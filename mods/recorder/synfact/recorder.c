@@ -326,6 +326,12 @@ static void recorder_ui_tick(void *controller)
         if(before==sam_norm_pos || sam_clock-began>=192u)break;
     }
     if(sam_enabled && sam_assign_phase)sam_assign_step();
+    /* SyntHack: a saved take is done. On the device the recorder stayed on the same screen after SAVED and the
+     * take could be saved again by mistake: show the result, then clear the take and close. */
+    if(sam_done_at && !sam_save_phase && !sam_assign_phase){
+        if(!sam_enabled)sam_done_at=0;
+        else if(sam_clock-sam_done_at>=72000u){sam_done_at=0;sam_clear();UI_CLOSE(sam_view);return;}
+    }
     for(q=0;q<32 && sam_enabled && sam_save_phase;q++){
         sam_save_step();if(sam_clock-began>=192u)break;
     }
