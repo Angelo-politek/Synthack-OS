@@ -438,78 +438,67 @@ static u32 sampler_key(u8 *iface,const u8 *ev)
     if(ready && sam_state==SAM_EMPTY && !sam_frames)recorder_resume();
     return result;
 }
+/* SyntHack: the recorder's screen, redrawn (device, RC1: texts too close and hard to read). One thing per row,
+ * as the OS's pages: title and state, the level meter across the screen, what the keys do now, then the four
+ * settings under their encoders E F G H with the OS's value-over-name rows. PRE/POST (encoder A) sits with the
+ * source it changes. Rows from the bottom: names 0, values 8, rule 16, key hints 21 and 29, source 39, meter
+ * 47..53, title 57. */
+#define SAM_FONT ((void *)0x443db210u)
 void sampler_draw(u8 *iface,void *ctx)
 {
-    u32 i,width,mark,frames=sam_frames,state=sam_state; s32 lo,hi;
-    const char *source,*line1,*line2;char value[12],time[6];
+    static const char *const names[4]={"LEN","THR","SRC","MON"};
+    u32 i,width,mark,frames=sam_frames,state=sam_state;
+    const char *source,*what,*line1,*line2;char value[12],time[6];
     (void)iface;
     sam_report[2]++;
     if(state==SAM_READY && sam_wave_ready && frames) {sam_editor_draw(ctx);return;}
     source=sam_sources[sam_source<18?sam_source:0];
     WAVE_FILL(ctx,0,0,127,63,0);
     if(frames>SAM_MAX_FRAMES)frames=SAM_MAX_FRAMES;
-    if(state==SAM_READY && sam_wave_ready) {
+    /* title and state */
+    what=sam_hint?"NO MEMORY":state==SAM_NORMALIZING?"NORMALIZING":state==SAM_RECORDING?"RECORDING":
+         state==SAM_ARMED?"ARMED":sam_save_phase?"SAVING":"READY";
+    WAVE_TEXT(ctx,SAM_FONT,1,57,0,"%s","RECORDER");
+    if(state==SAM_RECORDING || frames) {
         sam_time_text(time,frames);
-        WAVE_TEXT(ctx,(void *)0x443db210u,1,56,0,"REC %s",time);
-    } else WAVE_TEXT(ctx,(void *)0x443db210u,1,56,0,"%s",sam_labels[0]);
-    sam_time_text(time,sam_pcm?SAM_MAX_FRAMES-frames:0);
-    WAVE_TEXT(ctx,(void *)0x443db210u,1,47,0,"MEM:%s",time);
-    WAVE_TEXT(ctx,(void *)0x443db210u,64,58,0,"SRC: %s",source);
-    WAVE_FILL(ctx,64,49,127,55,1);
-    WAVE_FILL(ctx,65,50,126,54,0);
-    width=sampler_meter_width(sam_peak);
-    if(width)WAVE_FILL(ctx,65,50,64+(s32)width,54,1);
-    mark=65+sam_thr*61u/127u;
-    for(i=48;i<=56;i+=2)WAVE_PIXEL(ctx,(s32)mark,(s32)i,1);
-    if(sam_peak>=0x7f000000u)WAVE_FILL(ctx,126,48,127,56,1);
-    /*  POST FX (encoder A): stock toggle in the gap x33..62; label
-     * underneath as on native parameter pages. : the group (label rows
-     * 45..49, toggle 51..59) is centred in the free rows 41..63. */
-    SAM_TOGGLE(0,sam_post?0x100u:0u,ctx,38,47,0);
-    WAVE_TEXT(ctx,(void *)0x443db210u,47,45,2,"%s","POST FX");
-    /* Original recorder frame: x0..127, y16..40. */
-    WAVE_FILL(ctx,0,16,127,16,1);WAVE_FILL(ctx,0,40,127,40,1);
-    WAVE_FILL(ctx,0,16,0,40,1);WAVE_FILL(ctx,127,16,127,40,1);
-    if(sam_save_phase || sam_save_message[0]) {
-        WAVE_TEXT(ctx,(void *)0x443db210u,64,32,2,"%s",sam_save_phase?"SAVING":sam_save_message);
-        if(sam_save_phase){number3(value,sam_save_total?sam_save_pos*100u/sam_save_total:0);value[3]='%';value[4]=0;
-            WAVE_TEXT(ctx,(void *)0x443db210u,64,23,2,"%s",value);}
-        else WAVE_TEXT(ctx,(void *)0x443db210u,64,23,2,"%s","FUNC+YES: PLAY");
-    } else if(state==SAM_READY && sam_wave_ready && frames) {
-        for(i=0;i<126;i++) {
-            lo=28+((s32)sam_wave_low[i]*10>>15);
-            hi=28+((s32)sam_wave_high[i]*10>>15);
-            WAVE_FILL(ctx,1+(s32)i,lo,1+(s32)i,hi,1);
-        }
-        if(sam_play_length) {
-            i=1+sam_play_pos*125u/frames;
-            WAVE_FILL(ctx,(s32)i,17,(s32)i,39,1);
-        }
-    } else {
-    if(sam_hint) {line1="NO MEMORY";line2="NO: BACK";}
-    else if(state==SAM_NORMALIZING) {line1="NORMALIZING";line2="PLEASE WAIT";}
-    else if(state==SAM_RECORDING) {line1="RECORDING";line2="STOP: END";}
-    else if(state==SAM_ARMED) {line1="ARMED";line2="WAITING FOR THR";}
+        WAVE_TEXT(ctx,SAM_FONT,96,57,2,"%s %s",state==SAM_RECORDING?"REC":what,time);
+    } else WAVE_TEXT(ctx,SAM_FONT,96,57,2,"%s",what);
+    /* level meter across the screen, threshold mark, clip block */
+    WAVE_FILL(ctx,0,47,127,53,1);
+    WAVE_FILL(ctx,1,48,126,52,0);
+    width=sampler_meter_width(sam_peak)*2u;
+    if(width)WAVE_FILL(ctx,1,48,(s32)(width>125u?126u:width),52,1);
+    mark=1+sam_thr*125u/127u;
+    for(i=45;i<=55;i+=2)WAVE_PIXEL(ctx,(s32)mark,(s32)i,1);
+    if(sam_peak>=0x7f000000u)WAVE_FILL(ctx,124,45,127,55,1);
+    /* what is recorded */
+    if(sam_source<3 || sam_source>=14)WAVE_TEXT(ctx,SAM_FONT,64,39,2,"%s",source);
+    else WAVE_TEXT(ctx,SAM_FONT,64,39,2,"%s  %s",source,sam_post?"POST FX":"PRE FX");
+    /* what the keys do now */
+    if(sam_save_phase) {
+        number3(value,sam_save_total?sam_save_pos*100u/sam_save_total:0);value[3]='%';value[4]=0;
+        line1="SAVING";line2=value;
+    } else if(sam_save_message[0]) {line1=sam_save_message;line2="";}
+    else if(sam_hint) {line1="NOT ENOUGH MEMORY";line2="NO: CLOSE";}
+    else if(state==SAM_NORMALIZING) {line1="PLEASE WAIT";line2="";sam_norm_shown=1;}
+    else if(state==SAM_RECORDING) {line1="YES: STOP";line2="";}
+    else if(state==SAM_ARMED) {line1="WAITING FOR THE LEVEL";line2="YES: CANCEL";}
     else if(frames) {line1=sam_play_length?"PLAYING":"FUNC+YES: PLAY";line2="FUNC+NO: CLEAR";}
-    else {line1="FUNC+YES: REC";line2="YES: ARM";}
-    WAVE_TEXT(ctx,(void *)0x443db210u,64,32,2,"%s",line1);
-    WAVE_TEXT(ctx,(void *)0x443db210u,64,25,2,"%s",line2);
-    if(frames) {
-        sam_time_text(time,sam_play_length?sam_play_pos:frames);
-        WAVE_TEXT(ctx,(void *)0x443db210u,64,18,2,"%s",time);
-    }
-    if(state==SAM_NORMALIZING)sam_norm_shown=1;
-    }
+    else {line1="YES: ARM   FUNC+YES: REC";line2=sam_source<6 && sam_source>=3?"A: PRE / POST FX   NO: CLOSE":"NO: CLOSE";}
+    WAVE_TEXT(ctx,SAM_FONT,64,29,2,"%s",line1);
+    WAVE_TEXT(ctx,SAM_FONT,64,21,2,"%s",line2);
+    /* the four settings, under encoders E F G H */
+    WAVE_FILL(ctx,0,16,127,16,1);
     for(i=0;i<4;i++) {
         if(i==0) {
             if(sam_rlen==8)text_set(value,"MAX",11);
             else {number3(value,1u<<sam_rlen);value[3]=0;}
         } else if(i==1) {number3(value,sam_thr);value[3]=0;}
-        else if(i==2)text_set(value,sam_source==5?"MAIN+":sam_source==2?"IN L+R":source,11);
-        else text_set(value,sam_source<3?(sam_mon?"YES":"NO"):"--",11);
-        WAVE_TEXT(ctx,(void *)0x443db210u,16+32*i,7,2,"%s",value);
-        WAVE_TEXT(ctx,(void *)0x443db210u,16+32*i,0,2,"%s",sam_labels[3+i]);
-        if(sam_focus==i)WAVE_FILL(ctx,2+32*i,14,29+32*i,14,1);
+        else if(i==2)text_set(value,source,11);
+        else text_set(value,sam_source<3?(sam_mon?"ON":"OFF"):"--",11);
+        WAVE_TEXT(ctx,SAM_FONT,16+32*i,8,2,"%s",value);
+        WAVE_TEXT(ctx,SAM_FONT,16+32*i,0,2,"%s",names[i]);
+        if(sam_focus==i)WAVE_FILL(ctx,3+32*i,14,28+32*i,15,1);
     }
 }
 void sampler_open(u8 *manager)

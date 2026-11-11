@@ -166,11 +166,15 @@ static void sam_editor_draw(void *ctx)
     sam_trim_init();
     WAVE_FILL(ctx,0,0,127,63,0);
     if(!sam_trimmed) {
-        sam_small(ctx,0,57,"TRIM STRT");sam_small(ctx,43,57,"ZOOM");
-        sam_small(ctx,65,57,"TRIM END");sam_small(ctx,109,57,"ZOOM");
-        sam_small(ctx,16,49,"(A)");sam_small(ctx,46,49,"(B)");
-        sam_small(ctx,80,49,"(C)");sam_small(ctx,112,49,"(D)");
-        for(i=48;i<=63;i+=2)WAVE_PIXEL(ctx,63,(s32)i,1);
+        /* SyntHack: the four trim controls under encoders A B C D, value over name as on the OS's pages */
+        static const char *const names[4]={"START","ZOOM","END","ZOOM"};
+        for(i=0;i<4;i++) {
+            if(i==0)sam_time_text(value,sam_trim_start);
+            else if(i==2)sam_time_text(value,sam_trim_end);
+            else {value[0]='X';value[1]=(char)('1'+sam_zoom[i>>1]);value[2]=0;}
+            WAVE_TEXT(ctx,(void *)0x443db210u,16+32*(s32)i,57,2,"%s",value);
+            WAVE_TEXT(ctx,(void *)0x443db210u,16+32*(s32)i,49,2,"%s",names[i]);
+        }
     } else {
         /* The upper overview locates the retained selection in the full take. */
         for(i=0;i<126;i++) {
@@ -182,13 +186,14 @@ static void sam_editor_draw(void *ctx)
         {u32 y;for(y=48;y<=62;y+=2)WAVE_PIXEL(ctx,(s32)i,(s32)y,1);}
     }
     sam_draw_selection(ctx);
-    sam_small(ctx,0,8,sam_trimmed?"Y:SAVE":"Y:TRIM");
-    sam_small(ctx,0,0,sam_trimmed?"N:UNTRIM":"N:CLOSE");
-    sam_small(ctx,47,8,"FN+Y:PREVIEW");
-    if(!sam_trimmed)sam_small(ctx,47,0,"FN+N:DISCARD");
+    /* SyntHack: the keys, spelled out, one pair a row */
+    WAVE_TEXT(ctx,(void *)0x443db210u,1,8,0,"%s",sam_trimmed?"YES: SAVE":"YES: TRIM");
+    WAVE_TEXT(ctx,(void *)0x443db210u,66,8,0,"%s","FUNC+YES: PLAY");
+    WAVE_TEXT(ctx,(void *)0x443db210u,1,0,0,"%s",sam_trimmed?"NO: UNTRIM":"NO: CLOSE");
+    if(!sam_trimmed)WAVE_TEXT(ctx,(void *)0x443db210u,66,0,0,"%s","FUNC+NO: CLEAR");
     if(!sam_trimmed && sam_loupe_side && sam_clock-sam_loupe_at<SAM_LOUPE_FRAMES && !sam_save_phase)
         sam_draw_loupe(ctx,sam_loupe_side-1u);
-    if(sam_save_phase || (sam_save_message[0] && sam_save_message[0]!='S')) {
+    if(sam_save_phase || sam_save_message[0]) {   /* SyntHack: SAVED too (the result was never shown here) */
         WAVE_FILL(ctx,5,24,122,42,0);
         WAVE_TEXT(ctx,(void *)0x443db210u,64,33,2,"%s",sam_save_phase?"SAVING":sam_save_message);
         if(sam_save_phase){sam_frame_text(value,sam_save_total?sam_save_pos*100u/sam_save_total:0);WAVE_TEXT(ctx,(void *)0x443db210u,64,25,2,"%s%%",value);}

@@ -45,8 +45,10 @@ extern u32 recorder_irq_lock(void);extern void recorder_irq_unlock(u32);
 #define HZ_ENTRY ST_HZ_ENTRY
 #define HZ_MAX_LEN ST_HZ_WINDOW
 #define HZ_DATA_FIRST ST_HZ_DATA
-#define SAMPLER_SOURCES {"IN L","IN R","IN L+R","MAIN L","MAIN R","MAIN L+R",\
-    "TRK1","TRK2","TRK3","TRK4","TRK5","TRK6","TRK7","TRK8","TRK9","TRK10","TRK11","TRK12"}
+/* SyntHack: sources 3..5 are named for what they hold, the FX track's bus (not the main output: the Syntakt sums
+ * in analog and has no converter there; mods/recorder/README.md) */
+#define SAMPLER_SOURCES {"IN L","IN R","IN L+R","FX L","FX R","FX L+R",\
+    "TRK 1","TRK 2","TRK 3","TRK 4","TRK 5","TRK 6","TRK 7","TRK 8","TRK 9","TRK 10","TRK 11","TRK 12"}
 /* Short fixed captions observed by Synfact sampling_resources; no donor
  * firmware or resource extractor is needed by this module's normal build. */
 #define SAMPLER_LABELS {"RECORDER","Fn+YES: REC","YES: ARM","(E)RLEN","(F)THR","(G)SRC","(H)MON"}
