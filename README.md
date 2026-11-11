@@ -24,6 +24,8 @@ Mods and machines for the **Elektron Syntakt**, OS 1.42. You pick them, and buil
 | [Third LFO](mods/lfo3) | experimental | A third LFO on every audio track. |
 | [Arpeggiator](mods/arp) | experimental | Mode, speed, range, length, 16-step offsets, p-locks. Double-tap `TRIG`. |
 | [POLY](mods/poly) | experimental | 2 to 4 tracks played as one polyphonic instrument. |
+| [Sample manager](mods/sample-manager) | experimental | Your long samples in a list on the device: put one on a track, reorder, delete. |
+| [About SyntHack](mods/about) | beta | A SYNTHACK row in the settings menu: version, mods in the build, credits. |
 | [Audio recorder](mods/recorder) | experimental | Record up to 60 s, trim, normalize, play it at once. Double-tap `SOUND`. |
 
 - **stable**: tested on the device over many sessions. **beta**: works on the device, newer. **experimental**: first device tests only.

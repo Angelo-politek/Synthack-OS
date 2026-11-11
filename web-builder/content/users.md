@@ -351,6 +351,8 @@ A third LFO on every audio track.
 2. Set it like LFO1: `SPD`, `MULT`, `FADE`, `DEST`, `WAVE`, `SPH`, `MODE`, `DEP`.
 3. `DEST` lists the same destinations as LFO1, the parameters of the mods included.
 
+On the FX track, LFO1 and LFO2 can also modulate the FX3 page and the external input: `IN LR`, `BAL`, `DEL`, `REV`. In mono these are IN L's.
+
 - Saved with the Sound. P-locks work on the eight parameters.
 - The FX track has no LFO3.
 - The page shows the waveform as LFO1 and LFO2 do.
@@ -406,7 +408,7 @@ Mono, 48 kHz, up to 60 s. After `SAVED` the recorder closes. While it is open th
 |---|---|
 | `TRK 1`–`8` | The digital track after its filter and amp |
 | `TRK 9`–`12` | The analog voice before its level and pan |
-| `MAIN` | Only what goes through the FX track, before its drive and filter |
+| `FX L`, `FX R`, `FX L+R` | What goes through the FX track, before its drive and filter |
 | `IN L`, `IN R`, `IN L+R` | The inputs |
 
 `[!]` The Syntakt sums its tracks in analog: no source holds exactly what you hear. To record the real output, run a cable from MAIN OUT to the inputs, set the EXTERNAL IN level to 0 and record `IN L+R`.
@@ -419,6 +421,23 @@ No controls. The OS recomputes its modulations in every audio block, also when n
 
 - Add it when you use FX3, the compressor and dual mono together.
 - It checks itself: on the first difference it turns off until the next boot.
+
+## Sample manager
+
+`[wip]` Experimental: never tested on the device. Back up your samples with the **Samples** page first.
+
+Your long samples in a list, on the Syntakt. Needs **Long samples** and **SAMPLER** (added automatically).
+
+1. Open the settings menu. Choose **SAMPLES**. Press `YES`.
+2. `UP` / `DOWN` or an encoder move through the list: position, name, length.
+3. `YES`: the active track (1–8) gets the SAMPLER with this sample.
+4. `FUNC` + `UP` / `DOWN`: move the sample in the list.
+5. `FUNC` + `NO`, twice: delete the sample from the Syntakt. No undo.
+6. `NO` closes.
+
+`[!]` `SAMP` is a position in the list. Moving a sample changes what tracks on its old and new positions play. A deleted sample leaves its position empty.
+
+`[!]` Rename, add and back up samples on the **Samples** page of this site.
 
 ## About SyntHack
 

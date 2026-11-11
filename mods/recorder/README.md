@@ -13,7 +13,7 @@ Synfact's audio recorder ([recorder-st](https://github.com/GSM1980/synfact-dev),
 | A / C, B / D | Trim start / end, zoom and loupe |
 | YES, YES | Confirm the trim, name it, choose a track |
 
-Mono 48 kHz, up to 60 s, from IN L/R/L+R, MAIN L/R/L+R or TRK 1-12.
+Mono 48 kHz, up to 60 s, from IN L/R/L+R, FX L/R/L+R (the FX track's bus) or TRK 1-12.
 
 ## What each source records
 
@@ -23,7 +23,7 @@ The Syntakt sums its tracks in analog and has no converter on the main output: n
 |---|---|---|
 | TRK 1-8 | The digital track after its filter and amp. POST adds its level, pan, mute and the delay and reverb returns. | The analog FX block, when the track is routed to the FX track |
 | TRK 9-12 | The analog voice as the sends read it (converter channels 0-3), inverted. | Track level and pan, the analog FX block. POST adds only the delay and reverb returns |
-| MAIN | What goes through the FX track: tracks routed to it, before its drive, filter and level. PRE removes the delay and reverb returns routed there, POST adds the direct ones. | Every track not routed to the FX track, analog ones included |
+| FX L, FX R, FX L+R (MAIN in Synfact) | What goes through the FX track: tracks routed to it, before its drive, filter and level. PRE removes the delay and reverb returns routed there, POST adds the direct ones. | Every track not routed to the FX track, analog ones included |
 | IN L, IN R, IN L+R | The inputs as converted, whatever the EXTERNAL IN level. | — |
 
 Record the real output: cable from MAIN OUT to the inputs, EXTERNAL IN level at 0 (no feedback), source IN L+R.
