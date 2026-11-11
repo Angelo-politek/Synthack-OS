@@ -83,7 +83,7 @@ void ls_apply(void)
     for (j = 0; j < ls_loaded && n < MAX_FILES; j++) {      /* the files it does not name, in load order */
         for (i = 0; i < n && ls_pos[i] != j; i++)
             ;
-        if (i == n) {
+        if (i == n && files[j].id != 0xFFFFFFFFu) {         /* not a deleted one (ls_forget) */
             ls_pos[n] = (u8)j;
             ids[n++] = (u16)files[j].id;
         }
@@ -251,6 +251,44 @@ int ls_file_add(u32 id, u32 ptr, u32 frames, u32 pages, u32 mmc, const char *nam
     ls_file_rename(ls_loaded - 1, name);
     ls_apply();
     return (int)ls_loaded - 1;
+}
+
+/* ---- the project's list, for mods/sample-manager (UI task only) */
+
+/* HZFS id of the file at position pos of the list, 0 if the position is empty or beyond the list */
+u32 ls_id_at(u32 pos)
+{
+    if (!(REC[0] == 'L' && REC[1] == 'P') || pos >= REC[2] || ls_pos[pos] == HOLE)
+        return 0;
+    return rec_id(pos);
+}
+
+/* Positions pos and pos + 1 change places. SAMP values that pointed at one now point at the other. */
+int ls_swap(u32 pos)
+{
+    u8 a, b;
+    if (!(REC[0] == 'L' && REC[1] == 'P') || pos + 1 >= REC[2])
+        return 0;
+    a = REC[4 + 2 * pos];
+    b = REC[5 + 2 * pos];
+    REC[4 + 2 * pos] = REC[6 + 2 * pos];
+    REC[5 + 2 * pos] = REC[7 + 2 * pos];
+    REC[6 + 2 * pos] = a;
+    REC[7 + 2 * pos] = b;
+    ls_apply();
+    return 1;
+}
+
+/* File id is gone from the storage (core_hzfs_remove): its position stays in the list, empty, so the SAMP values of
+ * the others keep pointing at the same samples. Its memory on the voice CPU is free again at the next boot. */
+void ls_forget(u32 id)
+{
+    for (u32 j = 0; j < ls_loaded; j++)
+        if (files[j].id == id) {
+            files[j].id = 0xFFFFFFFFu;
+            loaded_names[j][0] = 0;
+        }
+    ls_apply();
 }
 
 /* bytes the uploader sends (it rounds up to pages): the stock total, or all pages ours included */

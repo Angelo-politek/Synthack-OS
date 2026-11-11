@@ -1,0 +1,9 @@
+{
+  "modarea": [
+    [
+      "0x2b800",
+      "0x2d000",
+      "code and data"
+    ]
+  ]
+}

@@ -151,6 +151,13 @@
       "project": 0,
       "sec7": 0
     },
+    "sample-manager": {
+      "cpu": 0,
+      "modarea": 6144,
+      "kit": 0,
+      "project": 0,
+      "sec7": 0
+    },
     "sampler": {
       "cpu": 400,
       "modarea": 12288,

@@ -39,7 +39,7 @@ def rows() -> list[tuple[str, int]]:
     for d in sorted((REPO / "mods").glob("*/mod.json")):
         card = json.loads(d.read_text(encoding="utf-8"))
         name = d.parent.name
-        if card["kind"] not in ("feature", "machine") or name == "about":
+        if card["kind"] not in ("feature", "machine") or name == "about" or not (d.parent / "patch.json").exists():
             continue
         first = min((a for a, _, who, _ in registry.MODAREA if who == name), default=None)
         if first is None:
@@ -53,6 +53,12 @@ def rows() -> list[tuple[str, int]]:
     return out
 
 
+def smgr_row() -> int:
+    """Indirizzo delle quattro callback della riga SAMPLES di mods/sample-manager, 0 se quella mod non c'e'."""
+    f = REPO / "mods" / "sample-manager" / "patch.json"
+    return int(json.loads(f.read_text(encoding="utf-8"))["symbols"]["smgr_row"], 16) if f.exists() else 0
+
+
 def header() -> str:
     r = rows()
     body = "\n".join(f'    {{"{t}", {p:#x}u}},' for t, p in r)
@@ -63,7 +69,7 @@ def header() -> str:
 def main() -> None:
     (HERE / "about_data.h").write_text(header(), encoding="utf-8", newline="\n")
     m = modkit.Mod(__file__)
-    code = m.compile(["about.c"])
+    code = m.compile(["about.c"], defs={"SMGR_ROW": smgr_row()})
     m.area(code, "about.c")
     m.word(registry.SFCORE_TABLE + 4 * SLOT, code["about_module"], f"tabella dei moduli di sfcore, posto {SLOT}")
     m.hook(SITE, SITE_ORIG, code["about_settings"], "menu delle impostazioni: la riga SYNTHACK dopo l'ultima")

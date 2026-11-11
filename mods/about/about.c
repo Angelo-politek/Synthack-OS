@@ -145,6 +145,12 @@ extern void about_additem(void *menu, const void *row);
 void about_rows(void *menu)
 {
     static const void *const row[] = {about_label, about_select, about_icon, about_change};
+#if SMGR_ROW
+    /* mods/sample-manager's row (its four callbacks at SMGR_ROW, zeros when that mod is not in the build): this
+     * mod owns the menu's hook, so it adds the row for it, before its own */
+    if (*(volatile const u32 *)SMGR_ROW)
+        about_additem(menu, (const void *)SMGR_ROW);
+#endif
     about_additem(menu, row);
 }
 

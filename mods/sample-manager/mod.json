@@ -1,0 +1,6 @@
+{
+  "title": "Sample manager",
+  "kind": "feature",
+  "status": "experimental",
+  "summary": "A SAMPLES row in the settings menu: your long samples in a list; put one on a track, reorder, delete."
+}
