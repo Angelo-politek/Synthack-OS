@@ -173,6 +173,42 @@
     },
     {
       "section": 3,
+      "addr": "0X40388C10",
+      "len": 4,
+      "append": true,
+      "hex": "2d03007e",
+      "ram": "0x445244e0",
+      "what": "menu DEST della FX track: ingresso esterno, id 126"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388C14",
+      "len": 4,
+      "append": true,
+      "hex": "2d030080",
+      "ram": "0x445244e4",
+      "what": "menu DEST della FX track: ingresso esterno, id 128"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388C18",
+      "len": 4,
+      "append": true,
+      "hex": "2d030081",
+      "ram": "0x445244e8",
+      "what": "menu DEST della FX track: ingresso esterno, id 129"
+    },
+    {
+      "section": 3,
+      "addr": "0X40388C1C",
+      "len": 4,
+      "append": true,
+      "hex": "2d030082",
+      "ram": "0x445244ec",
+      "what": "menu DEST della FX track: ingresso esterno, id 130"
+    },
+    {
+      "section": 3,
       "addr": "0X40011A42",
       "len": 4,
       "expect_sha256": "7af9698341985d46dfc38aae4304e291ed323545fe7e460505508249569dfc1c",

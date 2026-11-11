@@ -55,6 +55,7 @@ DEST_SITES = [
     (0x4004_E8A8, "2f320c044eb9400a5ce4", "ids_dest_e8a8", "gruppo della voce: id da 16 bit"),
     (0x4004_EC0A, "41f60c002f28ff7c4eb9400a5ce4", "ids_dest_ec0a", "encoder: gruppo della voce, id da 16 bit")]
 CODE_END = I.EXT
+IN_DEST, IN_DESTX_FIRST = (126, 128, 129, 130), 20     # posti DESTX 20..23 (registro)
 
 
 def sha(b: bytes) -> str:
@@ -133,6 +134,14 @@ def main() -> None:
         assert len(code) == len(old), (hex(addr), code.hex())
         patches.append({"section": 3, "addr": f"{addr:#010X}", "len": len(code), "expect_sha256": sha(old),
                         "hex": code.hex(), "what": what})
+    # LFO della FX track: l'ingresso esterno tra le destinazioni (richiesta dalla macchina, RC1). Sono parametri
+    # dell'OS (IN LR 126, BAL 128, DEL 129, REV 130: parole del blocco External Mixer del kit FX, che l'LFO modula
+    # sul posto), solo assenti dalla riga 45 dell'OS. In mono valgono per IN L; IN R sta nel kitstore: non modulabile.
+    for k, pid in enumerate(IN_DEST):
+        at = I.destx(IN_DESTX_FIRST + k)
+        patches.append({"section": 3, "addr": f"{L.IMG + at - L.RAM:#010X}", "len": 4, "append": True,
+                        "hex": struct.pack(">BBH", 45, 3, pid).hex(), "ram": f"{at:#010x}",
+                        "what": f"menu DEST della FX track: ingresso esterno, id {pid}"})
     found = sites(sec3)
     for addr, old, new, what in found:
         patches.append({"section": 3, "addr": f"{addr:#010X}", "len": 4, "expect_sha256": sha(struct.pack(">I", old)),

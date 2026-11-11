@@ -116,7 +116,11 @@ def test_dest_item_to_internal_id_like_the_os(uis):
                 got = ui.call(DEST_IID, [item, m, kind])
                 if item <= 32 or want != 0xFFFF_FFFF:
                     row = struct.unpack(">66H", bytes(ui.uc.mem_read(I.ROWS + 132 * (m if m <= 44 else 34), 132)))
-                    if len([x for x in row if x != 0xFFFF]) == 33 or kind == 12:
+                    if kind == 12:                          # FX track: dopo la voce 3 ci sono le 4 dell'ingresso
+                        if item > 3:                        # esterno (idspace), le voci stock scalano di 4
+                            got = ui.call(DEST_IID, [item + 4, m, kind])
+                        assert got == want, (kind, m, item, hex(got), hex(want))
+                    elif len([x for x in row if x != 0xFFFF]) == 33:
                         assert got == want, (kind, m, item, hex(got), hex(want))
 
 
@@ -210,8 +214,9 @@ def test_fx_track_dest_list_has_the_mod_parameters():
     want = {struct.unpack(">I", bytes(ui.uc.mem_read(I.TABLE + 52 * pid + 4, 4)))[0]: pid
             for k in range(I.DESTX_N)
             for m, _, pid in [struct.unpack(">BBH", bytes(ui.uc.mem_read(I.DESTX + 4 * k, 4)))] if m == 45 and pid}
-    assert len(want) == 6 and set(want.values()) == {506, 507, 508, 509, 510, 512}
-    assert {k: v for k, v in enumerate(fx) if v >= I.FIRST} == want
+    assert set(want.values()) == {506, 507, 508, 509, 510, 512, 126, 128, 129, 130}   # FX3 e l'ingresso esterno
+    assert {k: fx[k] for k in want} == want
+    assert not any(v >= I.FIRST for k, v in enumerate(fx) if k not in want)
     base = ids(stock, 45)
     assert [v for k, v in enumerate(fx) if k not in want] == [v for k, v in enumerate(base) if k not in want]
     for machine in (0, 4, 20, 44):                           # le altre tracce: come l'OS
@@ -219,3 +224,5 @@ def test_fx_track_dest_list_has_the_mod_parameters():
     for pid in want.values():                                # e passano il filtro della lista
         ui.uc.reg_write(UC_M68K_REG_A5, obj)
         assert ui.call(SYM["ids_dest_flags"], [pid]) == 0xE00
+    row = struct.unpack(f">{I.DEST_N}H", bytes(ui.uc.mem_read(I.ROWS + 2 * I.DEST_N * 45, 2 * I.DEST_N)))
+    assert set(want.values()) <= set(row)                    # e stanno nel menu DEST della FX track
