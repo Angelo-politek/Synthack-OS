@@ -223,3 +223,39 @@ def test_dest_helpers_and_fx_track_page():
     slots = lambda: struct.unpack(">8I", ui.uc.mem_read(I.page(38) + 8, 32))     # noqa: E731
     ui.call(SYM["lfo3_page_slots"])
     assert slots() == tuple(range(530, 538))                    # traccia attiva 0
+
+
+def test_paste_page_between_the_lfo_pages():
+    """Incolla pagina (0x4001F55E): l'OS accetta LFO1 <-> LFO2 spostando gli id di 10; con LFO3 (pagina 38) rifiutava
+    (sulla macchina: paste page non funziona col terzo LFO). Ora LFO1/LFO2 <-> LFO3, stessa manopola; un'altra pagina
+    resta rifiutata."""
+    import screens
+    screens.TABS.setdefault("LFO", 280)
+    ui = screens.UI(["lfo3"])
+    t = ui.tab("LFO")
+    model = ui.long(t + 104)
+    COPY, PASTE = 0x4001_F466, 0x4001_F55E
+
+    def vals(page):
+        ui.page(t, page)
+        return [ui.raw(t, e) >> 8 for e in "ABCDEFGH"]
+    ui.page(t, 0)
+    ui.set(t, "A", 40)
+    ui.set(t, "H", 90)
+    one = vals(0)
+    assert ui.call(COPY, [model, 4], count=400_000_000) & 0xFF == 1
+    assert ui.call(PASTE, [model, 38, 1], count=400_000_000) & 0xFF == 1 and vals(2) == one      # LFO1 -> LFO3
+    assert ui.call(PASTE, [model, 5, 1], count=400_000_000) & 0xFF == 1 and vals(1) == one       # LFO1 -> LFO2, come l'OS
+    ui.page(t, 2)
+    ui.set(t, "A", 33)
+    ui.set(t, "F", 64)
+    three = vals(2)
+    assert ui.call(COPY, [model, 38], count=400_000_000) & 0xFF == 1
+    for page, index in ((0, 4), (1, 5)):                                                         # LFO3 -> LFO1, LFO2
+        assert ui.call(PASTE, [model, index, 1], count=400_000_000) & 0xFF == 1 and vals(page) == three
+    ui.page(t, 2)
+    ui.set(t, "A", 1)
+    assert ui.call(PASTE, [model, 38, 1], count=400_000_000) & 0xFF == 1 and vals(2) == three    # LFO3 -> LFO3
+    f = ui.tab("FLTR")
+    assert ui.call(COPY, [ui.long(f + 104), ui.long(ui.long(f + 124))], count=400_000_000) & 0xFF == 1
+    assert ui.call(PASTE, [model, 38, 1], count=400_000_000) & 0xFF == 0 and vals(2) == three    # FLTR su LFO3: no

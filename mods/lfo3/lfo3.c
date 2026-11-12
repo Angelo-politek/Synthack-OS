@@ -168,6 +168,89 @@ __asm__(
     "        jmp     0x400F3A5A\n"
     "9:      jmp     0x400F3A84\n");
 
+/* Paste page between LFO pages. The OS's paste (0x4001F55E) takes a page copied from LFO1 (page 4) on LFO2 (5)
+ * and back, adding 10 to the ids of the copied {id, value} pairs; any other pair of pages is refused, so a copied
+ * LFO1 or LFO2 page could not be pasted on LFO3 (device). Its test at 0x4001F656 (moveq #4,d1 ; move.l 4(a0),d0:
+ * a0 = the clipboard, +4 its page, d5 = the page pasted on, d2 = where the pairs go) comes here. With page 38 on
+ * one side and 4, 5 or 38 on the other: the pairs are copied as the OS does (0x4017582A), each id is moved to
+ * the same knob of the target LFO (LFO1 86 87 88 89 90 92 93 94, LFO2 +10, LFO3 530..537), pairs with no knob
+ * there are dropped, and the OS goes on at 0x4001F6F8. Anything else: the OS's own test. */
+__asm__(
+    "        .text\n"
+    "        .globl  lfo3_paste_hook\n"
+    "lfo3_paste_hook:\n"
+    "        move.l  4(%a0),%d0\n"
+    "        moveq   #38,%d1\n"
+    "        cmp.l   %d0,%d1\n"
+    "        beq.s   1f\n"
+    "        cmp.l   %d5,%d1\n"
+    "        bne.w   9f\n"
+    "1:      moveq   #4,%d1\n"                          /* both sides must be 4, 5 or 38 */
+    "        cmp.l   %d0,%d1\n"
+    "        beq.s   2f\n"
+    "        cmp.l   %d5,%d1\n"
+    "        beq.s   2f\n"
+    "        moveq   #5,%d1\n"
+    "        cmp.l   %d0,%d1\n"
+    "        beq.s   2f\n"
+    "        cmp.l   %d5,%d1\n"
+    "        beq.s   2f\n"
+    "        cmp.l   %d0,%d5\n"                         /* 38 on 38: the same page, as the OS */
+    "        bne.w   9f\n"
+    "        moveq   #0,%d7\n"
+    "        jmp     0x4001F6C8\n"
+    "2:      move.l  %d0,-(%sp)\n"                      /* the clipboard's page */
+    "        pea     8(%a0)\n"
+    "        move.l  %d2,-(%sp)\n"
+    "        jsr     0x4017582A\n"
+    "        addq.l  #8,%sp\n"
+    "        move.l  (%sp)+,%d0\n"
+    "        movea.l -12(%fp),%a0\n"                    /* read */
+    "        movea.l %a0,%a1\n"                         /* write */
+    "3:      cmpa.l  -8(%fp),%a0\n"
+    "        beq.w   8f\n"
+    "        move.l  (%a0),%d1\n"                       /* id -> knob 0..7 of the copied LFO, or drop */
+    "        moveq   #38,%d7\n"
+    "        cmp.l   %d0,%d7\n"
+    "        bne.s   4f\n"
+    "        subi.l  #530,%d1\n"
+    "        bra.s   5f\n"
+    "4:      subi.l  #86,%d1\n"
+    "        moveq   #5,%d7\n"
+    "        cmp.l   %d0,%d7\n"
+    "        bne.s   41f\n"
+    "        subi.l  #10,%d1\n"
+    "41:     cmp.l   %d7,%d1\n"                         /* offset 5 (id 91 / 101): no knob */
+    "        beq.s   7f\n"
+    "        bcs.s   5f\n"
+    "        subq.l  #1,%d1\n"
+    "5:      moveq   #7,%d7\n"
+    "        cmp.l   %d1,%d7\n"
+    "        bcs.s   7f\n"
+    "        moveq   #38,%d7\n"                         /* knob -> id of the LFO pasted on */
+    "        cmp.l   %d5,%d7\n"
+    "        bne.s   6f\n"
+    "        addi.l  #530,%d1\n"
+    "        bra.s   62f\n"
+    "6:      moveq   #5,%d7\n"
+    "        cmp.l   %d1,%d7\n"
+    "        bcc.s   61f\n"
+    "        addq.l  #1,%d1\n"
+    "61:     addi.l  #86,%d1\n"
+    "        cmp.l   %d5,%d7\n"
+    "        bne.s   62f\n"
+    "        addi.l  #10,%d1\n"
+    "62:     move.l  %d1,(%a1)+\n"
+    "        move.l  4(%a0),(%a1)+\n"
+    "7:      addq.l  #8,%a0\n"
+    "        bra.s   3b\n"
+    "8:      move.l  %a1,-8(%fp)\n"
+    "        moveq   #0,%d7\n"
+    "        jmp     0x4001F6F8\n"
+    "9:      moveq   #4,%d1\n"                          /* the instructions this replaced */
+    "        move.l  4(%a0),%d0\n"
+    "        jmp     0x4001F65C\n");
+
 /* LFO3's DEST (id 533) is a DEST like LFO1's (89) and LFO2's (99) where the OS tells them apart by id: popup
  * (0x4003B11A, id in d3), randomize (0x400149E2, d2), relative step (0x40014C5E / 0x40014E48, d0). Each site's
  * compare chain becomes jsr here: Z = 1 for 89, 99, 533; the site's own bne follows. Only flags change. */

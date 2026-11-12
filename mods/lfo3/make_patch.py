@@ -49,6 +49,7 @@ S_SOURCES = ["synfact/render.s", "synfact/sram.s"]
 NOP = b"\x4e\x71"
 # (indirizzo 1.42, byte stock, simbolo, descrizione): siti dell'OS (pagina, memoria, lock: passi successivi)
 SITES: list[tuple[int, str, str, str]] = [
+    (0x4001_F656, "720420280004", "lfo3_paste_hook", "incolla pagina: tra le pagine LFO1, LFO2 e LFO3"),
     (0x400F_3A0C, "7201b2806672", "lfo3_wave_hook", "disegno della scheda LFO: il riquadro della forma d'onda anche per LFO3")]
 SRAM = {"code": 0x8000_7340, "bank": 0x8000_F870}
 

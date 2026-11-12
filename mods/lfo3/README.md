@@ -10,7 +10,7 @@ A third LFO on every audio track. The engine is the LFO3 kernel of [Synfact](htt
 - Saved with the Sound. A Sound made without the mod has DEST at none: no modulation.
 - The FX track has no LFO3: its page 3 is empty.
 
-`[!]` Not there yet: copy, paste and randomize of the LFO3 page.
+- Paste page works between LFO1, LFO2 and LFO3.
 
 `[!]` A Sound saved with LFO3 loads on a stock OS without it. Its LFO3 values and locks are ignored there.
 

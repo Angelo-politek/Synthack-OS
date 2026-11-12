@@ -358,7 +358,7 @@ On the FX track, LFO1 and LFO2 can also modulate the FX3 page and the external i
 - The page shows the waveform as LFO1 and LFO2 do.
 - A Sound made without the mod has `DEST` at none.
 
-`[!]` Not there yet: copy, paste and randomize of the LFO3 page.
+- Paste page works between LFO1, LFO2 and LFO3.
 
 ## Arpeggiator
 
