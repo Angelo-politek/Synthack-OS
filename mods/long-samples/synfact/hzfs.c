@@ -280,3 +280,28 @@ int core_hzfs_get(const struct st_storage_io *io,u32 id,st_sample_stream sink,vo
     }r=ST_HZ_OK;
 done:if(buf)io->free(buf);core_hzfs_close(&fs);return r;
 }
+
+/* SyntHack (not in Synfact; mods/sample-manager): a new name and/or a new flags word for file id, in a new copy of
+ * the catalogue committed as the others. The low byte of flags is the sample's tag (0 = none); nothing else in
+ * HZFS reads flags. name: up to 31 bytes, 0 = keep; a name another file has is refused. */
+int core_hzfs_update(const struct st_storage_io *io,u32 id,const char *name,u32 set_flags,u32 flags)
+{
+    struct st_hzfs fs;u8 *p,*next,*e;u32 i,j,k,n,len;int r=core_hzfs_open(&fs,io);if(r!=1)return r;
+    n=core_hzfs_count(&fs);i=find(&fs,id);if(i==n){r=ST_HZ_NOT_FOUND;goto done;}
+    p=fs.copy[fs.best];len=fs.length[fs.best];
+    if(name){
+        if(!name[0]){r=ST_HZ_ARGUMENT;goto done;}
+        for(j=0;j<n;j++)if(j!=i){
+            const u8 *o=entry(p,j)+32;
+            for(k=0;k<32 && o[k]==(u8)name[k] && name[k];k++){}
+            if(k<32 && !o[k] && !name[k]){r=ST_HZ_EXISTS;goto done;}
+        }
+    }
+    next=io->alloc((len+511)&~511u);if(!next){r=ST_HZ_MEMORY;goto done;}
+    zero(next,(len+511)&~511u);cp(next,p,len);
+    e=next+ST_HZ_ENTRIES+64*i;
+    if(name){zero(e+32,32);for(k=0;k<31 && name[k];k++)e[32+k]=(u8)name[k];}
+    if(set_flags)wr(e+28,flags);
+    r=commit(&fs,next,len);io->free(next);
+done:core_hzfs_close(&fs);return r;
+}

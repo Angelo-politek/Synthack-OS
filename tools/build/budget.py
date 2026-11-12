@@ -72,6 +72,8 @@ AUDIO_CYCLES["arp"] = 400
 # del 2026-11-07: registratore +1 363, POLY +1 953, ARP +1 295). Senza, il sito mostrava "tutte le mod" sotto il
 # misurato (12 775). lfo3: niente a riposo (nessuna destinazione).
 AUDIO_CYCLES.update({"arp": 1300, "recorder": 1400, "poly": 2000})
+# sample-manager (2026-11-12): il gestore del mix con l'anteprima ferma, poche istruzioni e una riga di codice: stima
+AUDIO_CYCLES["sample-manager"] = 300
 AUDIO_CPU["arp"] = 40
 AUDIO_CPU["modulation-skip"] = -5500
 

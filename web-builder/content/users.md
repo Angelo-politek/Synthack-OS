@@ -431,13 +431,16 @@ Your long samples in a list, on the Syntakt. Needs **Long samples** and **SAMPLE
 1. Open the settings menu. Choose **SAMPLES**. Press `YES`.
 2. `UP` / `DOWN` or an encoder move through the list: position, name, length.
 3. `YES`: the active track (1–8) gets the SAMPLER with this sample.
-4. `FUNC` + `UP` / `DOWN`: move the sample in the list.
-5. `FUNC` + `NO`, twice: delete the sample from the Syntakt. No undo.
-6. `NO` closes.
+4. `FUNC` + `YES`: play the first 3 s of the sample. Again: stop.
+5. `RIGHT`: give the sample a tag (KICK, SNARE, HAT, PERC, BASS, LEAD, PAD, FX, VOX, LOOP). `LEFT`: show all the samples, or those with one tag.
+6. `FUNC` + `RIGHT`: rename.
+7. `FUNC` + `UP` / `DOWN`: move the sample in the list.
+8. `FUNC` + `NO`, twice: delete the sample from the Syntakt. No undo.
+9. `NO` closes.
 
 `[!]` `SAMP` is a position in the list. Moving a sample changes what tracks on its old and new positions play. A deleted sample leaves its position empty.
 
-`[!]` Rename, add and back up samples on the **Samples** page of this site.
+`[!]` Add and back up samples on the **Samples** page of this site.
 
 ## About SyntHack
 

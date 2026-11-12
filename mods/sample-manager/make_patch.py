@@ -21,7 +21,11 @@ SLOT = next(s for s, who in registry.SFCORE_SLOTS.items() if who == "sample-mana
 EXTERN = {"LS_TABLE": ("long-samples", "ls_table"), "LS_NAMES": ("long-samples", "ls_names"),
           "LS_ID_AT": ("long-samples", "ls_id_at"), "LS_SWAP": ("long-samples", "ls_swap"),
           "LS_FORGET": ("long-samples", "ls_forget"), "HZFS_REMOVE": ("long-samples", "core_hzfs_remove"),
-          "HZFS_IO": ("long-samples", "core_hzfs_native_io"), "SM_LONG_SAMP": ("sampler", "sm_long_samp")}
+          "HZFS_IO": ("long-samples", "core_hzfs_native_io"), "SM_LONG_SAMP": ("sampler", "sm_long_samp"),
+          "LS_MMC_AT": ("long-samples", "ls_mmc_at"), "LS_FILE_INDEX": ("long-samples", "ls_file_index"),
+          "LS_FILE_RENAME": ("long-samples", "ls_file_rename"), "HZFS_UPDATE": ("long-samples", "core_hzfs_update"),
+          "HZFS_OPEN": ("long-samples", "core_hzfs_open"), "HZFS_CLOSE": ("long-samples", "core_hzfs_close"),
+          "HZFS_COUNT": ("long-samples", "core_hzfs_count"), "HZFS_ENTRY": ("long-samples", "core_hzfs_entry")}
 
 
 def externs() -> dict[str, int]:
@@ -40,8 +44,9 @@ def main() -> None:
     m.area(code, "sample_manager.c")
     m.word(registry.SFCORE_TABLE + 4 * SLOT, code["smgr_module"], f"tabella dei moduli di sfcore, posto {SLOT}")
     m.write(description="Riga SAMPLES nel menu delle impostazioni (aggiunta da about): la lista dei campioni lunghi "
-                        "del progetto; assegna alla traccia, sposta, cancella.",
+                        "del progetto; assegna alla traccia, anteprima, tag, rinomina, sposta, cancella.",
             requires=["modarea", "sfcore", "idspace", "long-samples", "sampler", "about"],
+            uses=["sfcore:main_mix"],                 # l'anteprima: 32 campioni per blocco nel bus di anteprima
             symbols={k: v for k, v in sorted(code.items()) if k.startswith("smgr_")})
 
 

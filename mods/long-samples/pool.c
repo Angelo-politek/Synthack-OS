@@ -263,6 +263,14 @@ u32 ls_id_at(u32 pos)
     return rec_id(pos);
 }
 
+/* byte offset on the eMMC of the file at position pos (its 64-byte SAMP header, then PCM16 big-endian), 0 if none */
+u32 ls_mmc_at(u32 pos)
+{
+    if (!ls_id_at(pos))
+        return 0;
+    return files[ls_pos[pos]].mmc;
+}
+
 /* Positions pos and pos + 1 change places. SAMP values that pointed at one now point at the other. */
 int ls_swap(u32 pos)
 {

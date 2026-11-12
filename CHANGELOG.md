@@ -13,7 +13,7 @@ Not released yet. This list follows `dev`.
 - **Third LFO**, **Arpeggiator**, **POLY**, **Audio recorder** (ported from Synfact): experimental.
 - **Modulation skip** (from Synfact): same sound, about 4 % more CPU free.
 - **LFO destinations for mod parameters**: SY FM4, the SAMPLER's knob H, FX3 (on the FX track's LFOs).
-- **Sample manager**: a SAMPLES row in the settings menu: put a long sample on a track, reorder, delete. Experimental.
+- **Sample manager**: a SAMPLES row in the settings menu: put a long sample on a track, play it, tag, rename, reorder, delete. Experimental.
 - **About SyntHack**: a SYNTHACK row in the settings menu lists the version, the mods in the build and the credits.
 - **FX3 send on the FX track**: AMP page, next to DEL and REV.
 - **Web builder**: build your OS in the browser, same bytes as `build.py`. Presets, load meter, a status on every mod (stable, beta, experimental).
@@ -27,7 +27,7 @@ Not released yet. This list follows `dev`.
 - **POLY** kept losing its group after a power cycle.
 - **Arpeggiator, recorder**: other keys acted under their views. The recorder closes after a save.
 - **Input page**: DEL, REV and FX3 side by side, in stereo too.
-- **Third LFO**: its page shows the waveform, as LFO1 and LFO2.
+- **Third LFO**: its page shows the waveform, as LFO1 and LFO2; paste page works between the three LFO pages.
 - **Recorder**: screens redrawn, sources named for what they hold, the result of a save is shown.
 - **FX track LFOs**: the external input among the destinations.
 

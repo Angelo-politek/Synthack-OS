@@ -20,7 +20,7 @@ sys.path[:0] = [str(ROOT / "tools" / "emu"), str(ROOT / "tools" / "build"), str(
                 str(ROOT / "tests")]
 
 EV = 0x4FE0_6000
-YES, NO, UP, DOWN = 12, 13, 14, 15
+YES, NO, UP, DOWN, LEFT, RIGHT = 12, 13, 14, 15, 16, 17
 
 
 def sym_of(mod):
@@ -96,6 +96,13 @@ def key(m, code, down=1, func=0):
     return m.call(m.sm["smgr_key"], [0, EV], count=2_000_000_000)
 
 
+def show(m, cursor=0):
+    """Come YES sulla riga SAMPLES: lista aperta, tag letti dal catalogo, cursore sulla riga data."""
+    m.put(m.sm["smgr_filter"], ">I", 0)
+    m.call(m.sm["smgr_show"], count=400_000_000)
+    m.put(m.sm["smgr_cursor"], ">I", cursor)
+
+
 def note(m):
     return bytes(m.uc.mem_read(m.sm["smgr_note"], 32)).split(b"\0")[0]
 
@@ -117,6 +124,7 @@ def test_row_and_module_are_wired(m):
 def test_list_is_drawn(m, tmp_path):
     import screens
     assert names(m) == [b"kick", b"pad", b"vox"]
+    show(m)
     fb = m.paint(m.sm["smgr_paint"])
     assert 700 < sum(bin(b).count("1") for b in fb) < 3500
     screens.png(fb, tmp_path / "samples.png")
@@ -127,8 +135,7 @@ def test_list_is_drawn(m, tmp_path):
 def test_keys_only_while_open(m):
     m.put(m.sm["smgr_open"], ">I", 0)
     assert key(m, DOWN) == 0 and key(m, YES) == 0
-    m.put(m.sm["smgr_open"], ">I", 1)
-    m.put(m.sm["smgr_cursor"], ">I", 0)
+    show(m)
     assert key(m, DOWN) == 1 and m.long(m.sm["smgr_cursor"]) == 1
     assert key(m, DOWN) == 1 and key(m, DOWN) == 1 and m.long(m.sm["smgr_cursor"]) == 2     # si ferma in fondo
     assert key(m, UP) == 1 and m.long(m.sm["smgr_cursor"]) == 1
@@ -139,8 +146,7 @@ def test_keys_only_while_open(m):
 
 
 def test_move_changes_the_project_order(m):
-    m.put(m.sm["smgr_open"], ">I", 1)
-    m.put(m.sm["smgr_cursor"], ">I", 0)
+    show(m)
     before = [m.call(m.sym["ls_id_at"], [i]) for i in range(3)]
     assert key(m, DOWN, func=1) == 1                                 # kick scende di un posto
     assert names(m) == [b"pad", b"kick", b"vox"] and m.long(m.sm["smgr_cursor"]) == 1
@@ -150,11 +156,95 @@ def test_move_changes_the_project_order(m):
     assert key(m, UP, func=1) == 1 and names(m) == [b"kick", b"pad", b"vox"]   # in cima: niente
 
 
+def catalogue(m):
+    """id -> (nome, flags) dal catalogo sull'eMMC finta."""
+    import test_long_samples as T
+    s = m.sym
+    fs, e = T.SCRATCH + 0x400, T.SCRATCH + 0x800
+    assert m.call(s["core_hzfs_open"], [fs, s["core_hzfs_native_io"]], count=400_000_000) == 1
+    out = {}
+    for i in range(m.call(s["core_hzfs_count"], [fs])):
+        assert m.call(s["core_hzfs_entry"], [fs, i, e]) == 1
+        out[m.long(e)] = (bytes(m.uc.mem_read(e + 32, 33)).split(b"\0")[0], m.long(e + 28))
+    m.call(s["core_hzfs_close"], [fs])
+    return out
+
+
+def test_tags_are_saved_in_the_catalogue_and_filter_the_list(m):
+    show(m)
+    kick = m.call(m.sym["ls_id_at"], [0])
+    assert key(m, RIGHT) == 1 and key(m, RIGHT) == 1                 # none -> KICK -> SNARE
+    assert m.uc.mem_read(m.sm["smgr_tags"], 1)[0] == 2
+    assert catalogue(m)[kick][1] & 0xFF == 0                         # non ancora scritto: si scrive lasciando la riga
+    assert key(m, DOWN) == 1
+    assert catalogue(m)[kick] == (b"kick", 2)                        # una scrittura sola, il nome resta
+    show(m)                                                          # riaperta: i tag tornano dal catalogo
+    assert list(m.uc.mem_read(m.sm["smgr_tags"], 3)) == [2, 0, 0]
+    for _ in range(2):                                               # filtro: ALL -> KICK -> SNARE
+        assert key(m, LEFT) == 1
+    assert m.long(m.sm["smgr_filter"]) == 2
+    fb = m.paint(m.sm["smgr_paint"])
+    assert key(m, DOWN) == 1 and m.long(m.sm["smgr_cursor"]) == 0    # una riga sola: kick
+    assert key(m, DOWN, func=1) == 1 and names(m) == [b"kick", b"pad", b"vox"]   # col filtro non si sposta
+    for _ in range(9):
+        key(m, LEFT)
+    assert m.long(m.sm["smgr_filter"]) == 0 and m.paint(m.sm["smgr_paint"]) != fb
+    show(m)
+    for _ in range(9):                                               # SNARE -> ... -> none
+        key(m, RIGHT)
+    key(m, NO)                                                       # chiudendo si scrive
+    assert catalogue(m)[kick][1] & 0xFF == 0
+
+
+def test_rename_writes_the_catalogue_and_the_list(m):
+    import test_long_samples as T
+    pad = m.call(m.sym["ls_id_at"], [1])
+    m.uc.mem_write(T.SCRATCH, b"Warm Pad  \0")
+    m.call(m.sm["smgr_rename_to"], [pad, T.SCRATCH], count=400_000_000)
+    assert note(m) == b"RENAMED" and names(m) == [b"kick", b"Warm Pad", b"vox"]
+    assert catalogue(m)[pad][0] == b"Warm Pad"
+    m.uc.mem_write(T.SCRATCH, b"kick\0")                             # il nome di un altro: rifiutato
+    m.call(m.sm["smgr_rename_to"], [pad, T.SCRATCH], count=400_000_000)
+    assert note(m) == b"NAME EXISTS" and catalogue(m)[pad][0] == b"Warm Pad"
+    m.uc.mem_write(T.SCRATCH, b"pad\0")
+    m.call(m.sm["smgr_rename_to"], [pad, T.SCRATCH], count=400_000_000)
+    assert names(m) == [b"kick", b"pad", b"vox"]
+
+
+def test_preview_plays_the_start_of_the_file(m):
+    BUS = 0x8000_DFD0
+    show(m, 0)
+    pos_mmc = m.call(m.sym["ls_mmc_at"], [0])
+    frames = 4800
+    pcm = struct.pack(f">{frames}h", *[((i * 37) % 2000) - 1000 for i in range(frames)])
+    head = m.disk.read(pos_mmc >> 9, 64)                             # dati veri nel file, dopo l'intestazione SAMP
+    m.disk.write(pos_mmc >> 9, head + pcm)
+    assert key(m, YES, func=1) == 1 and note(m) == b""
+    m.uc.mem_write(BUS, bytes(256))
+    m.call(m.sm["smgr_mix"])
+    got = struct.unpack(">64i", m.uc.mem_read(BUS, 256))
+    want = []
+    for i in range(32):
+        x = (((i * 37) % 2000) - 1000) * 2048
+        x += x >> 2
+        want += [-x, -x]                                             # bus invertito, mono sui due lati
+    assert list(got) == want
+    for _ in range(frames // 32):
+        m.call(m.sm["smgr_mix"])
+    m.uc.mem_write(BUS, bytes(256))
+    m.call(m.sm["smgr_mix"])                                         # finito: non tocca piu' il bus
+    assert bytes(m.uc.mem_read(BUS, 256)) == bytes(256)
+    assert key(m, YES, func=1) == 1                                  # di nuovo: riparte; e ancora: si ferma
+    assert key(m, YES, func=1) == 1
+    m.uc.mem_write(BUS, bytes(256))
+    m.call(m.sm["smgr_mix"])
+    assert bytes(m.uc.mem_read(BUS, 256)) == bytes(256)
+
+
 def test_delete_needs_two_presses_and_leaves_a_hole(m):
     import test_long_samples as T
     s = m.sym
-    m.put(m.sm["smgr_open"], ">I", 1)
-    m.put(m.sm["smgr_cursor"], ">I", 1)                              # pad
+    show(m, 1)                                                       # pad
     gone = m.call(s["ls_id_at"], [1])
     assert key(m, NO, func=1) == 1 and b"AGAIN" in note(m)
     assert names(m) == [b"kick", b"pad", b"vox"]                     # una pressione: niente
@@ -178,8 +268,7 @@ def test_delete_needs_two_presses_and_leaves_a_hole(m):
 def test_assign_puts_the_sampler_on_the_active_track(m):
     import idspace_layout as I
     s = m.sym
-    m.put(m.sm["smgr_open"], ">I", 1)
-    m.put(m.sm["smgr_cursor"], ">I", 2)                              # vox
+    show(m, 2)                                                       # vox
     assert key(m, YES) == 1
     assert note(m).startswith(b"SAMPLE > TRACK ")
     track = note(m)[-1] - ord("1")

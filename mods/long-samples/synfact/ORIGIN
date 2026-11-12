@@ -1,1 +1,2 @@
 1a6d0c74469db4c30423be29c90e0b07ba7f8003 2026-11-03
+SyntHack addition at the end of hzfs.c: core_hzfs_update (rename, flags), for mods/sample-manager.
