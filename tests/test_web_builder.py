@@ -29,7 +29,7 @@ STATUS = ["experimental", "beta", "stable"]          # dal meno al piu' provato 
 # funzioni che ne usano altre (il builder le aggiunge, build.ts): il registratore salva tra i campioni lunghi e assegna
 # il SAMPLER
 FEATURE_DEPS = {("recorder", "long-samples"), ("recorder", "sampler"), ("sample-manager", "long-samples"),
-                ("sample-manager", "sampler"), ("sample-manager", "about")}
+                ("sample-manager", "sampler"), ("sample-manager", "about"), ("about", "splash")}
 
 
 def test_every_mod_has_a_card():
