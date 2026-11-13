@@ -4,16 +4,16 @@ A **SAMPLES** row in the settings menu: the project's list of [long samples](../
 
 | Control | Action |
 |---|---|
-| Settings menu, SAMPLES, `YES` | Open the list: position, name, length, tag |
-| `UP` / `DOWN`, any encoder | Move |
-| `YES` | The active track (1-8) gets the SAMPLER with this sample. A track that is a SAMPLER keeps its settings |
-| `FUNC` + `YES` | Play the first 3 s of the sample; again: stop |
-| `RIGHT` | The sample's tag: none, KICK, SNARE, HAT, PERC, BASS, LEAD, PAD, FX, VOX, LOOP |
+| Settings menu, SAMPLES, `YES` | Open the list: position, name, tag, length |
+| `UP` / `DOWN`, any encoder | Choose a sample |
+| `YES` | The active track (1-8) gets the SAMPLER with this sample |
+| `FUNC` + `YES` | Listen to its first 3 s; again: stop |
+| `RIGHT` | The sample's menu: ASSIGN, PLAY, RENAME, TAG, MOVE, DELETE. `LEFT` or `NO` closes it |
 | `LEFT` | Show all the samples, or those with one tag |
-| `FUNC` + `RIGHT` | Rename, with the OS's name editor (16 characters) |
-| `FUNC` + `UP` / `DOWN` | Move the sample up or down in the list (with all the samples shown) |
-| `FUNC` + `NO`, twice | Delete the sample from the Syntakt |
+| `FUNC` + `RIGHT`, `FUNC` + `UP` / `DOWN`, `FUNC` + `NO` twice | Shortcuts: rename, move, delete |
 | `NO` | Close |
+
+The screen follows the OS's lists: a header bar with the filter and the count, the chosen row inverted, a scroll bar, what the keys do at the bottom. The menu opens over the right side, as the OS's.
 
 - Saved: the order, with the project (long-samples' list). Names and tags, with the sample, for every project. A deleted sample is gone from the Syntakt's storage for every project.
 - Audio cost per block: a few instructions while nothing plays; the preview mixes 32 frames a block.

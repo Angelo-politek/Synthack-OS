@@ -402,7 +402,7 @@ While the view is open the other keys do nothing. PLAY, STOP and REC work as alw
 4. `FUNC` + `YES` plays the take. `FUNC` + `NO` clears it. Trim: `A` / `C` start, `B` / `D` end.
 5. `YES`, `YES`: name it, choose a track. The track gets the SAMPLER with the take, which plays at once.
 
-Mono, 48 kHz, up to 60 s. After `SAVED` the recorder closes. While it is open the trig keys still play, the other keys do nothing; PLAY, STOP and REC work as always.
+Mono, 48 kHz, up to 60 s. After `SAVED` the recorder goes back to its first screen, ready for the next take. While it is open the trig keys still play, the other keys do nothing; PLAY, STOP and REC work as always.
 
 | Source | What you record |
 |---|---|
@@ -429,14 +429,22 @@ No controls. The OS recomputes its modulations in every audio block, also when n
 Your long samples in a list, on the Syntakt. Needs **Long samples** and **SAMPLER** (added automatically).
 
 1. Open the settings menu. Choose **SAMPLES**. Press `YES`.
-2. `UP` / `DOWN` or an encoder move through the list: position, name, length.
-3. `YES`: the active track (1–8) gets the SAMPLER with this sample.
-4. `FUNC` + `YES`: play the first 3 s of the sample. Again: stop.
-5. `RIGHT`: give the sample a tag (KICK, SNARE, HAT, PERC, BASS, LEAD, PAD, FX, VOX, LOOP). `LEFT`: show all the samples, or those with one tag.
-6. `FUNC` + `RIGHT`: rename.
-7. `FUNC` + `UP` / `DOWN`: move the sample in the list.
-8. `FUNC` + `NO`, twice: delete the sample from the Syntakt. No undo.
-9. `NO` closes.
+2. `UP` / `DOWN` or an encoder: choose a sample. The list shows position, name, tag and length.
+3. `YES`: the active track (1–8) gets the SAMPLER with this sample. `FUNC` + `YES`: listen to its first 3 s.
+4. `RIGHT` opens the menu of the sample:
+
+   | Item | Action |
+   |---|---|
+   | ASSIGN | Put it on the active track |
+   | PLAY | Listen; again: stop |
+   | RENAME | The OS's name editor |
+   | TAG | `YES` changes it: KICK, SNARE, HAT, PERC, BASS, LEAD, PAD, FX, VOX, LOOP, none |
+   | MOVE | Then `UP` / `DOWN` move the sample in the list; `YES` ends |
+   | DELETE | `YES` twice: gone from the Syntakt, no undo |
+
+   `LEFT` or `NO` closes the menu.
+5. `LEFT` in the list: show all the samples, or only one tag.
+6. `NO` closes.
 
 `[!]` `SAMP` is a position in the list. Moving a sample changes what tracks on its old and new positions play. A deleted sample leaves its position empty.
 
