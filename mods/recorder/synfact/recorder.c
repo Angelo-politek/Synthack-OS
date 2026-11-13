@@ -95,6 +95,7 @@ static void sam_start(u32 armed)
     u32 level,peak,shift;
     if(sam_frames || !sam_prepare())return;
     preview_stop();sampler_suspend();
+    sam_save_message[0]=0;   /* SyntHack: the last save's result goes when the next take starts */
     sam_frames=0;sam_limit=sam_record_limit();sam_take_source=sam_source;sam_take_post=sam_post;
     sam_seq_stop=sam_rlen<8;
     sam_pcm_peak=0;sam_norm_pos=0;sam_norm_init=0;sam_norm_shown=0;sam_wave_ready=0;
@@ -325,14 +326,20 @@ static void recorder_ui_tick(void *controller)
         before=sam_norm_pos;sam_normalize_step(sam_enabled);
         if(before==sam_norm_pos || sam_clock-began>=192u)break;
     }
-    if(sam_enabled && sam_assign_phase)sam_assign_step();
-    /* SyntHack: a saved take is done. On the device the recorder stayed on the same screen after SAVED and the
-     * take could be saved again by mistake: show the result, then clear the take and close. */
+    /* SyntHack: once the track popup has answered (DONE) the save goes on even while the OS still counts the
+     * popup as on top. On the device the take was written only after the trim screen was left: the steps below
+     * ran only with the recorder in the foreground. */
+    if(sam_assign_phase && (sam_enabled || sam_assign_phase==SAM_ASSIGN_DONE))sam_assign_step();
+    /* SyntHack: a saved take is done: back to the recorder's first screen with the result, ready for the next
+     * take (device: it stayed on the trim screen). */
     if(sam_done_at && !sam_save_phase && !sam_assign_phase){
-        if(!sam_enabled)sam_done_at=0;
-        else if(sam_clock-sam_done_at>=72000u){sam_done_at=0;sam_clear();UI_CLOSE(sam_view);return;}
+        char keep[25];
+        for(q=0;q<25;q++)keep[q]=sam_save_message[q];
+        sam_done_at=0;sam_clear();
+        for(q=0;q<25;q++)sam_save_message[q]=keep[q];
+        sam_redraw();
     }
-    for(q=0;q<32 && sam_enabled && sam_save_phase;q++){
+    for(q=0;q<32 && sam_view && sam_save_phase;q++){
         sam_save_step();if(sam_clock-began>=192u)break;
     }
     if(sam_enabled){
@@ -478,7 +485,7 @@ void sampler_draw(u8 *iface,void *ctx)
     if(sam_save_phase) {
         number3(value,sam_save_total?sam_save_pos*100u/sam_save_total:0);value[3]='%';value[4]=0;
         line1="SAVING";line2=value;
-    } else if(sam_save_message[0]) {line1=sam_save_message;line2="";}
+    } else if(sam_save_message[0]) {line1=sam_save_message;line2=frames?"":"YES: ARM   FUNC+YES: REC";}
     else if(sam_hint) {line1="NOT ENOUGH MEMORY";line2="NO: CLOSE";}
     else if(state==SAM_NORMALIZING) {line1="PLEASE WAIT";line2="";sam_norm_shown=1;}
     else if(state==SAM_RECORDING) {line1="YES: STOP";line2="";}

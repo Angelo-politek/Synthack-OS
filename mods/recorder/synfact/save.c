@@ -74,7 +74,7 @@ static void sam_save_cleanup(const char *message)
      * Failed writes remain in TRIMMED so naming/save can be retried. */
     if(message[0]=='S' && message[1]=='A' && message[2]=='V' && message[3]=='E' && message[4]=='D') {
         sam_trimmed=0;sam_loupe_side=0;sam_play_length=0;
-        sam_done_at=sam_clock|1u;   /* SyntHack: the result stays 1.5 s, then the recorder closes (recorder_ui_tick) */
+        sam_done_at=sam_clock|1u;   /* SyntHack: back to the first screen with the result (recorder_ui_tick) */
     }
     recorder_save_release();text_set(sam_save_message,message,24);sam_redraw();
 }
