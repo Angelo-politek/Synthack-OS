@@ -173,7 +173,12 @@ def catalogue(m):
 def test_tags_are_saved_in_the_catalogue_and_filter_the_list(m):
     show(m)
     kick = m.call(m.sym["ls_id_at"], [0])
-    assert key(m, RIGHT) == 1 and key(m, RIGHT) == 1                 # none -> KICK -> SNARE
+    assert key(m, RIGHT) == 1 and m.long(m.sm["smgr_menu"]) == 1     # RIGHT: il menu delle azioni
+    for _ in range(3):
+        key(m, DOWN)                                                 # ASSIGN, PLAY, RENAME, TAG
+    assert m.long(m.sm["smgr_item"]) == 3
+    assert key(m, YES) == 1 and key(m, YES) == 1                     # none -> KICK -> SNARE
+    assert key(m, LEFT) == 1 and m.long(m.sm["smgr_menu"]) == 0       # LEFT chiude il menu
     assert m.uc.mem_read(m.sm["smgr_tags"], 1)[0] == 2
     assert catalogue(m)[kick][1] & 0xFF == 0                         # non ancora scritto: si scrive lasciando la riga
     assert key(m, DOWN) == 1
@@ -190,9 +195,14 @@ def test_tags_are_saved_in_the_catalogue_and_filter_the_list(m):
         key(m, LEFT)
     assert m.long(m.sm["smgr_filter"]) == 0 and m.paint(m.sm["smgr_paint"]) != fb
     show(m)
+    key(m, RIGHT)
+    for _ in range(3):
+        key(m, DOWN)
     for _ in range(9):                                               # SNARE -> ... -> none
-        key(m, RIGHT)
-    key(m, NO)                                                       # chiudendo si scrive
+        key(m, YES)
+    key(m, NO)                                                       # il primo NO chiude il menu,
+    key(m, NO, 0)
+    key(m, NO)                                                       # il secondo la lista: si scrive
     assert catalogue(m)[kick][1] & 0xFF == 0
 
 
@@ -281,3 +291,28 @@ def test_assign_puts_the_sampler_on_the_active_track(m):
     assert m.call(s["sm_long_samp"], [2]) == 2                       # nessuno stock: posizione = valore
     m.put(m.sm["smgr_cursor"], ">I", 1)                              # la posizione vuota
     assert key(m, YES) == 1 and note(m) == b"EMPTY POSITION"
+
+
+def test_action_menu_moves_and_deletes_with_a_confirmation(m, tmp_path):
+    import screens
+    show(m, 0)
+    assert key(m, RIGHT) == 1
+    screens.png(m.paint(m.sm["smgr_paint"]), tmp_path / "menu.png")
+    order = names(m)
+    for _ in range(4):                                               # MOVE
+        key(m, DOWN)
+    assert m.long(m.sm["smgr_item"]) == 4
+    assert key(m, YES) == 1 and m.long(m.sm["smgr_moving"]) == 1
+    assert key(m, DOWN) == 1 and names(m) == [order[1], order[0], *order[2:]]   # GIU': il sample scende
+    assert m.long(m.sm["smgr_cursor"]) == 1                          # e il cursore lo segue
+    assert key(m, UP) == 1 and names(m) == order
+    assert key(m, YES) == 1 and m.long(m.sm["smgr_moving"]) == 0 and m.long(m.sm["smgr_menu"]) == 1
+    key(m, DOWN)                                                     # DELETE
+    assert m.long(m.sm["smgr_item"]) == 5
+    assert key(m, YES) == 1 and b"AGAIN" in note(m) and names(m) == order    # prima: chiede conferma
+    key(m, UP)                                                       # spostarsi annulla la conferma
+    key(m, DOWN)
+    assert key(m, YES) == 1 and names(m) == order
+    key(m, NO)
+    assert m.long(m.sm["smgr_menu"]) == 0 and m.long(m.sm["smgr_open"]) == 1  # NO chiude solo il menu
+    key(m, NO, 0)

@@ -56,7 +56,7 @@
 #define LONG_SAMP  ((u32 (*)(u32))SM_LONG_SAMP)
 #define SAMP_ID    (*(volatile const u32 *)(IDS_TABLE + 52u * 504u + 32u))
 
-#define ROWS 6
+#define ROWS 5
 #define MAX 64
 #define NTAGS 11
 #define PREVIEW_FRAMES 144000u                          /* 3 s */
@@ -168,57 +168,111 @@ static char *put_s(char *b, const char *s)
     return b;
 }
 
-static void row_text(u32 row, char *out)
+static const char *const tag_short[NTAGS] = {"", "KICK", "SNAR", "HAT", "PERC", "BASS", "LEAD", "PAD", "FX", "VOX",
+                                             "LOOP"};
+static const u32 wave_icon[9] = {0x08000000u, 0x00000000u, 0x3E000000u, 0x00000000u, 0xFF800000u, 0x00000000u,
+                                 0x1C000000u, 0x00000000u, 0x08000000u};
+enum { M_ASSIGN, M_PLAY, M_RENAME, M_TAG, M_MOVE, M_DELETE, M_COUNT };
+u32 smgr_menu DATA = 0, smgr_item DATA = 0, smgr_moving DATA = 0;            /* the action menu (RIGHT) and its cursor */
+
+static void text(void *bmp, s32 x, s32 y, const char *s)
 {
-    char *b = out;
-    u32 pos = shown[row], frames = TABLE[3 + 2 * pos], k, tenths, c;
-    *b++ = row == smgr_cursor ? '>' : ' ';
-    b = put_u(b, pos + 1, 2);
-    *b++ = ' ';
-    if (!frames)
-        b = put_s(b, "- EMPTY -");
-    else {
-        for (k = 0; k < 15 && (c = (u32)(unsigned char)NAMES[pos][k]) != 0; k++)
-            *b++ = (char)(c >= 'a' && c <= 'z' ? c - 32 : c);
-        *b++ = ' ';
-        tenths = (frames + 2400) / 4800;
-        b = put_u(b, tenths / 10, 1);
-        *b++ = '.';
-        *b++ = (char)('0' + tenths % 10);
-        *b++ = 'S';
-        if (smgr_tags[pos]) {
-            *b++ = ' ';
-            b = put_s(b, tag_names[smgr_tags[pos]]);
-        }
-    }
+    DRAW_TEXT(bmp, FONT_4X6, x, y, 0, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "%s", s);
+}
+static u32 slen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
+static void text_right(void *bmp, s32 x1, s32 y, const char *s) { text(bmp, x1 - 5 * (s32)slen(s) + 1, y, s); }
+
+static void length_text(u32 frames, char *out)
+{
+    u32 tenths = (frames + 2400) / 4800;
+    char *b = put_u(out, tenths / 10, 1);
+    *b++ = '.';
+    *b++ = (char)('0' + tenths % 10);
+    *b++ = 'S';
     *b = 0;
 }
 
-/* the list, on a 128 x 64 bitmap (y = 0 is the bottom line) */
+static const char *item_text(u32 i, u32 pos, char *buf)
+{
+    char *b;
+    switch (i) {
+    case M_ASSIGN: return "ASSIGN";
+    case M_PLAY: return play_len ? "STOP" : "PLAY";
+    case M_RENAME: return "RENAME";
+    case M_TAG:
+        b = put_s(buf, "TAG: ");
+        b = put_s(b, smgr_tags[pos] ? tag_names[smgr_tags[pos]] : "NONE");
+        *b = 0;
+        return buf;
+    case M_MOVE: return smgr_moving ? "UP / DOWN" : "MOVE";
+    default: return confirm == pos ? "SURE? YES" : "DELETE";
+    }
+}
+
+/* the list (and the action menu over its right side), on a 128 x 64 bitmap, y = 0 at the bottom */
 void smgr_paint(void *bmp)
 {
     char line[48], *b;
     u32 k;
-    FILL(bmp, 0, 0, 127, 63, 0);
-    b = put_s(line, "SAMPLES ");
+    FILL_RECT(bmp, 0, 0, 127, 63, 0);
+    /* header: icon, title, filter and count; inverted */
+    sh_icon9(bmp, wave_icon, 2, 55);
+    text(bmp, 14, 57, "SAMPLES");
+    b = put_s(line, smgr_filter ? tag_names[smgr_filter] : "ALL");
+    *b++ = ' ';
     b = put_u(b, nshown, 1);
-    b = put_s(b, " / ");
+    *b++ = '/';
     b = put_u(b, count(), 1);
-    b = put_s(b, "  ");
-    b = put_s(b, smgr_filter ? tag_names[smgr_filter] : "ALL");
     *b = 0;
-    DRAW_TEXT(bmp, FONT_4X6, 2, 57, 0, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "%s", line);
-    FILL(bmp, 0, 54, 127, 54, 1);
+    text_right(bmp, 125, 57, line);
+    sh_invert(bmp, 0, 55, 127, 63);
     if (!nshown)
-        DRAW_TEXT(bmp, FONT_4X6, 2, 40, 0, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "%s",
-                  count() ? "NO SAMPLE WITH THIS TAG" : "NO LONG SAMPLES");
+        text(bmp, 4, 30, count() ? "NO SAMPLE WITH THIS TAG" : "NO LONG SAMPLES YET");
     for (k = 0; k < ROWS && top + k < nshown; k++) {
-        row_text(top + k, line);
-        DRAW_TEXT(bmp, FONT_4X6, 2, 46 - 7 * (s32)k, 0, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "%s", line);
+        u32 row = top + k, pos = shown[row], frames = TABLE[3 + 2 * pos], c, n;
+        s32 y = 46 - 8 * (s32)k;
+        b = put_u(line, pos + 1, 2);
+        *b++ = ' ';
+        if (!frames)
+            b = put_s(b, "--");
+        else
+            for (n = 0; n < 11 && (c = (u32)(unsigned char)NAMES[pos][n]) != 0; n++)
+                *b++ = (char)(c >= 'a' && c <= 'z' ? c - 32 : c);
+        *b = 0;
+        text(bmp, 2, y, line);
+        if (frames) {
+            if (smgr_tags[pos])
+                text(bmp, 76, y, tag_short[smgr_tags[pos]]);
+            length_text(frames, line);
+            text_right(bmp, 122, y, line);
+        }
+        if (row == smgr_cursor)
+            sh_invert(bmp, 0, y - 1, 123, y + 6);
     }
-    FILL(bmp, 0, 8, 127, 8, 1);
-    DRAW_TEXT(bmp, FONT_4X6, 2, 1, 0, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "%s",
-              smgr_note[0] ? smgr_note : play_len ? "PLAYING  FUNC+YES: STOP" : "YES:ASSIGN  FUNC+YES:PLAY");
+    if (nshown > ROWS) {                                /* scroll bar */
+        s32 h = 44 * ROWS / (s32)nshown, y = 53 - (s32)(44 * top / nshown);
+        FILL_RECT(bmp, 126, 10, 126, 53, 1);
+        FILL_RECT(bmp, 125, y - h + 1 < 10 ? 10 : y - h + 1, 127, y, 1);
+    }
+    /* footer: the result of the last action, or what the keys do */
+    FILL_RECT(bmp, 0, 9, 127, 9, 1);
+    if (smgr_note[0])
+        text(bmp, 2, 1, smgr_note);
+    else if (play_len)
+        text(bmp, 2, 1, "PLAYING   FUNC+YES: STOP");
+    else
+        text(bmp, 2, 1, smgr_moving ? "UP/DOWN: MOVE   YES: DONE" : smgr_menu ? "YES: SELECT   LEFT: BACK" : nshown ? "YES: ASSIGN    RIGHT: MENU" : "LEFT: SHOW ALL");
+    if (smgr_menu && nshown) {                          /* the action menu: a framed box over the right side */
+        u32 pos = shown[smgr_cursor];
+        FILL_RECT(bmp, 68, 10, 127, 54, 0);
+        FILL_RECT(bmp, 68, 10, 68, 54, 1);
+        for (k = 0; k < M_COUNT; k++) {
+            s32 y = 47 - 7 * (s32)k;
+            text(bmp, 72, y, item_text(k, pos, line));
+            if (k == smgr_item)
+                sh_invert(bmp, 69, y - 1, 127, y + 6);
+        }
+    }
 }
 
 static void smgr_draw(void *bmp, void *ctrl)
@@ -462,6 +516,60 @@ static void leave_row(void)
         flush_tag();
 }
 
+static void move_sample(int up)
+{
+    u32 pos = shown[smgr_cursor], other;
+    u8 t;
+    if (smgr_filter) {
+        note("SHOW ALL TO MOVE");
+        return;
+    }
+    if (up ? !smgr_cursor : smgr_cursor + 1 >= nshown)
+        return;
+    other = up ? pos - 1 : pos + 1;
+    if (!SWAP(up ? pos - 1 : pos))
+        return;
+    t = smgr_tags[pos];
+    smgr_tags[pos] = smgr_tags[other];
+    smgr_tags[other] = t;
+    if (up)
+        smgr_cursor--;
+    else
+        smgr_cursor++;
+    rebuild();
+}
+
+static void cycle_tag(u32 pos)
+{
+    if (!ID_AT(pos))
+        return;
+    smgr_tags[pos] = (u8)((smgr_tags[pos] + 1) % NTAGS);
+    tag_dirty = pos;
+    dirty = 1;
+}
+
+/* YES on the action menu */
+static void run_item(u32 pos)
+{
+    switch (smgr_item) {
+    case M_ASSIGN: smgr_menu = 0; smgr_assign(pos); break;
+    case M_PLAY: preview(pos); break;
+    case M_RENAME: smgr_menu = 0; rename_open(pos); break;
+    case M_TAG: cycle_tag(pos); break;
+    case M_MOVE:
+        if (smgr_filter)
+            note("SHOW ALL TO MOVE");
+        else
+            smgr_moving = 1;
+        break;
+    default:
+        smgr_delete(pos);
+        if (confirm == 0xFFFFFFFFu)                     /* done (or refused): back to the list */
+            smgr_menu = 0;
+    }
+    dirty = 1;
+}
+
 int smgr_key(void *brain, void *ev)
 {
     u32 key = be((const u8 *)ev + 12), flags = be((const u8 *)ev + 16), func = flags & 2, pos;
@@ -480,7 +588,37 @@ int smgr_key(void *brain, void *ev)
     if ((flags & 8) && key != KEY_UP && key != KEY_DOWN)    /* key repeat: only for moving */
         return 1;
     pos = nshown ? shown[smgr_cursor] : MAX;
-    if (key == KEY_NO && func) {
+    if (smgr_moving) {                                  /* MOVE: UP / DOWN move the sample, anything else ends */
+        if (key == KEY_UP)
+            move_sample(1);
+        else if (key == KEY_DOWN)
+            move_sample(0);
+        else {
+            smgr_moving = 0;
+            if (key == KEY_NO)
+                swallow = KEY_NO;
+        }
+        dirty = 1;
+        return 1;
+    }
+    if (smgr_menu) {                                    /* the action menu */
+        if (key == KEY_NO || key == KEY_LEFT) {
+            smgr_menu = 0;
+            confirm = 0xFFFFFFFFu;
+            if (key == KEY_NO)
+                swallow = KEY_NO;
+        } else if (key == KEY_UP && smgr_item)
+            smgr_item--;
+        else if (key == KEY_DOWN && smgr_item + 1 < M_COUNT)
+            smgr_item++;
+        else if (key == KEY_YES && pos < MAX)
+            run_item(pos);
+        if (smgr_item != M_DELETE)
+            confirm = 0xFFFFFFFFu;
+        dirty = 1;
+        return 1;
+    }
+    if (key == KEY_NO && func) {                        /* shortcuts, as in the menu */
         if (pos < MAX)
             smgr_delete(pos);
     } else if (key == KEY_NO) {
@@ -491,7 +629,6 @@ int smgr_key(void *brain, void *ev)
         smgr_note[0] = 0;
         note_ticks = 0;
         confirm = 0xFFFFFFFFu;
-        dirty = 1;
     } else if (key == KEY_YES && pos < MAX) {
         if (func)
             preview(pos);
@@ -500,10 +637,10 @@ int smgr_key(void *brain, void *ev)
     } else if (key == KEY_RIGHT && pos < MAX) {
         if (func)
             rename_open(pos);
-        else if (ID_AT(pos)) {
-            smgr_tags[pos] = (u8)((smgr_tags[pos] + 1) % NTAGS);
-            tag_dirty = pos;
-            dirty = 1;                                  /* the row stays while it is the cursor's, filter or not */
+        else {
+            smgr_menu = 1;
+            smgr_item = 0;
+            confirm = 0xFFFFFFFFu;
         }
     } else if (key == KEY_LEFT) {
         leave_row();
@@ -512,27 +649,22 @@ int smgr_key(void *brain, void *ev)
         rebuild();
     } else if (key == KEY_UP && smgr_cursor) {
         leave_row();
-        if (func && (smgr_filter || !SWAP(pos - 1)))
-            return 1;
-        if (func) {
-            u8 t = smgr_tags[pos];
-            smgr_tags[pos] = smgr_tags[pos - 1];
-            smgr_tags[pos - 1] = t;
+        if (func)
+            move_sample(1);
+        else {
+            smgr_cursor--;
+            rebuild();
         }
-        smgr_cursor--;
-        rebuild();
     } else if (key == KEY_DOWN && smgr_cursor + 1 < nshown) {
         leave_row();
-        if (func && (smgr_filter || !SWAP(pos)))
-            return 1;
-        if (func) {
-            u8 t = smgr_tags[pos];
-            smgr_tags[pos] = smgr_tags[pos + 1];
-            smgr_tags[pos + 1] = t;
+        if (func)
+            move_sample(0);
+        else {
+            smgr_cursor++;
+            rebuild();
         }
-        smgr_cursor++;
-        rebuild();
     }
+    dirty = 1;
     return 1;
 }
 
@@ -542,6 +674,20 @@ static int smgr_enc(void *brain, void *ev)
     (void)brain;
     if (!smgr_open || smgr_naming)
         return 0;
+    if (smgr_moving) {
+        if (delta)
+            move_sample(delta < 0);
+        dirty = 1;
+        return 1;
+    }
+    if (smgr_menu) {
+        if (delta < 0 && smgr_item)
+            smgr_item--;
+        if (delta > 0 && smgr_item + 1 < M_COUNT)
+            smgr_item++;
+        dirty = 1;
+        return 1;
+    }
     if ((delta < 0 && smgr_cursor) || (delta > 0 && smgr_cursor + 1 < nshown)) {
         leave_row();
         smgr_cursor += delta < 0 ? -1 : 1;
@@ -557,6 +703,8 @@ void smgr_show(void)
 {
     smgr_open = 1;
     smgr_naming = 0;
+    smgr_menu = 0;
+    smgr_moving = 0;
     confirm = 0xFFFFFFFFu;
     tag_dirty = 0xFFFFFFFFu;
     smgr_note[0] = 0;
@@ -571,7 +719,8 @@ static void smgr_select(const struct capture *fn)
 }
 static void smgr_icon(const struct capture *fn, void *item, void *bmp, int x, int y)
 {
-    (void)fn; (void)item; (void)bmp; (void)x; (void)y;
+    (void)fn; (void)item;
+    sh_icon9(bmp, wave_icon, x, y);
 }
 static void smgr_change(const struct capture *fn, int amount) { (void)fn; (void)amount; }
 extern void smgr_label(void);

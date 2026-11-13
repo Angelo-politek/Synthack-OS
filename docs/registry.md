@@ -32,8 +32,8 @@ Generated from `tools/build/registry.py` (`python tools/build/registry.py`); `te
 | `0x00020000` | `0x00026000` | recorder | Synfact recorder port: code and data (PCM in the OS heap) |
 | `0x00026000` | `0x0002a000` | lfo3 | third LFO (Synfact port): engine (source of the SRAM copy), page, actions |
 | `0x0002a000` | `0x0002b800` | about | code and data |
-| `0x0002b800` | `0x0002d000` | sample-manager | code and data |
-| `0x0002d000` | `0x00032000` | **free** | for new mods: code and data |
+| `0x0002b800` | `0x0002e000` | sample-manager | code and data |
+| `0x0002e000` | `0x00032000` | **free** | for new mods: code and data |
 | `0x00032000` | `0x00038000` | arp | arpeggiator (Synfact port): code and data |
 | `0x00038000` | `0x0003e000` | poly | POLY (Synfact port): groups, voice allocation, TRIG page 3 (GPL-2.0-or-later) |
 | `0x0003e000` | `0x0003fff0` | idspace | code; descriptors, object definitions and pages the mods write (idspace_layout) |
