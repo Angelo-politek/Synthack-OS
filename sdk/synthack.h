@@ -35,6 +35,44 @@ typedef int s32;
 /* (ctx, font, x, y, centred, 0, width_template, fmt, ...): printf-like; the template sets the width, e.g. "XXXX" */
 #define DRAW_TEXT ((void (*)(void *, const void *, s32, s32, s32, s32, const char *, const char *, ...))0x400F8DDCu)
 
+/* (bitmap, x0, y0, x1, y1, ink): filled rectangle, corners included, y = 0 at the bottom */
+#define FILL_RECT ((void (*)(void *, s32, s32, s32, s32, u32))0x400F7FB6u)
+/* 1-bit images: one u32 per column, bit 23 + row = the row from the top (bit 31 = bottom row of a 9-pixel image) */
+#define BITMAP_CTOR ((void (*)(void *, u32, u32, const void *, const void *))0x400F72BEu)   /* (b[8], w, h, pixels, mask) */
+#define BITMAP_DTOR ((void (*)(void *))0x400F71F0u)
+#define BLIT        ((void (*)(void *, const void *, s32, s32, u32))0x400F8F70u)          /* (bitmap, image, x, y, 0) */
+
+/* The screen bitmap's pixels: 64-bit columns, 8 bytes a column, bit 63 = y 0 (bottom). Inverts a rectangle:
+ * white text drawn first becomes black on a white bar (headers, the selected row of a list). */
+static __inline__ void sh_invert(void *bmp, s32 x0, s32 y0, s32 x1, s32 y1)
+{
+    u32 *d = *(u32 **)((u8 *)bmp + 16), lo = 0, hi = 0;
+    s32 x, y;
+    for (y = y0; y <= y1; y++) {
+        if (y < 0 || y > 63)
+            continue;
+        if (y < 32)
+            lo |= 1u << (31 - y);
+        else
+            hi |= 1u << (63 - y);
+    }
+    for (x = x0 < 0 ? 0 : x0; x <= x1 && x < 128; x++) {
+        d[2 * x] ^= lo;
+        d[2 * x + 1] ^= hi;
+    }
+}
+
+/* a 9 x 9 menu icon from 9 column words (bit 23 + row from the top) */
+static __inline__ void sh_icon9(void *bmp, const u32 *columns, s32 x, s32 y)
+{
+    static const u32 full[9] = {0xFF800000u, 0xFF800000u, 0xFF800000u, 0xFF800000u, 0xFF800000u, 0xFF800000u,
+                                0xFF800000u, 0xFF800000u, 0xFF800000u};
+    u32 b[8];
+    BITMAP_CTOR(b, 9, 9, columns, full);
+    BLIT(bmp, b, x, y, 0);
+    BITMAP_DTOR(b);
+}
+
 /* ---- time */
 #define TEMPO_X120 (*(const volatile u32 *)0x402D7360u)    /* BPM x 120 */
 

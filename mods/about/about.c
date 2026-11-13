@@ -1,38 +1,41 @@
 /* SPDX-License-Identifier: GPL-2.0-or-later
- * about: a SYNTHACK row at the end of the settings menu. YES opens a list: the version, the mods in this build
- * with their status, the repository, the credits. UP/DOWN or an encoder scroll, NO closes.
+ * about: a SYNTHACK row at the end of the settings menu, with its icon. YES opens a cover with the boot screen's
+ * logo (mods/splash: version and the builder's name), then, DOWN or an encoder, a list: the mods in this build with
+ * their status, the repository, the credits. UP / DOWN or an encoder scroll, NO closes.
  *
  * The row is added as Synfact adds its own (mods/core/settings.s and mods/system-info-st, GSM1980 and
  * contributors, on elekloader by irpina, GPL-2.0-or-later): a hook after the last row of the menu's item builder
- * and a MenuItem built from four std::function objects. Addresses are OS 1.42.
+ * and a MenuItem built from four std::function objects. It also adds mods/sample-manager's SAMPLES row (SMGR_ROW).
  *
- * The list is drawn over the frame while it is open (sfcore's draw event) and takes every key but transport.
- * Rows come from about_data.h, written by make_patch.py: text, and for a mod the address of its first bytes in
- * the mod area. The loader zeroes the area beyond the code of the build, so a mod that is not in the build
- * reads zero there and its row is skipped. Nothing in the audio interrupt, nothing saved.
+ * Drawn over the frame while open (sfcore's draw event); takes every key but transport. Rows come from
+ * about_data.h, written by make_patch.py; a mod's row has the address of its first bytes in the mod area, zero
+ * when the mod is not in the build, and is then skipped. Nothing in the audio interrupt, nothing saved.
  */
 #include "synthack.h"
 
-#define FILL       ((void (*)(void *, s32, s32, s32, s32, u32))0x400F7FB6u)     /* (bitmap, x0, y0, x1, y1, ink) */
 #define INVALIDATE ((void (*)(void *))0x400FFE22u)
-#define LINES 9
+#define LINES 6                                         /* list rows under the header */
 #define KEY_NO 13
 #define KEY_UP 14
 #define KEY_DOWN 15
+/* mods/splash's animation entry (make_patch.py): +8 the function (frame, frames, bitmap), +12 its frames */
+#define SPLASH_FN     (*(void (*const *)(u32, u32, void *))(SPLASH_ENTRY + 8))
+#define SPLASH_FRAMES (*(const u32 *)(SPLASH_ENTRY + 12))
 
-struct row { const char *text; u32 probe; };            /* probe: 0 = always shown */
-#include "about_data.h"                                 /* static const struct row rows[]; ROWS */
+enum { TEXT, HEAD, MOD };
+struct row { u8 kind, status; const char *text; u32 probe; };   /* status: 0 stable, 1 beta, 2 experimental */
+#include "about_data.h"                                 /* static const struct row rows[ROWS]; VERSION */
 
 struct capture { void *data; u32 unused, manager, invoke; };
 struct sub { u32 event; void (*callback)(void); };
 struct module { const char *name; int (*init)(const void *); const struct sub *subs; u32 count; };
 
-u32 about_open DATA = 0, about_top DATA = 0;
+u32 about_open DATA = 0, about_top DATA = 0;            /* top 0 = the cover; 1.. = the list from row top - 1 */
 static u32 dirty DATA = 0, swallow DATA = 0;
-#define open about_open
-#define top about_top
 static u8 shown[ROWS] DATA = {0};
 static u32 count DATA = 0;
+static const u32 mark[9] = {0x80000000u, 0x40000000u, 0x30000000u, 0x8C000000u, 0x43000000u, 0x30800000u,
+                            0x0C000000u, 0x03000000u, 0x00800000u};   /* the "//" of the brand */
 
 static void collect(void)
 {
@@ -45,34 +48,75 @@ static void collect(void)
 
 static void move(int d)
 {
-    u32 last = count > LINES ? count - LINES : 0;
-    if (d < 0 && top)
-        top--;
-    if (d > 0 && top < last)
-        top++;
+    u32 last = count > LINES ? count - LINES + 1 : 1;
+    if (d < 0 && about_top)
+        about_top--;
+    if (d > 0 && about_top < last)
+        about_top++;
     dirty = 1;
 }
 
-/* the list, on a 128 x 64 bitmap (y = 0 is the bottom line) */
+static void text(void *bmp, s32 x, s32 y, const char *s)
+{
+    DRAW_TEXT(bmp, FONT_4X6, x, y, 0, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "%s", s);
+}
+static u32 len(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
+
+static void cover(void *bmp)
+{
+    u32 n = SPLASH_FRAMES;
+    if (n && n < 1000)
+        SPLASH_FN(n - 1, n, bmp);                       /* the boot screen's last frame: logo, version, name */
+    FILL_RECT(bmp, 118, 0, 127, 6, 0);                  /* a down arrow: there is more */
+    FILL_RECT(bmp, 120, 4, 126, 4, 1);
+    FILL_RECT(bmp, 121, 3, 125, 3, 1);
+    FILL_RECT(bmp, 122, 2, 124, 2, 1);
+    FILL_RECT(bmp, 123, 1, 123, 1, 1);
+}
+
+/* the cover or the list, on a 128 x 64 bitmap (y = 0 is the bottom line) */
 void about_paint(void *bmp)
 {
-    u32 k;
+    static const char *const badge[3] = {"", "BETA", "EXP"};
+    u32 k, first;
     if (!count)
         collect();
-    FILL(bmp, 0, 0, 127, 63, 0);
-    for (k = 0; k < LINES && top + k < count; k++)
-        DRAW_TEXT(bmp, FONT_4X6, 2, 57 - 7 * (s32)k, 0, 0, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX", "%s",
-                  rows[shown[top + k]].text);
+    FILL_RECT(bmp, 0, 0, 127, 63, 0);
+    if (!about_top) {
+        cover(bmp);
+        return;
+    }
+    sh_icon9(bmp, mark, 2, 55);                         /* header: the brand mark and the version, inverted */
+    text(bmp, 14, 57, "SYNTHACK OS " VERSION);
+    text(bmp, 106, 57, "1.42");
+    sh_invert(bmp, 0, 55, 127, 63);
+    first = about_top - 1;
+    for (k = 0; k < LINES && first + k < count; k++) {
+        const struct row *r = &rows[shown[first + k]];
+        s32 y = 45 - 8 * (s32)k;
+        if (r->kind == HEAD) {                          /* section: a bar with the title on it */
+            text(bmp, 4, y, r->text);
+            sh_invert(bmp, 0, y - 1, 123, y + 6);
+        } else {
+            text(bmp, r->kind == MOD ? 6 : 2, y, r->text);
+            if (r->kind == MOD && r->status) {          /* status badge, right-aligned, inverted */
+                s32 w = 5 * (s32)len(badge[r->status]) + 2;   /* the 4x6 font advances 5 pixels */
+                text(bmp, 122 - w + 2, y, badge[r->status]);
+                sh_invert(bmp, 122 - w, y - 1, 121, y + 6);
+            }
+        }
+    }
     if (count > LINES) {                                /* scroll bar on the right edge */
-        s32 h = 64 * LINES / (s32)count, y = 63 - (s32)(64 * top / count);
-        FILL(bmp, 126, y - h + 1 < 0 ? 0 : y - h + 1, 127, y, 1);
+        s32 h = 53 * LINES / (s32)count, y = 53 - (s32)(53 * first / count);
+        FILL_RECT(bmp, 126, 0, 126, 53, 1);
+        FILL_RECT(bmp, 125, y - h + 1 < 0 ? 0 : y - h + 1, 127, y, 1);
     }
 }
 
 static void about_draw(void *bmp, void *ctrl)
 {
     (void)ctrl;
-    if (open)
+    if (about_open)
         about_paint(bmp);
 }
 
@@ -86,7 +130,7 @@ static void about_tick(void *ctrl)
 
 static u32 be(const u8 *p) { return (u32)p[0] << 24 | (u32)p[1] << 16 | (u32)p[2] << 8 | p[3]; }
 
-/* while the list is open every key is its own, transport (9, 10, 11) excepted; NO's release too after closing */
+/* while open every key is its own, transport (9, 10, 11) excepted; NO's release too after closing */
 int about_key(void *brain, void *ev)
 {
     u32 key = be((const u8 *)ev + 12), flags = be((const u8 *)ev + 16);
@@ -96,12 +140,12 @@ int about_key(void *brain, void *ev)
             swallow = 0;
             return 1;
         }
-        return open && !(key >= 9 && key <= 11);
+        return about_open && !(key >= 9 && key <= 11);
     }
-    if (!open || (key >= 9 && key <= 11))
+    if (!about_open || (key >= 9 && key <= 11))
         return 0;
     if (key == KEY_NO) {
-        open = 0;
+        about_open = 0;
         swallow = KEY_NO;
         dirty = 1;
     } else if (key == KEY_UP)
@@ -115,28 +159,29 @@ static int about_enc(void *brain, void *ev)
 {
     int delta = (int)be((const u8 *)ev + 16);
     (void)brain;
-    if (!open)
+    if (!about_open)
         return 0;
     if (delta)
         move(delta > 0 ? 1 : -1);
     return 1;
 }
 
-/* ---- the settings row */
+/* ---- the settings rows */
 const char *about_label_text(void) { return "SYNTHACK"; }
 
 static void about_select(const struct capture *fn)
 {
     collect();
-    open = 1;
-    top = 0;
+    about_open = 1;
+    about_top = 0;
     dirty = 1;
     if (fn->data)
         INVALIDATE((u8 *)fn->data + 0x38);
 }
-static void about_icon(const struct capture *fn, void *item, void *bmp, int x, int y)
+void about_icon(const struct capture *fn, void *item, void *bmp, int x, int y)
 {
-    (void)fn; (void)item; (void)bmp; (void)x; (void)y;
+    (void)fn; (void)item;
+    sh_icon9(bmp, mark, x, y);
 }
 static void about_change(const struct capture *fn, int amount) { (void)fn; (void)amount; }
 

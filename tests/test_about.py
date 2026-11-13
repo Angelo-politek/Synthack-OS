@@ -35,11 +35,12 @@ def test_generated_rows_are_current():
     mp = make_patch()
     assert (MOD / "about_data.h").read_text(encoding="utf-8") == mp.header()
     rows = mp.rows()
-    assert rows[0][0] == f"SYNTHACK OS {mp.version()}"
-    assert all(len(t) <= mp.WIDTH for t, _ in rows)
-    mods = [t for t, p in rows if p]
-    assert len(mods) >= 12 and any(t.startswith("SY FM4") for t in mods) and not any("ABOUT" in t for t in mods)
-    assert any(t.endswith("(EXP)") for t in mods) and any(t.endswith("(BETA)") for t in mods)
+    assert f'#define VERSION "{mp.version()}"' in mp.header()
+    assert all(len(t) <= mp.WIDTH for _, t, _, _ in rows)
+    mods = [(t, st) for k, t, st, p in rows if k == "M"]
+    assert len(mods) >= 12 and ("SY FM4", 1) in mods and not any("ABOUT" in t for t, _ in mods)
+    assert {st for _, st in mods} == {0, 1, 2}
+    assert [t for k, t, _, _ in rows if k == "H"] == ["MODS IN THIS BUILD", "SOURCE", "CREDITS"]
 
 
 @needs_os
@@ -63,8 +64,8 @@ def test_list_shows_only_the_mods_of_the_build():
     """Una mod che non e' nella build ha zeri all'inizio del suo spazio: la sua riga non compare."""
     import screens
     mp = make_patch()
-    probes = [(t, p) for t, p in mp.rows() if p]
-    few = screens.UI(["about", "fx3"])
+    probes = [(t, p) for _, t, _, p in mp.rows() if p]
+    few = screens.UI(["splash", "about", "fx3"])
     few.call(few.sym["sfcore_bind"])
     assert few.long(few.sym["sfcore_status"] + 4) == 1                         # legata da sfcore, posto 1
     there = {t for t, p in probes if few.long(p)}
@@ -76,10 +77,13 @@ def test_list_shows_only_the_mods_of_the_build():
 @needs_os
 def test_list_is_drawn_and_takes_the_keys(tmp_path):
     import screens
-    ui = screens.UI(["about", "fx3", "sy-fm4"])
+    ui = screens.UI(["splash", "about", "fx3", "sy-fm4"])
     sym = symbols()
-    first = ui.paint(sym["about_paint"])
-    assert 600 < sum(bin(b).count("1") for b in first) < 4000                   # nove righe di testo
+    first = ui.paint(sym["about_paint"])                                       # la copertina: il logo dello splash
+    assert sum(bin(b).count("1") for b in first) > 400
+    ui.put(sym["about_top"], ">I", 1)
+    listed = ui.paint(sym["about_paint"])                                      # l'elenco: barra in alto invertita
+    assert listed[0:16].count(0xFF) >= 12                                      # (riga in cima: quasi tutta accesa)
     screens.png(first, tmp_path / "about.png")
     ev = 0x4FE0_6000
 
@@ -88,7 +92,8 @@ def test_list_is_drawn_and_takes_the_keys(tmp_path):
         return ui.call(sym["about_key"], [0, ev])
     assert key(15) == 0                                                         # chiuso: i tasti sono dell'OS
     ui.put(sym["about_open"], ">I", 1)
-    assert key(15) == 1 and ui.long(sym["about_top"]) == 1                      # DOWN scorre
+    ui.put(sym["about_top"], ">I", 0)
+    assert key(15) == 1 and ui.long(sym["about_top"]) == 1                      # DOWN: dalla copertina all'elenco
     assert ui.paint(sym["about_paint"]) != first
     assert key(14) == 1 and ui.long(sym["about_top"]) == 0                      # UP
     assert key(5) == 1 and key(5, 0) == 1                                       # un altro tasto: nostro, col rilascio
