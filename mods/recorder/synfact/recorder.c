@@ -347,6 +347,7 @@ static void recorder_ui_tick(void *controller)
         if(sam_clock-recorder_last_paint>=3200u){recorder_last_paint=sam_clock;sam_redraw();}
     }
 }
+static void rec_invert(void *ctx,s32 x0,s32 y0,s32 x1,s32 y1);   /* SyntHack, below */
 #include "trim.c"
 static void sam_adjust(u32 field,s32 delta)
 {
@@ -451,6 +452,14 @@ static u32 sampler_key(u8 *iface,const u8 *ev)
  * source it changes. Rows from the bottom: names 0, values 8, rule 16, key hints 21 and 29, source 39, meter
  * 47..53, title 57. */
 #define SAM_FONT ((void *)0x443db210u)
+/* SyntHack: inverts a rectangle of the screen bitmap (64-bit columns, bit 63 = y 0): white text on it becomes
+ * black on a white bar, as the OS's headers and selections */
+static void rec_invert(void *ctx,s32 x0,s32 y0,s32 x1,s32 y1)
+{
+    u32 *d=*(u32 **)((u8 *)ctx+16),lo=0,hi=0;s32 x,y;
+    for(y=y0<0?0:y0;y<=y1 && y<64;y++){if(y<32)lo|=1u<<(31-y);else hi|=1u<<(63-y);}
+    for(x=x0<0?0:x0;x<=x1 && x<128;x++){d[2*x]^=lo;d[2*x+1]^=hi;}
+}
 void sampler_draw(u8 *iface,void *ctx)
 {
     static const char *const names[4]={"LEN","THR","SRC","MON"};
@@ -465,19 +474,20 @@ void sampler_draw(u8 *iface,void *ctx)
     /* title and state */
     what=sam_hint?"NO MEMORY":state==SAM_NORMALIZING?"NORMALIZING":state==SAM_RECORDING?"RECORDING":
          state==SAM_ARMED?"ARMED":sam_save_phase?"SAVING":"READY";
-    WAVE_TEXT(ctx,SAM_FONT,1,57,0,"%s","RECORDER");
+    WAVE_TEXT(ctx,SAM_FONT,2,57,0,"%s","RECORDER");
     if(state==SAM_RECORDING || frames) {
         sam_time_text(time,frames);
-        WAVE_TEXT(ctx,SAM_FONT,96,57,2,"%s %s",state==SAM_RECORDING?"REC":what,time);
-    } else WAVE_TEXT(ctx,SAM_FONT,96,57,2,"%s",what);
+        WAVE_TEXT(ctx,SAM_FONT,98,57,2,"%s %s",state==SAM_RECORDING?"REC":what,time);
+    } else WAVE_TEXT(ctx,SAM_FONT,98,57,2,"%s",what);
+    rec_invert(ctx,0,55,127,63);   /* header bar */
     /* level meter across the screen, threshold mark, clip block */
-    WAVE_FILL(ctx,0,47,127,53,1);
-    WAVE_FILL(ctx,1,48,126,52,0);
+    WAVE_FILL(ctx,0,45,127,51,1);
+    WAVE_FILL(ctx,1,46,126,50,0);
     width=sampler_meter_width(sam_peak)*2u;
-    if(width)WAVE_FILL(ctx,1,48,(s32)(width>125u?126u:width),52,1);
+    if(width)WAVE_FILL(ctx,1,46,(s32)(width>125u?126u:width),50,1);
     mark=1+sam_thr*125u/127u;
-    for(i=45;i<=55;i+=2)WAVE_PIXEL(ctx,(s32)mark,(s32)i,1);
-    if(sam_peak>=0x7f000000u)WAVE_FILL(ctx,124,45,127,55,1);
+    for(i=43;i<=53;i+=2)WAVE_PIXEL(ctx,(s32)mark,(s32)i,1);
+    if(sam_peak>=0x7f000000u)WAVE_FILL(ctx,124,43,127,53,1);
     /* what is recorded */
     if(sam_source<3 || sam_source>=14)WAVE_TEXT(ctx,SAM_FONT,64,39,2,"%s",source);
     else WAVE_TEXT(ctx,SAM_FONT,64,39,2,"%s  %s",source,sam_post?"POST FX":"PRE FX");
@@ -505,7 +515,7 @@ void sampler_draw(u8 *iface,void *ctx)
         else text_set(value,sam_source<3?(sam_mon?"ON":"OFF"):"--",11);
         WAVE_TEXT(ctx,SAM_FONT,16+32*i,8,2,"%s",value);
         WAVE_TEXT(ctx,SAM_FONT,16+32*i,0,2,"%s",names[i]);
-        if(sam_focus==i)WAVE_FILL(ctx,3+32*i,14,28+32*i,15,1);
+        if(sam_focus==i)rec_invert(ctx,1+32*(s32)i,0,30+32*(s32)i,15);   /* the focused setting, as the OS's pages */
     }
 }
 void sampler_open(u8 *manager)

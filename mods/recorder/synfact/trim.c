@@ -186,6 +186,7 @@ static void sam_editor_draw(void *ctx)
         {u32 y;for(y=48;y<=62;y+=2)WAVE_PIXEL(ctx,(s32)i,(s32)y,1);}
     }
     sam_draw_selection(ctx);
+    if(!sam_trimmed)rec_invert(ctx,0,47,127,63);   /* SyntHack: the trim controls on a bar, as a page header */
     /* SyntHack: the keys, spelled out, one pair a row */
     WAVE_TEXT(ctx,(void *)0x443db210u,1,8,0,"%s",sam_trimmed?"YES: SAVE":"YES: TRIM");
     WAVE_TEXT(ctx,(void *)0x443db210u,66,8,0,"%s","FUNC+YES: PLAY");
